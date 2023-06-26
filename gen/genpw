@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+pwgen 16 1 | perl -ane '{for $i (0..3) {print substr($_,$i*4,4) . ($i<3?"-":"\n")}  }'

@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+
+# The MIT License
+# Copyright (c) 2022 Adrian Tan <adrian_tan@nparks.gov.sg>
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the 'Software'), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+# THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
+import click
+import subprocess
+
+
+@click.command()
+def main():
+    """
+    Check REFSEQ and GENBANK database versions
+
+    e.g. dbver
+    """
+    print("querying current genbank release: ", end="", flush=True)
+    genbank_release_number = subprocess.run(
+        ["curl", f"https://ftp.ncbi.nlm.nih.gov/genbank/GB_Release_Number"],
+        text=True,
+        capture_output=True,
+    ).stdout.rstrip()
+    print(f"{genbank_release_number}")
+    print("querying current refseq release: ", end="", flush=True)
+    refseq_release_number = subprocess.run(
+        ["curl", f"https://ftp.ncbi.nlm.nih.gov/refseq/release/RELEASE_NUMBER"],
+        text=True,
+        capture_output=True,
+    ).stdout.rstrip()
+    print(f"{refseq_release_number}")
+
+    local_genbank_release_number = subprocess.run(
+        ["ls", f"/usr/local/ref/genbank/"], text=True, capture_output=True
+    ).stdout.rstrip()
+    local_genbank_release_number = local_genbank_release_number.replace("\n", " ")
+    print(f"local genbank releases: {local_genbank_release_number}")
+    local_refseq_release_number = subprocess.run(
+        ["ls", f"/usr/local/ref/refseq/"], text=True, capture_output=True
+    ).stdout.rstrip()
+    local_refseq_release_number = local_refseq_release_number.replace("\n", " ")
+    print(f"local refseq releases: {local_refseq_release_number}")
+
+
+if __name__ == "__main__":
+    main()
