@@ -39,9 +39,9 @@ import click
 )
 def main(make_file, working_dir):
     """
-    African Swine Fever Virus Assembly
+    African Swine Fever Virus Denovi Assembly evaluation
 
-    e.g. generate_asfv_bulan_analysis.py
+    e.g. generate_asfv_denove_assembly_analysis.py
     """
     print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
     print("\t{0:<20} :   {1:<10}".format("working_dir", working_dir))
@@ -88,163 +88,13 @@ def main(make_file, working_dir):
     ###############
     # sequence file
     ###############
-    fastq_files = [
-        "M230446_ASFV_pig1_kidney",
-        "M230446_ASFV_pig1_lymph1",
-        "M230446_ASFV_pig1_lymph2",
-        "M230446_ASFV_pig2_spleen",
-        "M230446_ASFV_pig2_lymph1",
-        "M230446_ASFV_pig2_lymph2",
-        "unclassified",
-    ]
+    wb1_dir = "/home/atks/analysis/20230522_asfv_ilm51/M230255_wildboar"
+    bulan_pig46_2_dir = "/home/atks/analysis//20230522_asfv_ilm51/M230446_pig2"
+    bulan_pig48_4_dir = "/home/atks/analysis//20230522_asfv_ilm51/M230448_pig4"
 
-    pig1_fastq1_files = ""
-    pig1_fastq2_files = ""
-    pig2_fastq1_files = ""
-    pig2_fastq2_files = ""
+    # extract paired sequences from original fastq file based on a bam file
 
-    samples = []
-    for i, root_name in enumerate(fastq_files):
-        id = i + 1
-        tech = "ilm"
-        name = f"50_{id}_{root_name}"
-        fastq1 = f"/net/singapura/var/hts/ilm50/50_{id}_{root_name}_R1.fastq.gz"
-        fastq2 = f"/net/singapura/var/hts/ilm50/50_{id}_{root_name}_R2.fastq.gz"
-        samples.append(Sample(id, name, tech, fastq1, fastq2, "", ""))
-
-        if "pig1" in root_name:
-            pig1_fastq1_files += f" {fastq1}"
-            pig1_fastq2_files += f" {fastq2}"
-        elif "pig2" in root_name:
-            pig2_fastq1_files += f" {fastq1}"
-            pig2_fastq2_files += f" {fastq2}"
-
-    # generate aggregate fastq files for pig1 and pig2 and combo pig
-    input_fastq_files = pig1_fastq1_files
-    output_fastq_file = f"{fastq_dir}/pig1_R1.fastq.gz"
-    fastq1 = output_fastq_file
-    fastq1_OK = f"{fastq1}.OK"
-    dep = ""
-    tgt = f"{output_fastq_file}.OK"
-    cmd = f"zcat {input_fastq_files} | gzip > {output_fastq_file}"
-    pg.add(tgt, dep, cmd)
-
-    input_fastq_files = pig1_fastq2_files
-    output_fastq_file = f"{fastq_dir}/pig1_R2.fastq.gz"
-    fastq2 = output_fastq_file
-    fastq2_OK = f"{fastq1}.OK"
-    dep = ""
-    tgt = f"{output_fastq_file}.OK"
-    cmd = f"zcat {input_fastq_files} | gzip > {output_fastq_file}"
-    pg.add(tgt, dep, cmd)
-
-    samples.append(Sample(8, "pig1", "ilm", fastq1, fastq2, fastq1_OK, fastq2_OK))
-
-    # generate aggregate fastq files for pig2
-    input_fastq_files = pig2_fastq1_files
-    output_fastq_file = f"{fastq_dir}/pig2_R1.fastq.gz"
-    fastq1 = output_fastq_file
-    fastq1_OK = f"{fastq1}.OK"
-    dep = ""
-    tgt = f"{output_fastq_file}.OK"
-    cmd = f"zcat {input_fastq_files} | gzip > {output_fastq_file}"
-    pg.add(tgt, dep, cmd)
-
-    input_fastq_files = pig2_fastq2_files
-    output_fastq_file = f"{fastq_dir}/pig2_R2.fastq.gz"
-    fastq2 = output_fastq_file
-    fastq2_OK = f"{fastq1}.OK"
-    dep = ""
-    tgt = f"{output_fastq_file}.OK"
-    cmd = f"zcat {input_fastq_files} | gzip > {output_fastq_file}"
-    pg.add(tgt, dep, cmd)
-
-    samples.append(Sample(9, "pig2", "ilm", fastq1, fastq2, fastq1_OK, fastq2_OK))
-
-    # generate aggregate fastq files for combo pig
-    input_fastq_files = f"{pig1_fastq1_files} {pig2_fastq1_files}"
-    output_fastq_file = f"{fastq_dir}/combo_pig_R1.fastq.gz"
-    fastq1 = output_fastq_file
-    fastq1_OK = f"{fastq1}.OK"
-    dep = ""
-    tgt = f"{output_fastq_file}.OK"
-    cmd = f"zcat {input_fastq_files} | gzip > {output_fastq_file}"
-    pg.add(tgt, dep, cmd)
-
-    input_fastq_files = f"{pig1_fastq2_files} {pig2_fastq2_files}"
-    output_fastq_file = f"{fastq_dir}/combo_pig_R2.fastq.gz"
-    fastq2 = output_fastq_file
-    fastq2_OK = f"{fastq1}.OK"
-    dep = ""
-    tgt = f"{output_fastq_file}.OK"
-    cmd = f"zcat {input_fastq_files} | gzip > {output_fastq_file}"
-    pg.add(tgt, dep, cmd)
-
-    samples.append(Sample(10, "combo_pig", "ilm", fastq1, fastq2, fastq1_OK, fastq2_OK))
-
-    #################
-    # align sequences
-    #################
-    # bwa index -a bwtsw NC_039223.1.fa
-    bwa_ref_fasta_file = f"{ref_dir}/FR682468.2.fasta"
-    ref_fasta_file = f"{ref_dir}/FR682468.2.fasta"
-
-    # bwa index
-    log = f"{ref_dir}/bwa_index.log"
-    err = f"{ref_dir}/bwa_index.err"
-    dep = f"{ref_fasta_file}.OK"
-    tgt = f"{ref_dir}/bwa_index.OK"
-    cmd = f"{bwa} index -a bwtsw {ref_fasta_file} > {log} 2> {err}"
-    pg.add(tgt, dep, cmd)
-
-    for sample in samples:
-        output_bam_file = f"{bam_dir}/{sample.name}.bam"
-        log = f"{output_bam_file}.log"
-        err = f"{output_bam_file}.log"
-        dep = f"{sample.fastq1_OK} {sample.fastq2_OK} {ref_dir}/bwa_index.OK"
-        tgt = f"{output_bam_file}.OK"
-        cmd = f"{bwa} mem -t 2 -M {bwa_ref_fasta_file} {sample.fastq1} {sample.fastq2} 2> {err}| {samtools} view -h -F 4 | {samtools} sort - | {samtools} view -o {output_bam_file} > {log} 2> {err}"
-        pg.add(tgt, dep, cmd)
-
-        input_bam_file = f"{bam_dir}/{sample.name}.bam"
-        dep = f"{input_bam_file}.OK"
-        tgt = f"{input_bam_file}.bai.OK"
-        cmd = f"{samtools} index {input_bam_file}"
-        pg.add(tgt, dep, cmd)
-
-        input_bam_file = f"{bam_dir}/{sample.name}.bam"
-        output_txt_file = f"{coverage_stats_dir}/{sample.name}.coverage.txt"
-        dep = f"{input_bam_file}.OK"
-        tgt = f"{output_txt_file}.OK"
-        cmd = f"{samtools} coverage {input_bam_file} > {output_txt_file}"
-        pg.add(tgt, dep, cmd)
-
-    #################################################
-    # generate consensus for pig1, pig2 and combo pig
-    #################################################
-    input_bam_file = f"{bam_dir}/pig1.bam"
-    output_fasta_file = f"{consensus_dir}/pig1.asfv.fasta"
-    log = f"{output_fasta_file}.log"
-    dep = f"{input_bam_file}.OK"
-    tgt = f"{output_fasta_file}.OK"
-    cmd = f'{samtools} consensus {input_bam_file} | {seqkit} replace -p "^.+$\\" -r CAVS_ASFV_PIG1 > {output_fasta_file} 2> {log}'
-    pg.add(tgt, dep, cmd)
-
-    input_bam_file = f"{bam_dir}/pig2.bam"
-    output_fasta_file = f"{consensus_dir}/pig2.asfv.fasta"
-    log = f"{output_fasta_file}.log"
-    dep = f"{input_bam_file}.OK"
-    tgt = f"{output_fasta_file}.OK"
-    cmd = f'{samtools} consensus {input_bam_file} | {seqkit} replace -p "^.+$\\" -r CAVS_ASFV_PIG2 > {output_fasta_file} 2> {log}'
-    pg.add(tgt, dep, cmd)
-
-    input_bam_file = f"{bam_dir}/combo_pig.bam"
-    output_fasta_file = f"{consensus_dir}/combo_pig.asfv.fasta"
-    log = f"{output_fasta_file}.log"
-    dep = f"{input_bam_file}.OK"
-    tgt = f"{output_fasta_file}.OK"
-    cmd = f'{samtools} consensus {input_bam_file} | {seqkit} replace -p "^.+$\\" -r CAVS_ASFV_COMBO_PIG > {output_fasta_file} 2> {log}'
-    pg.add(tgt, dep, cmd)
+    # denovo assembly
 
     # clean
     pg.add_clean(f"rm -fr {ref_dir} {fastq_dir} {fasta_dir} {bam_dir} {stats_dir} ")
