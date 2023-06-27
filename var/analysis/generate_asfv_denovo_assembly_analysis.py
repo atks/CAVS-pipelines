@@ -27,7 +27,7 @@ import click
     "-m",
     "--make_file",
     show_default=True,
-    default="run_asfv_bulan_analysis.mk",
+    default="run_asfv_denovo_assembly_analysis.mk",
     help="make file name",
 )
 @click.option(
@@ -54,36 +54,18 @@ def main(make_file, working_dir):
     samtools = "/usr/local/samtools-1.17/bin/samtools"
     bwa = "/usr/local/bwa-0.7.17/bwa"
     seqkit = "/usr/local/seqkit-2.1.0/bin/seqkit"
+    extract_aligned_reads = "/home/atks/programs/cavspipes/var/extract_aligned_reads.py"
+    trinity = "/usr/local/trinityrnaseq-v2.15.1/Trinity"
 
     # create directories in destination folder directory
-    ref_dir = f"{working_dir}/ref"
     fastq_dir = f"{working_dir}/fastq"
-    fasta_dir = f"{working_dir}/fasta"
-    bam_dir = f"{working_dir}/bam"
-    consensus_dir = f"{working_dir}/consensus"
-    stats_dir = f"{working_dir}/stats"
-    coverage_stats_dir = f"{working_dir}/stats/coverage"
+    assembly_dir = f"{working_dir}/assembly"
 
     try:
-        os.makedirs(ref_dir, exist_ok=True)
         os.makedirs(fastq_dir, exist_ok=True)
-        os.makedirs(fasta_dir, exist_ok=True)
-        os.makedirs(bam_dir, exist_ok=True)
-        os.makedirs(consensus_dir, exist_ok=True)
-        os.makedirs(stats_dir, exist_ok=True)
-        os.makedirs(coverage_stats_dir, exist_ok=True)
+        os.makedirs(assembly_dir, exist_ok=True)
     except OSError as error:
         print(f"Directory cannot be created")
-
-    #################
-    # reference files
-    #################
-    id = "FR682468.2"
-    output_fasta_file = f"{ref_dir}/{id}.fasta"
-    dep = ""
-    tgt = f"{output_fasta_file }.OK"
-    cmd = f"{efetch} -db nuccore -id {id} -format fasta > {output_fasta_file}"
-    pg.add(tgt, dep, cmd)
 
     ###############
     # sequence file
@@ -92,12 +74,35 @@ def main(make_file, working_dir):
     bulan_pig46_2_dir = "/home/atks/analysis//20230522_asfv_ilm51/M230446_pig2"
     bulan_pig48_4_dir = "/home/atks/analysis//20230522_asfv_ilm51/M230448_pig4"
 
-    # extract paired sequences from original fastq file based on a bam file
+    input_dirs = [wb1_dir, bulan_pig46_2_dir, bulan_pig48_4_dir]
+    names = ["wb1", "bulan_pig46_2", "bulan_pig48_4"]
+    for idx, dir in enumerate(input_dirs):
+        # extract paired sequences from original fastq file based on a bam file
+        input_bam_file = f"{dir}/bam/ilm.bam"
+        input_fastq_file1 = f"{dir}/fastq/ilm.r1.fastq.gz"
+        input_fastq_file2 = f"{dir}/fastq/ilm.r2.fastq.gz"
+        output_fastq_root = f"{fastq_dir}/{names[idx]}"
+        dep = ""
+        tgt = f"{fastq_dir}/{names[idx]}.fastq.gz.OK"
+        cmd = f"{extract_aligned_reads} -b {input_bam_file} -1 {input_fastq_file1} -2 {input_fastq_file2} -o {output_fastq_root}"
+        pg.add(tgt, dep, cmd)
 
-    # denovo assembly
+        # denovo assembly
+        input_fastq_file1 = f"{fastq_dir}/{names[idx]}_r1.fastq.gz"
+        input_fastq_file2 = f"{fastq_dir}/{names[idx]}_r2.fastq.gz"
+        output_trinity_dir = f"{assembly_dir}/trinity_{names[idx]}"
+        dep = ""
+        tgt = f"{assembly_dir}/{names[idx]}.assembly.OK"
+        log = f"{assembly_dir}/{names[idx]}.assembly.log"
+        cmd = f"{trinity} --seqType fq --left {input_fastq_file1} --right {input_fastq_file2} --CPU 2 --max_memory 40G --output {output_trinity_dir} > {log}"
+        pg.add(tgt, dep, cmd)
+
+        # down sample reads
+        # seqtk sample
+        # 10K,20K,30K,40K,30K
 
     # clean
-    pg.add_clean(f"rm -fr {ref_dir} {fastq_dir} {fasta_dir} {bam_dir} {stats_dir} ")
+    pg.add_clean(f"rm -fr  {fastq_dir} ")
 
     # write make file
     print("Writing pipeline")

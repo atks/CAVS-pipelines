@@ -26,9 +26,9 @@ import subprocess
 
 @click.command()
 @click.option(
-    "-w",
-    "--output_dir",
-    default=os.path.join(os.getcwd(), "align_consensus"),
+    "-o",
+    "--output_fastq_root",
+    required=True,
     show_default=True,
     help="output directory",
 )
@@ -64,7 +64,6 @@ def main(
 
     e.g. extract_aligned_reads -b aligned.bam -1 r1.fastq.gz -2 r2.fastq.gz -o extracted_aligned_reads
     """
-    illumina = len(input_ilm_read1_fastq_files) != 0
 
     # programs
     samtools = "/usr/local/samtools-1.17/bin/samtools"
@@ -80,13 +79,13 @@ def main(
     # extract files from fastq files
     output_fastq_file1 = f"{output_fastq_root}_r1.fastq.gz"
     cmd = f"{seqtk} subseq {input_ilm_read1_fastq_file} {output_id_txt_file} | gzip > {output_fastq_file1}"
-    tgt = f"{output_fastq_file}.OK"
+    tgt = f"{output_fastq_file1}.OK"
     desc = f"Extract R1 fastq reads"
     run(cmd, tgt, desc)
 
     output_fastq_file2 = f"{output_fastq_root}_r2.fastq.gz"
     cmd = f"{seqtk} subseq {input_ilm_read2_fastq_file} {output_id_txt_file} | gzip > {output_fastq_file2}"
-    tgt = f"{output_fastq_file}.OK"
+    tgt = f"{output_fastq_file2}.OK"
     desc = f"Extract R2 fastq reads"
     run(cmd, tgt, desc)
 
