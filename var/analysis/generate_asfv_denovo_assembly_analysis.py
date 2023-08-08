@@ -56,6 +56,7 @@ def main(make_file, working_dir):
     seqkit = "/usr/local/seqkit-2.1.0/bin/seqkit"
     extract_aligned_reads = "/home/atks/programs/cavspipes/var/extract_aligned_reads.py"
     trinity = "/usr/local/trinityrnaseq-v2.15.1/Trinity"
+    spades = "/usr/local/SPAdes-3.15.5/bin/spades.py"
 
     # create directories in destination folder directory
     fastq_dir = f"{working_dir}/fastq"
@@ -71,8 +72,8 @@ def main(make_file, working_dir):
     # sequence file
     ###############
     wb1_dir = "/home/atks/analysis/20230522_asfv_ilm51/M230255_wildboar"
-    bulan_pig46_2_dir = "/home/atks/analysis//20230522_asfv_ilm51/M230446_pig2"
-    bulan_pig48_4_dir = "/home/atks/analysis//20230522_asfv_ilm51/M230448_pig4"
+    bulan_pig46_2_dir = "/home/atks/analysis/20230522_asfv_ilm51/M230446_pig2"
+    bulan_pig48_4_dir = "/home/atks/analysis/20230522_asfv_ilm51/M230448_pig4"
 
     input_dirs = [wb1_dir, bulan_pig46_2_dir, bulan_pig48_4_dir]
     names = ["wb1", "bulan_pig46_2", "bulan_pig48_4"]
@@ -87,7 +88,7 @@ def main(make_file, working_dir):
         cmd = f"{extract_aligned_reads} -b {input_bam_file} -1 {input_fastq_file1} -2 {input_fastq_file2} -o {output_fastq_root}"
         pg.add(tgt, dep, cmd)
 
-        # denovo assembly
+        # trinity denovo assembly
         input_fastq_file1 = f"{fastq_dir}/{names[idx]}_r1.fastq.gz"
         input_fastq_file2 = f"{fastq_dir}/{names[idx]}_r2.fastq.gz"
         output_trinity_dir = f"{assembly_dir}/trinity_{names[idx]}"
@@ -95,6 +96,16 @@ def main(make_file, working_dir):
         tgt = f"{assembly_dir}/{names[idx]}.assembly.OK"
         log = f"{assembly_dir}/{names[idx]}.assembly.log"
         cmd = f"{trinity} --seqType fq --left {input_fastq_file1} --right {input_fastq_file2} --CPU 2 --max_memory 40G --output {output_trinity_dir} > {log}"
+        pg.add(tgt, dep, cmd)
+
+        # spades denovo assembly
+        input_fastq_file1 = f"{fastq_dir}/{names[idx]}_r1.fastq.gz"
+        input_fastq_file2 = f"{fastq_dir}/{names[idx]}_r2.fastq.gz"
+        output_trinity_dir = f"{assembly_dir}/trinity_{names[idx]}"
+        dep = ""
+        tgt = f"{assembly_dir}/{names[idx]}.assembly.OK"
+        log = f"{assembly_dir}/{names[idx]}.assembly.log"
+        cmd = f"{spades} --seqType fq --left {input_fastq_file1} --right {input_fastq_file2} --CPU 2 --max_memory 40G --output {output_trinity_dir} > {log}"
         pg.add(tgt, dep, cmd)
 
         # down sample reads
