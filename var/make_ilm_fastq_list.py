@@ -59,6 +59,7 @@ def main(ilm_dir):
     temp = samples.pop(0)
     samples.append(temp)
 
+    print(f"#sample-id\tfastq1\tfastq2")
     for id, name in enumerate(samples):
         print(f"{id+1}\t{name}_R1_001.fastq.gz\t{name}_R2_001.fastq.gz")
 
