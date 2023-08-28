@@ -63,7 +63,7 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
     except OSError as error:
         print(f"Directory cannot be created")
 
-    align_and_consensus = "/home/atks/programs/cavs/var/align_and_consensus.py"
+    align_and_consensus = "/home/atks/programs/cavspipes/var/align_and_consensus.py"
 
     # initialize
     pg = PipelineGenerator(make_file)
