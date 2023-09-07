@@ -63,7 +63,7 @@ def main(make_file, sequence_id_file, download_type, output_dir):
 
     ext = "fasta"
     if download_type == "genbank":
-        ext = "seq"
+        ext = "genbank"
 
     release_number = subprocess.run(
         ["curl", f"https://ftp.ncbi.nlm.nih.gov/genbank/GB_Release_Number"],
