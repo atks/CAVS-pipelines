@@ -45,9 +45,9 @@ from shutil import rmtree
 )
 def main(src_dir, dst_dir):
     """
-    Looks for all .ab1 and .seq files in source directory and copies it to destination directory
-
-    e.g. copy_sanger_sequences
+    Extract sanger sequences from mbox files from gmail.
+    
+    e.g. downloads all the files. 
     """
 
     ab1_files = dict()
