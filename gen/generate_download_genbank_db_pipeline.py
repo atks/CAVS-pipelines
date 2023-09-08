@@ -162,7 +162,7 @@ def main(make_file, database, output_directory):
         pg.add(tgt, dep, cmd)
 
         # convert to fasta
-        gb2fasta = "/home/atks/programs/cavs/gen/gb2fasta"
+        gb2fasta = "/home/atks/programs/cavspipes/gen/gb2fasta"
         input_genbank_file = f"{output_dir}/{file_name}"
         output_fasta_file = f"{output_dir}/{file_core}.fasta.gz"
         log = f"{output_fasta_file}.err"
