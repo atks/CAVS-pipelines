@@ -26,11 +26,18 @@ import subprocess
 
 @click.command()
 @click.option(
-    "-o",
-    "--output_fastq_root",
+    "-d",
+    "--output_fastq_dir",
     required=True,
     show_default=True,
-    help="output directory",
+    help="output fastq directory",
+)
+@click.option(
+    "-o",
+    "--output_fastq_root_name",
+    required=True,
+    show_default=True,
+    help="output fastq root name",
 )
 @click.option(
     "-b",
@@ -57,7 +64,7 @@ def main(
     input_bam_file,
     input_ilm_read1_fastq_file,
     input_ilm_read2_fastq_file,
-    output_fastq_root,
+    output_fastq_dir,
 ):
     """
     Extracted aligned reads from a bam file and extracts from fastq file.
@@ -77,13 +84,13 @@ def main(
     run(cmd, tgt, desc)
 
     # extract files from fastq files
-    output_fastq_file1 = f"{output_fastq_root}_r1.fastq.gz"
+    output_fastq_file1 = f"{output_fastq_dir}/{output_fastq_root_name}_r1.fastq.gz"
     cmd = f"{seqtk} subseq {input_ilm_read1_fastq_file} {output_id_txt_file} | gzip > {output_fastq_file1}"
     tgt = f"{output_fastq_file1}.OK"
     desc = f"Extract R1 fastq reads"
     run(cmd, tgt, desc)
 
-    output_fastq_file2 = f"{output_fastq_root}_r2.fastq.gz"
+    output_fastq_file1 = f"{output_fastq_dir}/{output_fastq_root_name}_r2.fastq.gz"
     cmd = f"{seqtk} subseq {input_ilm_read2_fastq_file} {output_id_txt_file} | gzip > {output_fastq_file2}"
     tgt = f"{output_fastq_file2}.OK"
     desc = f"Extract R2 fastq reads"
