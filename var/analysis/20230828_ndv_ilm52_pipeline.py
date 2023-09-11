@@ -99,10 +99,10 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
         "F230820_frc1",
     ]
 
-    for id in high_coverage_samples:
-        # extract viral reads
+    # for id in high_coverage_samples:
+    # extract viral reads
 
-        # assemble virus genome
+    # assemble virus genome
 
     # write make file
     print("Writing pipeline")
