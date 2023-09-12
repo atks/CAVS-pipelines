@@ -69,7 +69,7 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
     # initialize
     pg = PipelineGenerator(make_file)
 
-    # inedx reference
+    # index reference
     dep = ""
     tgt = f"{log_dir}/ref.OK"
     cmd = f"{index_bwa_minimap2} -r {reference_fasta_file}"
@@ -113,10 +113,20 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
         "23_F230820_frc1",
     ]
 
-    # for id in high_coverage_samples:
-    # extract viral reads
+    seq_tech = ["ilm_ont" * 3, "ilm" * 11]
 
-    # assemble virus genome
+    extract_gene = "/home/atks/programs/cavspipes/var/extract_gene.py"
+    fusion_gene_fasta = f"{working_dir}/ref/AF077761_II_fusion.fasta"
+    for i, id in enumerate(high_coverage_samples):
+        # extract fusion gene from consensus sequence
+        consensus_fasta_file = f"{working_dir}/{id}/consensus/{id}.fasta"
+        extracted_gene_header = id
+        dep = f"{log_dir}/{id}.OK"
+        tgt = f"{log_dir}/{id}_extracted_gene.OK"
+        log = f"{log_dir}/{id}_extracted_gene.log"
+        err = f"{log_dir}/{id}_extracted_gene.err"
+        cmd = f"{extract_gene} -g {fusion_gene_fasta} -r {consensus_fasta_file} -w {working_dir}/{id} -h {extracted_gene_header} > {log} 2> {err}"
+        pg.add(tgt, dep, cmd)
 
     # write make file
     print("Writing pipeline")

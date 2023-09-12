@@ -34,11 +34,11 @@ import re
     help="working directory",
 )
 @click.option(
-    "-g",
-    "--gene_fasta_file",
+    "-f",
+    "--fasta_file",
     required=True,
     show_default=True,
-    help="gene fasta file",
+    help="sequence panel fasta file",
 )
 @click.option(
     "-r",
@@ -47,60 +47,24 @@ import re
     show_default=True,
     help="reference fasta file",
 )
-@click.option(
-    "-h",
-    "--extracted_gene_fasta_header",
-    required=False,
-    default="gene",
-    show_default=True,
-    help="extracted gene FASTA header",
-)
-def main(
-    working_dir, gene_fasta_file, reference_fasta_file, extracted_gene_fasta_header
-):
+def main(working_dir, sequence_panel_fasta_file):
     """
-    Extracts gene from a reference sequence file based on a gene sequence
+    Generates a phylogenetic tree from a panel of sequences and reference sequences
 
-    e.g. extract_gene -g gene.fasta -r ref.fasta
+    e.g. make_phylogenetic_tree.py -s ndv.fasta -r ndv_ref.fasta
     """
-
-    # read reference sequences
-    seq = ""
-    with open(reference_fasta_file, "r") as file:
-        for line in file:
-            if line.startswith(">"):
-                pass
-            else:
-                seq += line.rstrip()
-
-    # read gene sequence
-    gene = ""
-    with open(gene_fasta_file, "r") as file:
-        for line in file:
-            if line.startswith(">"):
-                pass
-            else:
-                gene += line.rstrip()
-
-    # reverse_complement
-    gene_fwd = gene.upper()
-    gene_rev = (
-        gene[::-1]
-        .replace("A", "t")
-        .replace("T", "a")
-        .replace("G", "c")
-        .replace("C", "g")
-        .upper()
-    )
 
     # create working directory
-    output_dir = f"{working_dir}/extract_gene_output"
+    output_dir = f"{working_dir}/phylo"
     try:
         os.makedirs(output_dir, exist_ok=True)
     except OSError as error:
         print(f"Directory cannot be created")
 
-    # write out to separate files
+    # mafft ndv_classII.fasta > ndv_classII.msa.fasta
+    # raxml-ng  --msa ndv_classII.msa.fasta --model GTR+G --prefix  ndv_classII --bootstrap > phylo.log
+    # raxml-ng --consense MRE --tree alltrees.nw --prefix consMRE
+    # combine sequence files
     output_fasta_file = f"{output_dir}/gene_fwd.fasta"
     cmd = f"echo '>gene_fwd\n{gene_fwd}' > {output_fasta_file}"
     tgt = f"{output_fasta_file}.OK"
@@ -121,13 +85,6 @@ def main(
     cmd = f"{water} {input_fasta_file} {reference_fasta_file} {alignment_file} -gapopen 10 -gapextend 0.5"
     tgt = f"{alignment_file}.OK"
     desc = f"Align forward gene to reference"
-    run(cmd, tgt, desc)
-
-    input_fasta_file = f"{output_dir}/gene_rev.fasta"
-    alignment_file = f"{output_dir}/gene_rev_ref.water"
-    cmd = f"{water} {input_fasta_file} {reference_fasta_file} {alignment_file} -gapopen 10 -gapextend 0.5"
-    tgt = f"{alignment_file}.OK"
-    desc = f"Align reverse gene to reference"
     run(cmd, tgt, desc)
 
     # examine alignments
