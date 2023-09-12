@@ -64,6 +64,12 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
         print(f"Directory cannot be created")
 
     align_and_consensus = "/home/atks/programs/cavspipes/var/align_and_consensus.py"
+    index_bwa_minimap2 = "/home/atks/programs/cavspipes/var/index_bwa_minimap2.py"
+
+    dep = ""
+    tgt = f"{log_dir}/ref.OK"
+    cmd = f"{index_bwa_minimap2} -r {reference_fasta_file}"
+    pg.add(tgt, dep, cmd)
 
     # initialize
     pg = PipelineGenerator(make_file)
@@ -73,7 +79,7 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
             if not line.startswith("#"):
                 id, ilm_fastq1, ilm_fastq2, ont_fastq = line.rstrip().split("\t")
                 output_dir = f"{working_dir}/{id}"
-                dep = ""
+                dep = f"{log_dir}/ref.OK"
                 tgt = f"{log_dir}/{id}.OK"
                 log = f"{log_dir}/{id}.log"
                 err = f"{log_dir}/{id}.err"
