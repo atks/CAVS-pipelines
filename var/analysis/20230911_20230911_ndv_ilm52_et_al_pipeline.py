@@ -97,13 +97,20 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
     # output
 
     high_coverage_samples = [
-        "F230815_dead_rooster_tracheal1",
-        "F230815_pts_chicken_tracheal2to4",
-        "F230816_pts_hen_cloacal",
-        "F230817_dead_chicken_organA",
-        "F230817_pts_chicken_organA",
-        "F230820_frc2and3",
-        "F230820_frc1",
+        "1_F220223_tracheal",
+        "2_F220228_house34_tracheal",
+        "3_F220238_house5_tracheal",
+        "7_F220318_house8_tracheal",
+        "10_F220144_tracheal",
+        "11_F2203111_tracheal",
+        "12_F220945_house8_tracheal",
+        "16_F230815_dead_rooster_tracheal1",
+        "17_F230815_pts_chicken_tracheal2to4",
+        "19_F230816_pts_hen_cloacal",
+        "20_F230817_dead_chicken_organA",
+        "21_F230817_pts_chicken_organA",
+        "22_F230820_frc2and3",
+        "23_F230820_frc1",
     ]
 
     # for id in high_coverage_samples:
