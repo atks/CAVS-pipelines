@@ -97,7 +97,14 @@ def main(
     print("\t{0:<20} :   {1:<10}".format("dest_dir", dest_dir))
     print("\t{0:<20} :   {1:<10}".format("fastq_path", fastq_path))
 
+    # version
+    version = "20231004_ont_deploy_and_qc_dorado_10.4.1_pipeline"
+
     # programs
+    dorado = "/usr/local/dorado-0.3.4/bin/dorado"
+    dorado_basecall_model = (
+        "/usr/local/dorado-0.3.4/models/dna_r10.4.1_e8.2_400bps_sup@v4.2.0"
+    )
     guppy_base_caller = "/usr/local/ont-guppy-6.5.7/bin/guppy_basecaller"
     guppy_barcoder = "/usr/local/ont-guppy-6.5.7/bin/guppy_barcoder"
     fastqc = f"/usr/local/FastQC-0.12.1/fastqc --adapters /usr/local/FastQC-0.12.1/Configuration/adapter_list.nanopore.txt --memory {memory}"
@@ -151,6 +158,8 @@ def main(
     pg = PipelineGenerator(make_file)
 
     # base call
+    # dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ > calls.bam
+    # dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ > calls.bam
     # guppy_basecaller -i {input_dir} -r -s {output_dir} --flowcell FLO-MIN106  --kit SQK-LSK109 --min_qscore 8 -x auto --compress_fastq
     output_dir = f"{working_dir}/fastq/"
     log = f"{log_dir}/guppy_base_caller.log"
