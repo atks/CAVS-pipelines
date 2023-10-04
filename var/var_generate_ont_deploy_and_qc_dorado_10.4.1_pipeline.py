@@ -47,17 +47,7 @@ import sys
     "-l", "--len", help="Minimum passing read length", required=False, default=20
 )
 @click.option("-x", "--memory", help="Memory for fastqc", required=False, default=2048)
-@click.option(
-    "-f", "--flowcell", help="Flow cell ID", required=False, default="FLO-MIN106"
-)
-@click.option("-k", "--kit", default="SQK-LSK109", show_default=True, help="Kit ID")
-@click.option(
-    "-b",
-    "--barcode_kit",
-    default="EXP-NBD104",
-    show_default=True,
-    help="Barcode Kit ID",
-)
+@click.option("-k", "--kit", default="SQK-NBD114.24", show_default=True, help="Kit ID")
 @click.option("-s", "--sample_file", required=True, help="sample file")
 def main(
     make_file,
@@ -67,9 +57,7 @@ def main(
     qscore,
     len,
     memory,
-    flowcell,
     kit,
-    barcode_kit,
     sample_file,
 ):
     """
@@ -90,9 +78,7 @@ def main(
     print("\t{0:<20} :   {1:<10}".format("minumum qscore", qscore))
     print("\t{0:<20} :   {1:<10}".format("minumum length", len))
     print("\t{0:<20} :   {1:<10}".format("memory", memory))
-    print("\t{0:<20} :   {1:<10}".format("flowcell", flowcell))
     print("\t{0:<20} :   {1:<10}".format("kit", kit))
-    print("\t{0:<20} :   {1:<10}".format("barcode_kit", barcode_kit))
     print("\t{0:<20} :   {1:<10}".format("sample_file", sample_file))
     print("\t{0:<20} :   {1:<10}".format("dest_dir", dest_dir))
     print("\t{0:<20} :   {1:<10}".format("fastq_path", fastq_path))
@@ -100,13 +86,17 @@ def main(
     # version
     version = "20231004_ont_deploy_and_qc_dorado_10.4.1_pipeline"
 
+    barcode_kit = ""
+    dorado_basecall_model = ""
+    if kit == "SQK-NBD114.24":
+        barcode_kit = "EXP-NBD104 EXP-NBD114"
+        dorado_basecall_model = (
+            "/usr/local/dorado-0.3.4/models/dna_r10.4.1_e8.2_400bps_sup@v4.2.0"
+        )
     # programs
-    dorado = "/usr/local/dorado-0.3.4/bin/dorado"
-    dorado_basecall_model = (
-        "/usr/local/dorado-0.3.4/models/dna_r10.4.1_e8.2_400bps_sup@v4.2.0"
-    )
-    guppy_base_caller = "/usr/local/ont-guppy-6.5.7/bin/guppy_basecaller"
+    dorado_basecaller = "/usr/local/dorado-0.3.4/bin/dorado basecaller"
     guppy_barcoder = "/usr/local/ont-guppy-6.5.7/bin/guppy_barcoder"
+    samtools = "/usr/local/samtools-1.17/bin/samtools"
     fastqc = f"/usr/local/FastQC-0.12.1/fastqc --adapters /usr/local/FastQC-0.12.1/Configuration/adapter_list.nanopore.txt --memory {memory}"
     multiqc = "/usr/local/bin/multiqc"
     nanoplot = "/usr/local/bin/NanoPlot"
@@ -128,6 +118,8 @@ def main(
     analysis_dir = f"{dest_dir}/analysis"
     aux_dir = f"{working_dir}/aux"
     log_dir = f"{working_dir}/log"
+    bam_dir = f"{working_dir}/bam"
+    fastq_dir = f"{working_dir}/fastq"
     untrimmed_dir = f"{dest_dir}/raw/untrimmed_fastq"
     trimmed_dir = f"{dest_dir}/raw/trimmed_fastq"
     new_dir = ""
@@ -137,6 +129,10 @@ def main(
         new_dir = log_dir
         os.makedirs(new_dir, exist_ok=True)
         new_dir = aux_dir
+        os.makedirs(new_dir, exist_ok=True)
+        new_dir = bam_dir
+        os.makedirs(new_dir, exist_ok=True)
+        new_dir = fastq_dir
         os.makedirs(new_dir, exist_ok=True)
         new_dir = trimmed_dir
         os.makedirs(new_dir, exist_ok=True)
@@ -159,34 +155,42 @@ def main(
 
     # base call
     # dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ > calls.bam
-    # dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ > calls.bam
-    # guppy_basecaller -i {input_dir} -r -s {output_dir} --flowcell FLO-MIN106  --kit SQK-LSK109 --min_qscore 8 -x auto --compress_fastq
-    output_dir = f"{working_dir}/fastq/"
-    log = f"{log_dir}/guppy_base_caller.log"
-    err = f"{log_dir}/guppy_base_caller.err"
-    tgt = f"{log_dir}/guppy_base_caller.OK"
+    output_bam_file = f"{working_dir}/bam/basecalls.bam"
+    pod5_files_dir = nanopore_dir
+    log = f"{log_dir}/dorado_base_caller.log"
+    err = f"{log_dir}/dorado_base_caller.err"
+    tgt = f"{log_dir}/dorado_base_caller.OK"
     dep = ""
-    cmd = f'{guppy_base_caller} -i "{nanopore_dir}" -r -s {output_dir} --flowcell {flowcell}  --kit {kit} --min_qscore 0 -x auto --compress_fastq > {log} 2> {err}'
+    cmd = f"{dorado_basecaller} -r {dorado_basecall_model} {pod5_files_dir} > {output_bam_file} 2> {log}"
+    pg.add(tgt, dep, cmd)
+
+    # convert bam to fastq
+    # dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ > calls.bam
+    input_bam_file = f"{working_dir}/bam/basecalls.bam"
+    output_fastq_file = f"{working_dir}/fastq/basecalls.fastq"
+    tgt = f"{log_dir}/dorado_basecalled_fastq.OK"
+    dep = f"{log_dir}/dorado_base_caller.OK"
+    cmd = f"{samtools} bam2fq {input_bam_file} > {output_fastq_file}"
     pg.add(tgt, dep, cmd)
 
     # demux
     # guppy_barcoder -i {input_dir} -r -s {output_dir} --barcode_kits EXP-NBD104 -t 12 --compress_fastq
-    input_dir = f"{working_dir}/fastq/pass"
+    input_dir = f"{working_dir}/fastq"
     output_dir = f"{working_dir}/demux/untrimmed"
     log = f"{log_dir}/demux.untrimmed.log"
     err = f"{log_dir}/demux.untrimmed.err"
-    dep = f"{log_dir}/guppy_base_caller.OK"
+    dep = f"{log_dir}/dorado_basecalled_fastq.OK"
     tgt = f"{log_dir}/demux.untrimmed.OK"
     cmd = f'{guppy_barcoder} -i "{input_dir}" -r -s {output_dir} --barcode_kits "{barcode_kit}" --compress_fastq -t 12 > {log} 2> {err}'
     pg.add(tgt, dep, cmd)
 
     # demux
     # guppy_barcoder -i {input_dir} -r -s {output_dir} --barcode_kits EXP-NBD104 -t 12 --compress_fastq --enable_trim_barcodes
-    input_dir = f"{working_dir}/fastq/pass"
+    input_dir = f"{working_dir}/fastq"
     output_dir = f"{working_dir}/demux/trimmed"
     log = f"{log_dir}/demux.trimmed.log"
     err = f"{log_dir}/demux.trimmed.err"
-    dep = f"{log_dir}/guppy_base_caller.OK"
+    dep = f"{log_dir}/dorado_basecalled_fastq.OK"
     tgt = f"{log_dir}/demux.trimmed.OK"
     cmd = f'{guppy_barcoder} -i "{input_dir}" -r -s {output_dir} --barcode_kits "{barcode_kit}" --compress_fastq -t 12 --enable_trim_barcodes > {log} 2> {err}'
     pg.add(tgt, dep, cmd)
