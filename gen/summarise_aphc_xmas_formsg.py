@@ -32,13 +32,11 @@ import math
     show_default=True,
     help="working directory",
 )
-@click.option("-p", "--phrase_file", required=True, help="CNY phrase file")
-@click.option("-o", "--latex_file", default="cny_bingo.tex", help="latex file")
 def main(working_dir, phrase_file, latex_file):
     """
     generate bingo cards
 
-    e.g. generate_bingo_cards.py
+    e.g. summarise_aphc_xmas_formsg.py
     """
     print("\t{0:<20} :   {1:<10}".format("working_dir", working_dir))
     print("\t{0:<20} :   {1:<10}".format("phrase_file", phrase_file))
