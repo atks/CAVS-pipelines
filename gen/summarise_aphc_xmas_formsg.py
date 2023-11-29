@@ -22,6 +22,7 @@ import os
 import click
 import random
 import math
+import sys
 
 
 @click.command()
@@ -32,14 +33,26 @@ def main(file_name):
 
     e.g. summarise_aphc_xmas_formsg.py
     """
-    print(f'processing "{file_name}"')
+    # print(f'processing "{file_name}"')
+
+    print(f"#giving\t#name\t#email\t#section\t#wish")
 
     # read phrase file
     phrases = []
     line_no = 0
     no_participating = 0
     no_skipping = 0
-    section_no = dict(car=0, cwr=0, var=0, vm=0, vfp=0, pqa=0, pbps=0, phla=0)
+    section_no = {
+        "CAR": 0,
+        "CWR": 0,
+        "VAR": 0,
+        "VM": 0,
+        "VFP": 0,
+        "PQA": 0,
+        "PBPS": 0,
+        "PHLA": 0,
+    }
+
     with open(file_name, "r") as file:
         for line in file:
             line_no += 1
@@ -49,27 +62,42 @@ def main(file_name):
                 tokens = line.split(",")
                 l = len(tokens)
                 attendance = tokens[4]
+                name = tokens[3]
+                section = tokens[-1]
                 if attendance == "Yes":
-                    wish = ",".join(tokens[5:-2])
-                    wish = wish.rstrip('"').lstrip('"')
-                    name = tokens[3]
-                    section = tokens[-1]
-                    section_no[section] += 1
-                    email = tokens[-2]
                     if not (
                         name == "Adrian" or (name == "Adrian Tan" and section == "PHLA")
                     ):
-                        print(f"{name}\t{email}\t{section}\t{wish}")
+                        wish = ",".join(tokens[5:-2])
+                        wish = wish.rstrip('"').lstrip('"')
+                        section_no[section] += 1
+                        email = tokens[-2]
+                        print(f"YES\t{name}\t{email}\t{section}\t{wish}")
                         no_participating += 1
                 else:
                     no_skipping += 1
+                    if name == "Ng Oi Wing":
+                        section = "VAR"
+                    if name == "Amy Chan":
+                        section = "VFP"
+                    print(f"NO\t{name}\tn/a\t{section}\tn/a")
 
-    print(f"Summary\n")
-    print(f"No respondants:   {no_participating+no_skipping}")
-    print(f"No participating: {no_participating}")
-    print(f"No skipping:      {no_skipping}")
+    # randomise assignments
 
-    print(f"car:      {section_no[car]}")
+    print(f"\n\n", file=sys.stderr)
+    print(f"Summary", file=sys.stderr)
+    print(f"No respondants:   {no_participating+no_skipping}", file=sys.stderr)
+    print(f"No participating: {no_participating}", file=sys.stderr)
+    print(f"No skipping:      {no_skipping}", file=sys.stderr)
+
+    print(f"car:      {section_no['CAR']}", file=sys.stderr)
+    print(f"cwr:      {section_no['CWR']}", file=sys.stderr)
+    print(f"var:      {section_no['VAR']}", file=sys.stderr)
+    print(f"vm:       {section_no['VM']}", file=sys.stderr)
+    print(f"vfp:      {section_no['VFP']}", file=sys.stderr)
+    print(f"pqa:      {section_no['PQA']}", file=sys.stderr)
+    print(f"pbps:     {section_no['PBPS']}", file=sys.stderr)
+    print(f"phla:     {section_no['PHLA']}", file=sys.stderr)
 
 
 if __name__ == "__main__":
