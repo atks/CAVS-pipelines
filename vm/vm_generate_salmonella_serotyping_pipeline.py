@@ -99,6 +99,9 @@ def main(make_file, output_dir, sample_file):
         cmd = f'{spades} -o {out_dir} --isolate -1 {sample.fastq1} -2 {sample.fastq2} > {log} 2> {err}'
         pg.add(tgt, dep, cmd)
 
+        # sequence typing
+        # mlst illu13/*/spades_assembly/contigs.fasta --json out.json
+
     # write make file
     print("Writing pipeline")
     pg.write()
