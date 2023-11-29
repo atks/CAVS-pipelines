@@ -102,6 +102,10 @@ def main(make_file, output_dir, sample_file):
         # sequence typing
         # mlst illu13/*/spades_assembly/contigs.fasta --json out.json
 
+        # serovar and antigen
+        # /usr/local/SeqSero2/bin/SeqSero2_package.py -t 2 -i /net/singapura/vm/hts/illu13/13_1_salmonella_23_1704_R1.fastq.gz  /net/singapura/vm/hts/illu13/13_1_salmonella_23_1704_R2.fastq.gz
+
+
     # write make file
     print("Writing pipeline")
     pg.write()
