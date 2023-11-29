@@ -23,33 +23,36 @@ import click
 import sys
 import re
 
-
 @click.command()
 @click.option(
     "-m",
     "--make_file",
     show_default=True,
-    default="amr_resfinder_plasmid_finder.mk",
+    default="run_salmonella_serotyping.mk",
     help="make file name",
 )
 @click.option(
-    "-w",
-    "--working_dir",
+    "-o",
+    "--output_dir",
     default=os.getcwd(),
     show_default=True,
     help="working directory",
 )
 @click.option("-s", "--sample_file", required=True, help="sample file")
-def main(make_file, working_dir, sample_file):
+def main(make_file, output_dir, sample_file):
     """
-    Runs resFinder and plasmidFinder on isolate sequences
+    Generates assemblies and run raw reads on
+        a. seroseq
+        b. seroseq2
+        c. SISTR
+        d. MOST
 
-    e.g. vm_generate_amr_analysis_pipeline.py -r ilm1 -i raw -i ilm23.sa
+    e.g. vm_generate_salmonella_serotyping_pipeline.py -s illu13.sa
     """
-    log_dir = f"{working_dir}/log"
+    log_dir = f"{output_dir}/log"
 
     print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
-    print("\t{0:<20} :   {1:<10}".format("working_dir", working_dir))
+    print("\t{0:<20} :   {1:<10}".format("output_dir", output_dir))
     print("\t{0:<20} :   {1:<10}".format("sample_file", sample_file))
 
     # read sample file
@@ -59,36 +62,20 @@ def main(make_file, working_dir, sample_file):
         for line in file:
             if not line.startswith("#"):
                 index += 1
-                sample_id, species, fastq1, fastq2, fasta = line.rstrip().split("\t")
-                renamed_species = ""
-                if species == "escherichia_coli":
-                    renamed_species = "Escherichia coli"
-                elif species in [
-                    "salmonella_typhimurium",
-                    "salmonella_enteritidis",
-                    "salmonella",
-                ]:
-                    renamed_species = "Salmonella enterica"
+                sample_id, fastq1, fastq2 = line.rstrip().split("\t")
                 samples.append(
-                    Sample(index, sample_id, renamed_species, fastq1, fastq2, fasta)
+                    Sample(index, sample_id, fastq1, fastq2)
                 )
-                # print(f'{species} => {renamed_species}')
+
     # create directories in destination folder directory
-    analysis_dir = f"{working_dir}/analysis"
     new_dir = ""
     try:
         os.makedirs(log_dir, exist_ok=True)
 
         for sample in samples:
-            # new_dir = f'{working_dir}/resfinder/reads/{sample.id}'
-            # os.makedirs(new_dir, exist_ok=True)
-            # new_dir = f'{working_dir}/resfinder/contigs/{sample.id}'
-            # os.makedirs(new_dir, exist_ok=True)
-            # new_dir = f'{working_dir}/pointfinder/reads/{sample.id}'
-            # os.makedirs(new_dir, exist_ok=True)
-            # new_dir = f'{working_dir}/pointfinder/contigs/{sample.id}'
-            # os.makedirs(new_dir, exist_ok=True)
-            new_dir = f"{working_dir}/results/{sample.id}"
+            new_dir = f"{output_dir}/{sample.id}"
+            os.makedirs(new_dir, exist_ok=True)
+            new_dir = f"{output_dir}/{sample.id}/spades_assembly"
             os.makedirs(new_dir, exist_ok=True)
 
     except OSError as error:
@@ -97,70 +84,20 @@ def main(make_file, working_dir, sample_file):
     # initialize
     pg = PipelineGenerator(make_file)
 
+    # programs
+    spades = "/usr/local/SPAdes-3.15.5/bin/spades.py"
+
     # analyze
     for idx, sample in enumerate(samples):
-        # /usr/local/resfinder-4.1.5/run_resfinder.py
-        #    -ifq salmonella_R1.fastq.gz salmonella_R2.fastq.gz
-        #    -o salmonella  -s 'Salmonella' --min_cov 0.6 -t 0.8 --acquired
-        #    -k /usr/local/kma-1.4.7/kma
-        # /usr/local/resfinder-4.1.5/run_resfinder.py
-        #    -ifq salmonella_R1.fastq.gz salmonella_R2.fastq.gz
-        #    -o salmonella  -s 'Salmonella' --min_cov 0.6 -t 0.8 --acquired
-        #    -k /usr/local/kma-1.4.7/kma
-        # resfinder
-        resfinder = "/usr/local/resfinder-4.1.5/run_resfinder.py"
-        db_resfinder = "/usr/local/resfinder-4.1.5/db_resfinder"
-        db_pointfinder = "/usr/local/resfinder-4.1.5/db_pointfinder"
-        kma = "/usr/local/kma-1.4.7/kma"
-        blastn = "/usr/local/ncbi-blast-2.13.0+/bin/blastn"
-        species = sample.species
-        fastqs = f"{sample.fastq1} {sample.fastq2}"
-        fasta = sample.fasta
 
-        # resfinder, pointfinder, contigs
-        output_dir = f"{working_dir}/results/{sample.id}"
-        log = f"{output_dir}/run.log"
-        err = f"{output_dir}/run.err"
-        tgt = f"{log_dir}/{sample.id}_resfinder_pointfinder_contigs.OK"
+        # spades
+        out_dir = f"{output_dir}/{sample.id}/spades_assembly"
+        log = f"{out_dir}/run.log"
+        err = f"{out_dir}/run.err"
+        tgt = f"{log_dir}/{sample.id}_spades_assembly_contigs.OK"
         dep = ""
-        cmd = f'{resfinder} -o {output_dir} -ifa {fasta} -b {blastn} --min_cov 0.6 -t 0.8 --acquired -s "{species}" --point > {log} 2> {err}'
+        cmd = f'{spades} -o {out_dir} --isolate -1 {sample.fastq1} -2 {sample.fastq2} > {log} 2> {err}'
         pg.add(tgt, dep, cmd)
-
-        # #resfinder, reads
-        # output_dir = f'{working_dir}/resfinder/reads/{sample.id}'
-        # log = f'{output_dir}/run.log'
-        # err = f'{output_dir}/run.err'
-        # tgt = f'{log_dir}/{sample.id}_resfinder_reads.OK'
-        # dep = ''
-        # cmd = f'{resfinder} -o {output_dir} -ifq {fastqs} -k {kma} --min_cov 0.6 -t 0.8 --acquired > {log} 2> {err}'
-        # pg.add(tgt, dep, cmd)
-
-        # #pointfinder, contigs
-        # output_dir = f'{working_dir}/resfinder/contigs/{sample.id}'
-        # log = f'{output_dir}/run.log'
-        # err = f'{output_dir}/run.err'
-        # tgt = f'{log_dir}/{sample.id}_resfinder_contigs.OK'
-        # dep = ''
-        # cmd = f'{resfinder} -o {output_dir} -ifa {fasta} -b {blastn} --min_cov 0.6 -t 0.8  --acquired > {log} 2> {err}'
-        # pg.add(tgt, dep, cmd)
-
-        # #pointfinder, reads
-        # output_dir = f'{working_dir}/pointfinder/reads/{sample.id}'
-        # log = f'{output_dir}/run.log'
-        # err = f'{output_dir}/run.err'
-        # tgt = f'{log_dir}/{sample.id}_pointfinder_reads.OK'
-        # dep = ''
-        # cmd = f'{resfinder} -o {output_dir} -ifq {fastqs} -k {kma} -s {species} --point > {log} 2> {err}'
-        # pg.add(tgt, dep, cmd)
-
-        # #pointfinder, contigs
-        # output_dir = f'{working_dir}/pointfinder/contigs/{sample.id}'
-        # log = f'{output_dir}/run.log'
-        # err = f'{output_dir}/run.err'
-        # tgt = f'{log_dir}/{sample.id}_pointfinder_contigs.OK'
-        # dep = ''
-        # cmd = f'{resfinder} -o {output_dir} -ifa {fasta} -b {blastn} -s {species} --point > {log} 2> {err}'
-        # pg.add(tgt, dep, cmd)
 
     # write make file
     print("Writing pipeline")
@@ -209,20 +146,17 @@ class PipelineGenerator(object):
 
 
 class Sample(object):
-    def __init__(self):
+    def __init__(self): # type: ignore
         self.idx = ""
         self.id = ""
         self.fastq1 = ""
         self.fastq2 = ""
-        self.fasta = ""
 
-    def __init__(self, idx, id, species, fastq1, fastq2, fasta):
+    def __init__(self, idx, id, fastq1, fastq2):
         self.idx = idx
         self.id = id
-        self.species = species
         self.fastq1 = fastq1
         self.fastq2 = fastq2
-        self.fasta = fasta
 
     def print(self):
         print(f"index   : {self.idx}")
@@ -232,4 +166,4 @@ class Sample(object):
 
 
 if __name__ == "__main__":
-    main()
+    main() # type: ignore
