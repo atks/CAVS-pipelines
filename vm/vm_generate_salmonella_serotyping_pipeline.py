@@ -77,6 +77,8 @@ def main(make_file, output_dir, sample_file):
             os.makedirs(new_dir, exist_ok=True)
             new_dir = f"{output_dir}/{sample.id}/spades_assembly"
             os.makedirs(new_dir, exist_ok=True)
+            new_dir = f"{output_dir}/{sample.id}/seqsero2"
+            os.makedirs(new_dir, exist_ok=True)
 
     except OSError as error:
         print(f"Directory {new_dir} cannot be created")
@@ -86,6 +88,8 @@ def main(make_file, output_dir, sample_file):
 
     # programs
     spades = "/usr/local/SPAdes-3.15.5/bin/spades.py"
+    seqsero2 = "/usr/local/SeqSero2/bin/SeqSero2_package.py"
+    mlst = "/usr/local/mlst-2.23.0/bin/mlst"
 
     # analyze
     for idx, sample in enumerate(samples):
@@ -99,12 +103,26 @@ def main(make_file, output_dir, sample_file):
         cmd = f'{spades} -o {out_dir} --isolate -1 {sample.fastq1} -2 {sample.fastq2} > {log} 2> {err}'
         pg.add(tgt, dep, cmd)
 
-        # sequence typing
-        # mlst illu13/*/spades_assembly/contigs.fasta --json out.json
-
         # serovar and antigen
-        # /usr/local/SeqSero2/bin/SeqSero2_package.py -t 2 -i /net/singapura/vm/hts/illu13/13_1_salmonella_23_1704_R1.fastq.gz  /net/singapura/vm/hts/illu13/13_1_salmonella_23_1704_R2.fastq.gz
+        # /usr/local/SeqSero2/bin/SeqSero2_package.py -d efg -n 23_1704 -t 2 -i /net/singapura/vm/hts/illu13/13_1_salmonella_23_1704_R1.fastq.gz  /net/singapura/vm/hts/illu13/13_1_salmonella_23_1704_R2.fastq.gz
+        out_dir = f"{output_dir}/{sample.id}/seqsero2"
+        log = f"{out_dir}/run.log"
+        err = f"{out_dir}/run.err"
+        tgt = f"{log_dir}/{sample.id}.seqsero2.OK"
+        dep = ""
+        cmd = f'{seqsero2} -d {out_dir} -n {sample.id} -t 2 -i {sample.fastq1} {sample.fastq2} > {log} 2> {err}'
+        pg.add(tgt, dep, cmd)
 
+        # sequence typing
+        # mlst illu13/*/spades_assembly/contigs.fasta --json out.json --
+        out_dir = f"{output_dir}/{sample.id}/mlst"
+        input_contig_fasta_file = "{output_dir}/{sample.id}/spades_assembly/contigs.fasta"
+        log = f"{out_dir}/run.log"
+        err = f"{out_dir}/run.err"
+        tgt = f"{log_dir}/{sample.id}.mlst.OK"
+        dep = f"{log_dir}/{sample.id}_spades_assembly_contigs.OK"
+        cmd = f'{mlst} {input_contig_fasta_file} --json typing.json  > {log} 2> {err}'
+        pg.add(tgt, dep, cmd)
 
     # write make file
     print("Writing pipeline")
