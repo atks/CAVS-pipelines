@@ -22,6 +22,7 @@ import os
 import click
 import random
 import math
+import re
 import sys
 
 
@@ -33,10 +34,6 @@ def main(file_name):
 
     e.g. summarise_aphc_xmas_formsg.py
     """
-    # print(f'processing "{file_name}"')
-
-    print(f"#giving\t#name\t#email\t#section\t#wish")
-
     # read phrase file
     phrases = []
     line_no = 0
@@ -88,24 +85,90 @@ def main(file_name):
                         non_participants.append(Person(name, section, email, wish))
                         # print(f"NO\t{name}\tn/a\t{section}\tn/a")
 
+    print("Randomising ", end="", file=sys.stderr)
     # randomise assignments
+
     no_participants = len(participants)
+    print(f"{no_participants} assigments ... ", file=sys.stderr)
+
     sample = []
 
     while True:
         sample = random.sample(range(no_participants), no_participants)
         # check self assignment
+        collision_detected = False
         for idx, i in enumerate(sample):
             if idx == i:
-                print("Collision detected, resampling")
+                collision_detected = True
+                print("\tCollision detected, resampling", file=sys.stderr)
+                break
+        if not collision_detected:
+            break
 
-    # write out to full data
-    for idx, person in participants:
-        pass
+    for idx in range(no_participants):
+        santa = participants[sample[idx]]
+        participants[idx].set_santa(santa.name, santa.section, santa.email)
+    print("\tsuccessful. ", file=sys.stderr)
+
+    # move committee members (santas) to end of list
+    print("Move committee members (santas) to the back\n", file=sys.stderr)
+    old_participants = participants.copy()
+    participants.clear()
+    for person in old_participants:
+        if person.santa in (
+            "Adrian Tan",
+            "Jasmine",
+            "Noemi Gesmundo",
+            "Loke Li Yan",
+            "Brina",
+            "Li Pei",
+            "Shahreza Darwis",
+            "Reg",
+        ):
+            person.set_committee()
+            participants.append(person)
+        else:
+            participants.insert(0, person)
 
     # tweaks
     # affixed: kum chew randomly sampled mdm tay
-    # move committee members to the end
+    print(f"======Swap KC's santee======", file=sys.stderr)
+
+    idx_santa_kc = 0
+    idx_mdm_tay = 0
+    for idx, person in enumerate(participants):
+        if person.santa == "Kum Chew":
+            idx_santa_kc = idx
+        if person.name == "Tay Yih Hong":
+            idx_mdm_tay = idx
+
+    # copy madam tay's santa to idx_santa_kc
+    # participants[idx].set_santa(santa.name, santa.section, santa.email)
+
+    participants[idx_mdm_tay].print()
+    print(f"+++++++++++++++++++++++", file=sys.stderr)
+    participants[idx_santa_kc].print()
+
+    print(f"=======After swap======", file=sys.stderr)
+
+    participants[idx_santa_kc].set_santa(
+        participants[idx_mdm_tay].santa,
+        participants[idx_mdm_tay].santa_section,
+        participants[idx_mdm_tay].santa_email,
+    )
+    participants[idx_mdm_tay].set_santa(
+        "Kum Chew", "VFP", "hiong_kum_chew@nparks.gov.sg"
+    )
+    participants[idx_mdm_tay].print()
+    print(f"+++++++++++++++++++++++", file=sys.stderr)
+    participants[idx_santa_kc].print()
+
+    output_file_name = re.sub("\.csv$", ".assigned.txt", file_name)
+    print(f"Write out to {output_file_name}", file=sys.stderr)
+    with open(output_file_name, "w") as f:
+        f.write("#santa\t#santa_email\t#santee\t#santee_section\t#santee_wish\n")
+        for person in participants:
+            f.write(person.print_str_to_santa() + "\n")
 
     print(f"\n\n", file=sys.stderr)
     print(f"Summary", file=sys.stderr)
@@ -124,7 +187,7 @@ def main(file_name):
 
 
 class Person(object):
-    def __init__(self):  # type: ignore
+    def __init__(self):
         self.name = ""
         self.section = ""
         self.email = ""
@@ -132,16 +195,25 @@ class Person(object):
         self.santa = ""
         self.santa_email = ""
         self.santa_section = ""
+        self.committee = ""
 
     def __init__(self, name, section, email, wish):
         self.name = name
         self.section = section
         self.email = email
+        self.wish = wish
+        self.santa = ""
+        self.santa_email = ""
+        self.santa_section = ""
+        self.committee = "aphc"
 
     def set_santa(self, name, section, email):
         self.santa = name
-        self.santa_email = section
-        self.santa_section = email
+        self.santa_section = section
+        self.santa_email = email
+
+    def set_committee(self):
+        self.committee = "committee"
 
     def print(self):
         print(f"name    : {self.name}")
@@ -151,12 +223,13 @@ class Person(object):
         print(f"santa_name    : {self.santa}")
         print(f"santa_section : {self.santa_section}")
         print(f"santa_email   : {self.santa_email}")
+        print(f"committee     : {self.committee}")
 
     def print_str(self):
         return f"{self.name}\t{self.section}\t{self.email}\t{self.wish}\t{self.santa}\t{self.santa_section}\t{self.santa_email}"
 
     def print_str_to_santa(self):
-        return f"{self.santa}\t{self.santa_email}\t{self.name}\t{self.section}\t{self.wish}"
+        return f"{self.committee}\t{self.santa}\t{self.santa_section}\t{self.santa_email}\t{self.name}\t{self.section}\t{self.email}\t{self.wish}"
 
 
 if __name__ == "__main__":
