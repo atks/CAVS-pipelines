@@ -53,6 +53,9 @@ def main(file_name):
         "PHLA": 0,
     }
 
+    participants = []
+    non_participants = []
+
     with open(file_name, "r") as file:
         for line in file:
             line_no += 1
@@ -72,17 +75,37 @@ def main(file_name):
                         wish = wish.rstrip('"').lstrip('"')
                         section_no[section] += 1
                         email = tokens[-2]
-                        print(f"YES\t{name}\t{email}\t{section}\t{wish}")
+                        participants.append(Person(name, section, email, wish))
+                        # print(f"YES\t{name}\t{email}\t{section}\t{wish}")
                         no_participating += 1
                 else:
-                    no_skipping += 1
                     if name == "Ng Oi Wing":
                         section = "VAR"
                     if name == "Amy Chan":
                         section = "VFP"
-                    print(f"NO\t{name}\tn/a\t{section}\tn/a")
+                    if not (name == "Tara" or name == "Kum Chew"):
+                        no_skipping += 1
+                        non_participants.append(Person(name, section, email, wish))
+                        # print(f"NO\t{name}\tn/a\t{section}\tn/a")
 
     # randomise assignments
+    no_participants = len(participants)
+    sample = []
+
+    while True:
+        sample = random.sample(range(no_participants), no_participants)
+        # check self assignment
+        for idx, i in enumerate(sample):
+            if idx == i:
+                print("Collision detected, resampling")
+
+    # write out to full data
+    for idx, person in participants:
+        pass
+
+    # tweaks
+    # affixed: kum chew randomly sampled mdm tay
+    # move committee members to the end
 
     print(f"\n\n", file=sys.stderr)
     print(f"Summary", file=sys.stderr)
@@ -98,6 +121,42 @@ def main(file_name):
     print(f"pqa:      {section_no['PQA']}", file=sys.stderr)
     print(f"pbps:     {section_no['PBPS']}", file=sys.stderr)
     print(f"phla:     {section_no['PHLA']}", file=sys.stderr)
+
+
+class Person(object):
+    def __init__(self):  # type: ignore
+        self.name = ""
+        self.section = ""
+        self.email = ""
+        self.wish = ""
+        self.santa = ""
+        self.santa_email = ""
+        self.santa_section = ""
+
+    def __init__(self, name, section, email, wish):
+        self.name = name
+        self.section = section
+        self.email = email
+
+    def set_santa(self, name, section, email):
+        self.santa = name
+        self.santa_email = section
+        self.santa_section = email
+
+    def print(self):
+        print(f"name    : {self.name}")
+        print(f"section : {self.section}")
+        print(f"email   : {self.email}")
+        print(f"wish    : {self.wish}")
+        print(f"santa_name    : {self.santa}")
+        print(f"santa_section : {self.santa_section}")
+        print(f"santa_email   : {self.santa_email}")
+
+    def print_str(self):
+        return f"{self.name}\t{self.section}\t{self.email}\t{self.wish}\t{self.santa}\t{self.santa_section}\t{self.santa_email}"
+
+    def print_str_to_santa(self):
+        return f"{self.santa}\t{self.santa_email}\t{self.name}\t{self.section}\t{self.wish}"
 
 
 if __name__ == "__main__":
