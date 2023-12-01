@@ -81,6 +81,12 @@ def main(make_file, output_dir, sample_file):
             os.makedirs(new_dir, exist_ok=True)
             new_dir = f"{output_dir}/{sample.id}/mlst"
             os.makedirs(new_dir, exist_ok=True)
+            new_dir = f"{output_dir}/{sample.id}/bam"
+            os.makedirs(new_dir, exist_ok=True)
+            new_dir = f"{output_dir}/{sample.id}/bam/ref"
+            os.makedirs(new_dir, exist_ok=True)
+            new_dir = f"{output_dir}/{sample.id}/bcf"
+            os.makedirs(new_dir, exist_ok=True)
 
     except OSError as error:
         print(f"Directory {new_dir} cannot be created")
@@ -92,6 +98,9 @@ def main(make_file, output_dir, sample_file):
     spades = "/usr/local/SPAdes-3.15.5/bin/spades.py"
     seqsero2 = "/usr/local/SeqSero2/bin/SeqSero2_package.py"
     mlst = "/usr/local/mlst-2.23.0/bin/mlst"
+    bwa = "/usr/local/bwa-0.7.17/bwa"
+    samtools = "/usr/local/samtools-1.17/bin/samtools"
+    bcftools = "/usr/local/bcftools-1.17/bin/bcftools"
 
     # analyze
     for idx, sample in enumerate(samples):
@@ -125,6 +134,60 @@ def main(make_file, output_dir, sample_file):
         dep = f"{log_dir}/{sample.id}_spades_assembly_contigs.OK"
         cmd = f'{mlst} {input_contig_fasta_file} --json typing.json --scheme senterica_achtman_2  --nopath > {log} 2> {err}'
         pg.add(tgt, dep, cmd)
+
+        # copy reference
+        input_contig_fasta_file = f"{output_dir}/{sample.id}/spades_assembly/contigs.fasta"
+        output_ref_fasta_file = f"{output_dir}/{sample.id}/bam/ref/ref.fasta"
+        tgt = f"{log_dir}/{sample.id}.ref.fasta.OK"
+        dep = f"{log_dir}/{sample.id}_spades_assembly_contigs.OK"
+        cmd = f'cp {input_contig_fasta_file} {output_ref_fasta_file}'
+        pg.add(tgt, dep, cmd)
+
+        # index reference
+        ref_fasta_file = f"{output_dir}/{sample.id}/bam/ref/ref.fasta"
+        tgt = f"{output_dir}/{sample.id}/bam/ref/bwa_index.ok"
+        dep = f"{log_dir}/{sample.id}.ref.fasta.OK"
+        cmd = f'{bwa} index -a bwtsw {ref_fasta_file}'
+        pg.add(tgt, dep, cmd)
+
+        # map to reference
+        out_dir = f"{output_dir}/{sample.id}/bam"
+        output_bam_file = f"{out_dir}/aligned.bam"
+        ref_fasta_file = f"{out_dir}/ref/ref.fasta"
+        log = f"{out_dir}/run.log"
+        err = f"{out_dir}/run.err"
+        tgt = f"{output_bam_file}.ok"
+        dep = f"{out_dir}/ref/bwa_index.ok"
+        cmd = f"{bwa} mem -t 2 -M {ref_fasta_file} {sample.fastq1} {sample.fastq2} | {samtools} view -hF4 | {samtools} sort -o {output_bam_file} > {log} 2> {err}"
+        pg.add(tgt, dep, cmd)
+
+        # index bam
+        out_dir = f"{output_dir}/{sample.id}/bam"
+        input_bam_file = f"{out_dir}/aligned.bam"
+        tgt = f"{input_bam_file}.bai.ok"
+        dep = f"{input_bam_file}.ok"
+        cmd = f"{samtools} index {input_bam_file} "
+        pg.add(tgt, dep, cmd)
+
+        # call variants
+        out_dir = f"{output_dir}/{sample.id}/bcf"
+        input_bam_file = f"{output_dir}/{sample.id}/bam/aligned.bam"
+        ref_fasta_file = f"{output_dir}/{sample.id}/bam/ref/ref.fasta"
+        output_bcf_file = f"{out_dir}/call.bcf"
+        log = f"{out_dir}/run.log"
+        err = f"{out_dir}/run.err"
+        tgt = f"{output_bcf_file}.ok"
+        dep = f"{input_bam_file}.bai.ok"
+        cmd = f"{bcftools} mpileup -f {ref_fasta_file} {input_bam_file}  | {bcftools} call -mv -Ob -o {output_bcf_file} > {log} 2> {err}"
+        pg.add(tgt, dep, cmd)
+
+        # index bcf
+        input_bcf_file = f"{output_dir}/{sample.id}/bcf/call.bcf"
+        tgt = f"{input_bcf_file}.csi.ok"
+        dep = f"{input_bcf_file}.ok"
+        cmd = f"{bcftools} index -f {input_bcf_file} "
+        pg.add(tgt, dep, cmd)
+
 
     # write make file
     print("Writing pipeline")
