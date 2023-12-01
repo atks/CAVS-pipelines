@@ -79,6 +79,8 @@ def main(make_file, output_dir, sample_file):
             os.makedirs(new_dir, exist_ok=True)
             new_dir = f"{output_dir}/{sample.id}/seqsero2"
             os.makedirs(new_dir, exist_ok=True)
+            new_dir = f"{output_dir}/{sample.id}/mlst"
+            os.makedirs(new_dir, exist_ok=True)
 
     except OSError as error:
         print(f"Directory {new_dir} cannot be created")
@@ -116,12 +118,12 @@ def main(make_file, output_dir, sample_file):
         # sequence typing
         # mlst illu13/*/spades_assembly/contigs.fasta --json out.json --
         out_dir = f"{output_dir}/{sample.id}/mlst"
-        input_contig_fasta_file = "{output_dir}/{sample.id}/spades_assembly/contigs.fasta"
+        input_contig_fasta_file = f"{output_dir}/{sample.id}/spades_assembly/contigs.fasta"
         log = f"{out_dir}/run.log"
         err = f"{out_dir}/run.err"
         tgt = f"{log_dir}/{sample.id}.mlst.OK"
         dep = f"{log_dir}/{sample.id}_spades_assembly_contigs.OK"
-        cmd = f'{mlst} {input_contig_fasta_file} --json typing.json  > {log} 2> {err}'
+        cmd = f'{mlst} {input_contig_fasta_file} --json typing.json --scheme senterica_achtman_2  --nopath > {log} 2> {err}'
         pg.add(tgt, dep, cmd)
 
     # write make file
