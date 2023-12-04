@@ -81,6 +81,8 @@ def main(make_file, output_dir, sample_file):
             os.makedirs(new_dir, exist_ok=True)
             new_dir = f"{output_dir}/{sample.id}/mlst"
             os.makedirs(new_dir, exist_ok=True)
+            new_dir = f"{output_dir}/{sample.id}/sistr"
+            os.makedirs(new_dir, exist_ok=True)
             new_dir = f"{output_dir}/{sample.id}/bam"
             os.makedirs(new_dir, exist_ok=True)
             new_dir = f"{output_dir}/{sample.id}/bam/ref"
@@ -97,6 +99,7 @@ def main(make_file, output_dir, sample_file):
     # programs
     spades = "/usr/local/SPAdes-3.15.5/bin/spades.py"
     seqsero2 = "/usr/local/SeqSero2/bin/SeqSero2_package.py"
+    sistr = "/home/atks/miniconda3/envs/sistr/bin/sistr"
     mlst = "/usr/local/mlst-2.23.0/bin/mlst"
     bwa = "/usr/local/bwa-0.7.17/bwa"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
@@ -133,6 +136,19 @@ def main(make_file, output_dir, sample_file):
         tgt = f"{log_dir}/{sample.id}.mlst.OK"
         dep = f"{log_dir}/{sample.id}_spades_assembly_contigs.OK"
         cmd = f'{mlst} {input_contig_fasta_file} --json typing.json --scheme senterica_achtman_2  --nopath > {log} 2> {err}'
+        pg.add(tgt, dep, cmd)
+
+        # SISTR
+        # sistr  23_1705/spades_assembly/contigs.fasta -f csv -o new
+        # sistr 23_1704/spades_assembly/contigs.fasta -f csv -o new -K -T output
+        out_dir = f"{output_dir}/{sample.id}/sistr"
+        output_file = f"{out_dir}/sistr"
+        input_contig_fasta_file = f"{output_dir}/{sample.id}/spades_assembly/contigs.fasta"
+        log = f"{out_dir}/run.log"
+        err = f"{out_dir}/run.err"
+        tgt = f"{log_dir}/{sample.id}.sistr.OK"
+        dep = f"{log_dir}/{sample.id}_spades_assembly_contigs.OK"
+        cmd = f'{sistr} {input_contig_fasta_file} -f csv -o {output_file} -K -T {out_dir} > {log} 2> {err}'
         pg.add(tgt, dep, cmd)
 
         # copy reference
