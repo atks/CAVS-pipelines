@@ -49,7 +49,12 @@ def main(make_file, output_dir, sample_file):
 
     e.g. vm_generate_salmonella_serotyping_pipeline.py -s illu13.sa
     """
+    if not os.path.isabs(output_dir):
+        cur_dir =  os.getcwd()
+        output_dir = f"{cur_dir}/{output_dir}"
+
     log_dir = f"{output_dir}/log"
+
 
     print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
     print("\t{0:<20} :   {1:<10}".format("output_dir", output_dir))
