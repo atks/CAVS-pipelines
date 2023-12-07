@@ -91,10 +91,10 @@ def main(
     if kit == "SQK-NBD114.24":
         barcode_kit = "EXP-NBD104 EXP-NBD114"
         dorado_basecall_model = (
-            "/usr/local/dorado-0.3.4/models/dna_r10.4.1_e8.2_400bps_sup@v4.2.0"
+            "/usr/local/dorado-0.5.0/models/dna_r10.4.1_e8.2_400bps_sup@v4.2.0"
         )
     # programs
-    dorado_basecaller = "/usr/local/dorado-0.3.4/bin/dorado basecaller"
+    dorado_basecaller = "/usr/local/dorado-0.5.0/bin/dorado basecaller"
     guppy_barcoder = "/usr/local/ont-guppy-6.5.7/bin/guppy_barcoder"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
     fastqc = f"/usr/local/FastQC-0.12.1/fastqc --adapters /usr/local/FastQC-0.12.1/Configuration/adapter_list.nanopore.txt --memory {memory}"
@@ -399,7 +399,7 @@ class PipelineGenerator(object):
 
 
 class Sample(object):
-    def __init__(self):
+    def __init__(self):  # type: ignore
         self.idx = ""
         self.id = ""
         self.barcode = ""
@@ -434,4 +434,4 @@ class Run(object):
 
 
 if __name__ == "__main__":
-    main()
+    main()  # type: ignore
