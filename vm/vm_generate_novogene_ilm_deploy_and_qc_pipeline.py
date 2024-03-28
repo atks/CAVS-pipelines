@@ -32,7 +32,7 @@ from datetime import datetime
     "-m",
     "--make_file",
     show_default=True,
-    default="ilm_deploy_and_qc.mk",
+    default="novogene_ilm_deploy_and_qc.mk",
     help="make file name",
 )
 @click.option("-r", "--run_id", required=True, help="Run ID")
@@ -49,7 +49,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     """
     Moves Illumina fastq files to a destination and performs QC
 
-    e.g. vm_generate_ilm_deploy_and_qc_pipeline -r ilm1 -i raw -i ilm23.sa
+    e.g. vm_generate_novogene_ilm_deploy_and_qc_pipeline -r ilm1 -i raw -i ilm23.sa
     """
     log_dir = f"{working_dir}/log"
     dest_dir = working_dir + "/" + run_id
