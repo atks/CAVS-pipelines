@@ -49,7 +49,12 @@ def main(make_file, output_dir, sample_file):
 
     e.g. vm_generate_salmonella_serotyping_pipeline.py -s illu13.sa
     """
+    if not os.path.isabs(output_dir):
+        cur_dir =  os.getcwd()
+        output_dir = f"{cur_dir}/{output_dir}"
+
     log_dir = f"{output_dir}/log"
+
 
     print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
     print("\t{0:<20} :   {1:<10}".format("output_dir", output_dir))
@@ -77,6 +82,18 @@ def main(make_file, output_dir, sample_file):
             os.makedirs(new_dir, exist_ok=True)
             new_dir = f"{output_dir}/{sample.id}/spades_assembly"
             os.makedirs(new_dir, exist_ok=True)
+            new_dir = f"{output_dir}/{sample.id}/seqsero2"
+            os.makedirs(new_dir, exist_ok=True)
+            new_dir = f"{output_dir}/{sample.id}/mlst"
+            os.makedirs(new_dir, exist_ok=True)
+            new_dir = f"{output_dir}/{sample.id}/sistr"
+            os.makedirs(new_dir, exist_ok=True)
+            new_dir = f"{output_dir}/{sample.id}/bam"
+            os.makedirs(new_dir, exist_ok=True)
+            new_dir = f"{output_dir}/{sample.id}/bam/ref"
+            os.makedirs(new_dir, exist_ok=True)
+            new_dir = f"{output_dir}/{sample.id}/bcf"
+            os.makedirs(new_dir, exist_ok=True)
 
     except OSError as error:
         print(f"Directory {new_dir} cannot be created")
@@ -86,6 +103,12 @@ def main(make_file, output_dir, sample_file):
 
     # programs
     spades = "/usr/local/SPAdes-3.15.5/bin/spades.py"
+    seqsero2 = "/usr/local/SeqSero2/bin/SeqSero2_package.py"
+    sistr = "/home/atks/miniconda3/envs/sistr/bin/sistr"
+    mlst = "/usr/local/mlst-2.23.0/bin/mlst"
+    bwa = "/usr/local/bwa-0.7.17/bwa"
+    samtools = "/usr/local/samtools-1.17/bin/samtools"
+    bcftools = "/usr/local/bcftools-1.17/bin/bcftools"
 
     # analyze
     for idx, sample in enumerate(samples):
@@ -99,11 +122,92 @@ def main(make_file, output_dir, sample_file):
         cmd = f'{spades} -o {out_dir} --isolate -1 {sample.fastq1} -2 {sample.fastq2} > {log} 2> {err}'
         pg.add(tgt, dep, cmd)
 
-        # sequence typing
-        # mlst illu13/*/spades_assembly/contigs.fasta --json out.json
-
         # serovar and antigen
-        # /usr/local/SeqSero2/bin/SeqSero2_package.py -t 2 -i /net/singapura/vm/hts/illu13/13_1_salmonella_23_1704_R1.fastq.gz  /net/singapura/vm/hts/illu13/13_1_salmonella_23_1704_R2.fastq.gz
+        # /usr/local/SeqSero2/bin/SeqSero2_package.py -d efg -n 23_1704 -t 2 -i /net/singapura/vm/hts/illu13/13_1_salmonella_23_1704_R1.fastq.gz  /net/singapura/vm/hts/illu13/13_1_salmonella_23_1704_R2.fastq.gz
+        out_dir = f"{output_dir}/{sample.id}/seqsero2"
+        log = f"{out_dir}/run.log"
+        err = f"{out_dir}/run.err"
+        tgt = f"{log_dir}/{sample.id}.seqsero2.OK"
+        dep = ""
+        cmd = f'{seqsero2} -d {out_dir} -n {sample.id} -t 2 -i {sample.fastq1} {sample.fastq2} > {log} 2> {err}'
+        pg.add(tgt, dep, cmd)
+
+        # sequence typing
+        # mlst illu13/*/spades_assembly/contigs.fasta --json out.json --
+        out_dir = f"{output_dir}/{sample.id}/mlst"
+        input_contig_fasta_file = f"{output_dir}/{sample.id}/spades_assembly/contigs.fasta"
+        log = f"{out_dir}/run.log"
+        err = f"{out_dir}/run.err"
+        tgt = f"{log_dir}/{sample.id}.mlst.OK"
+        dep = f"{log_dir}/{sample.id}_spades_assembly_contigs.OK"
+        cmd = f'{mlst} {input_contig_fasta_file} --json typing.json --scheme senterica_achtman_2  --nopath > {log} 2> {err}'
+        pg.add(tgt, dep, cmd)
+
+        # SISTR
+        # sistr  23_1705/spades_assembly/contigs.fasta -f csv -o new
+        # sistr 23_1704/spades_assembly/contigs.fasta -f csv -o new -K -T output
+        out_dir = f"{output_dir}/{sample.id}/sistr"
+        output_file = f"{out_dir}/sistr"
+        input_contig_fasta_file = f"{output_dir}/{sample.id}/spades_assembly/contigs.fasta"
+        log = f"{out_dir}/run.log"
+        err = f"{out_dir}/run.err"
+        tgt = f"{log_dir}/{sample.id}.sistr.OK"
+        dep = f"{log_dir}/{sample.id}_spades_assembly_contigs.OK"
+        cmd = f'{sistr} {input_contig_fasta_file} -f csv -o {output_file} -K -T {out_dir} > {log} 2> {err}'
+        pg.add(tgt, dep, cmd)
+
+        # copy reference
+        input_contig_fasta_file = f"{output_dir}/{sample.id}/spades_assembly/contigs.fasta"
+        output_ref_fasta_file = f"{output_dir}/{sample.id}/bam/ref/ref.fasta"
+        tgt = f"{log_dir}/{sample.id}.ref.fasta.OK"
+        dep = f"{log_dir}/{sample.id}_spades_assembly_contigs.OK"
+        cmd = f'cp {input_contig_fasta_file} {output_ref_fasta_file}'
+        pg.add(tgt, dep, cmd)
+
+        # index reference
+        ref_fasta_file = f"{output_dir}/{sample.id}/bam/ref/ref.fasta"
+        tgt = f"{output_dir}/{sample.id}/bam/ref/bwa_index.ok"
+        dep = f"{log_dir}/{sample.id}.ref.fasta.OK"
+        cmd = f'{bwa} index -a bwtsw {ref_fasta_file}'
+        pg.add(tgt, dep, cmd)
+
+        # map to reference
+        out_dir = f"{output_dir}/{sample.id}/bam"
+        output_bam_file = f"{out_dir}/aligned.bam"
+        ref_fasta_file = f"{out_dir}/ref/ref.fasta"
+        log = f"{out_dir}/run.log"
+        err = f"{out_dir}/run.err"
+        tgt = f"{output_bam_file}.ok"
+        dep = f"{out_dir}/ref/bwa_index.ok"
+        cmd = f"{bwa} mem -t 2 -M {ref_fasta_file} {sample.fastq1} {sample.fastq2} | {samtools} view -hF4 | {samtools} sort -o {output_bam_file} > {log} 2> {err}"
+        pg.add(tgt, dep, cmd)
+
+        # index bam
+        out_dir = f"{output_dir}/{sample.id}/bam"
+        input_bam_file = f"{out_dir}/aligned.bam"
+        tgt = f"{input_bam_file}.bai.ok"
+        dep = f"{input_bam_file}.ok"
+        cmd = f"{samtools} index {input_bam_file} "
+        pg.add(tgt, dep, cmd)
+
+        # call variants
+        out_dir = f"{output_dir}/{sample.id}/bcf"
+        input_bam_file = f"{output_dir}/{sample.id}/bam/aligned.bam"
+        ref_fasta_file = f"{output_dir}/{sample.id}/bam/ref/ref.fasta"
+        output_bcf_file = f"{out_dir}/call.bcf"
+        log = f"{out_dir}/run.log"
+        err = f"{out_dir}/run.err"
+        tgt = f"{output_bcf_file}.ok"
+        dep = f"{input_bam_file}.bai.ok"
+        cmd = f"{bcftools} mpileup -f {ref_fasta_file} {input_bam_file}  | {bcftools} call -mv -Ob -o {output_bcf_file} > {log} 2> {err}"
+        pg.add(tgt, dep, cmd)
+
+        # index bcf
+        input_bcf_file = f"{output_dir}/{sample.id}/bcf/call.bcf"
+        tgt = f"{input_bcf_file}.csi.ok"
+        dep = f"{input_bcf_file}.ok"
+        cmd = f"{bcftools} index -f {input_bcf_file} "
+        pg.add(tgt, dep, cmd)
 
 
     # write make file

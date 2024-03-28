@@ -47,7 +47,7 @@ import sys
     "-l", "--len", help="Minimum passing read length", required=False, default=20
 )
 @click.option("-x", "--memory", help="Memory for fastqc", required=False, default=2048)
-@click.option("-k", "--kit", default="SQK-NBD114.24", show_default=True, help="Kit ID")
+@click.option("-k", "--kit", default="SQK-NBD114-24", show_default=True, help="Kit ID")
 @click.option("-s", "--sample_file", required=True, help="sample file")
 def main(
     make_file,
@@ -63,9 +63,7 @@ def main(
     """
     Moves ONT fastq files to a destination and performs QC
 
-    e.g. var_generate_ont_deploy_and_qc_pipeline  -r ont26 -i raw -s ont26.sa
-         var_generate_ont_deploy_and_qc_pipeline  -r ont26 -i raw -s ont26.sa --no-base-call
-         var_generate_ont_deploy_and_qc_pipeline.py  -r ont30 -i raw -s ont30.sa -b "EXP-NBD104 EXP-NBD114"
+    e.g. var_generate_ont_deploy_and_qc_pipeline -r ont38 -i raw -s ont38.sa
     """
     log_dir = f"{working_dir}/log"
     dest_dir = working_dir + "/" + run_id
@@ -86,16 +84,9 @@ def main(
     # version
     version = "20231004_ont_deploy_and_qc_dorado_10.4.1_pipeline"
 
-    barcode_kit = ""
-    dorado_basecall_model = ""
-    if kit == "SQK-NBD114.24":
-        barcode_kit = "EXP-NBD104 EXP-NBD114"
-        dorado_basecall_model = (
-            "/usr/local/dorado-0.3.4/models/dna_r10.4.1_e8.2_400bps_sup@v4.2.0"
-        )
     # programs
-    dorado_basecaller = "/usr/local/dorado-0.3.4/bin/dorado basecaller"
-    guppy_barcoder = "/usr/local/ont-guppy-6.5.7/bin/guppy_barcoder"
+    dorado = "/usr/local/dorado-0.5.0/bin/dorado"
+    dorado_basecall_model = " /usr/local/dorado-0.5.0/models/dna_r10.4.1_e8.2_400bps_sup@v4.3.0"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
     fastqc = f"/usr/local/FastQC-0.12.1/fastqc --adapters /usr/local/FastQC-0.12.1/Configuration/adapter_list.nanopore.txt --memory {memory}"
     multiqc = "/usr/local/bin/multiqc"
@@ -154,45 +145,38 @@ def main(
     pg = PipelineGenerator(make_file)
 
     # base call
-    # dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ > calls.bam
+    # dorado duplex dna_r10.4.1_e8.2_400bps_sup@v4.2.0  pod5s/ > calls.bam
     output_bam_file = f"{working_dir}/bam/basecalls.bam"
     pod5_files_dir = nanopore_dir
     log = f"{log_dir}/dorado_base_caller.log"
     err = f"{log_dir}/dorado_base_caller.err"
     tgt = f"{log_dir}/dorado_base_caller.OK"
     dep = ""
-    cmd = f"{dorado_basecaller} -r {dorado_basecall_model} {pod5_files_dir} > {output_bam_file} 2> {log}"
-    pg.add(tgt, dep, cmd)
-
-    # convert bam to fastq
-    # dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ > calls.bam
-    input_bam_file = f"{working_dir}/bam/basecalls.bam"
-    output_fastq_file = f"{working_dir}/fastq/basecalls.fastq"
-    tgt = f"{log_dir}/dorado_basecalled_fastq.OK"
-    dep = f"{log_dir}/dorado_base_caller.OK"
-    cmd = f"{samtools} bam2fq {input_bam_file} > {output_fastq_file}"
+    cmd = f"{dorado} duplex -r {dorado_basecall_model} {pod5_files_dir} > {output_bam_file} 2> {log}"
     pg.add(tgt, dep, cmd)
 
     # demux
-    # guppy_barcoder -i {input_dir} -r -s {output_dir} --barcode_kits EXP-NBD104 -t 12 --compress_fastq
-    input_dir = f"{working_dir}/fastq"
+
+    # untrimmed barcode
+    # dorado demux --no-trim --output-dir demux --kit-name SQK-NBD114-24  basecalls.bam
+    input_bam_file = f"{working_dir}/bam/basecalls.bam"
     output_dir = f"{working_dir}/demux/untrimmed"
     log = f"{log_dir}/demux.untrimmed.log"
     err = f"{log_dir}/demux.untrimmed.err"
-    dep = f"{log_dir}/dorado_basecalled_fastq.OK"
+    dep = f"{log_dir}/dorado_base_caller.OK"
     tgt = f"{log_dir}/demux.untrimmed.OK"
-    cmd = f'{guppy_barcoder} -i "{input_dir}" -r -s {output_dir} --barcode_kits "{barcode_kit}" --compress_fastq -t 12 > {log} 2> {err}'
+    cmd = f'{dorado} demux --no-trim --output-dir {output_dir} --kit-name {kit} {input_bam_file} > {log} 2> {err}'
     pg.add(tgt, dep, cmd)
 
-    # demux
-    # guppy_barcoder -i {input_dir} -r -s {output_dir} --barcode_kits EXP-NBD104 -t 12 --compress_fastq --enable_trim_barcodes
-    input_dir = f"{working_dir}/fastq"
+    # trim barcode
+    # dorado demux --output-dir demux --kit-name SQK-NBD114-24  basecalls.bam
+    input_bam_file = f"{working_dir}/bam/basecalls.bam"
     output_dir = f"{working_dir}/demux/trimmed"
     log = f"{log_dir}/demux.trimmed.log"
     err = f"{log_dir}/demux.trimmed.err"
-    dep = f"{log_dir}/dorado_basecalled_fastq.OK"
+    dep = f"{log_dir}/dorado_base_caller.OK"
     tgt = f"{log_dir}/demux.trimmed.OK"
-    cmd = f'{guppy_barcoder} -i "{input_dir}" -r -s {output_dir} --barcode_kits "{barcode_kit}" --compress_fastq -t 12 --enable_trim_barcodes > {log} 2> {err}'
+    cmd = f'{dorado} demux --output-dir {output_dir} --kit-name {kit} {input_bam_file} > {log} 2> {err}'
     pg.add(tgt, dep, cmd)
 
     untrimmed_fastqc_multiqc_dep = ""
@@ -204,80 +188,69 @@ def main(
     kraken2_reports = ""
 
     for idx, sample in enumerate(run.samples):
-        # combine untrimmed gzip files
-        input_dir = f"{working_dir}/demux/untrimmed/{sample.barcode}"
-        output_file = f"{untrimmed_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
-        log = f"{log_dir}/{sample.idx}_{sample.id}.untrimmed.zcat.log"
-        err = f"{log_dir}/{sample.idx}_{sample.id}.untrimmed.zcat.err"
-        dep = f"{log_dir}/demux.untrimmed.OK"
-        tgt = f"{log_dir}/{sample.idx}_{sample.id}.untrimmed.zcat.OK"
-        cmd = f"zcat {input_dir}/*.fastq.gz | gzip -c > {output_file}"
-        pg.add(tgt, dep, cmd)
 
-        # combine trimmed fastq gzip files
-        input_dir = f"{working_dir}/demux/trimmed/{sample.barcode}"
+        # trimmed reads
+        # samtools bam2fq SQK-NBD114-24_barcode01.bam  -T "*"
+        input_bam_file = f"{working_dir}/demux/trimmed/{kit}_{sample.barcode}.bam"
+        if sample.barcode=="unclassified":
+            input_bam_file = f"{working_dir}/demux/trimmed/unclassified.bam"
         output_fastq_file = f"{trimmed_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
-        log = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.zcat.log"
-        err = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.zcat.err"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.fastq.gz.OK"
         dep = f"{log_dir}/demux.trimmed.OK"
-        tgt = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.zcat.OK"
-        cmd = f"zcat {input_dir}/*.fastq.gz | gzip -c > {output_fastq_file}"
+        cmd = f"{samtools} bam2fq -T \"*\" {input_bam_file} | gzip > {output_fastq_file} "
         pg.add(tgt, dep, cmd)
 
-        # filter trimmed fastq gzip files
+        # filter
         input_fastq_file = f"{trimmed_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
         output_fastq_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
-        log = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.zcat.filtered.log"
-        err = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.zcat.filtered.err"
-        dep = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.zcat.OK"
-        tgt = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.zcat.filtered.OK"
-        cmd = f"{ft} filter -q {qscore} -l {len} {input_fastq_file}  -o {output_fastq_file}"
-        pg.add(tgt, dep, cmd)
-
-        # untrimmed fastqc
-        input_file = f"{untrimmed_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
-        output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/untrimmed_fastqc_result"
-        untrimmed_fastqc_directories += f"{output_dir}\n"
-        log = f"{log_dir}/{sample.idx}_{sample.id}.untrimmed.zcat.fastqc.log"
-        err = f"{log_dir}/{sample.idx}_{sample.id}.untrimmed.zcat.fastqc.err"
-        dep = f"{log_dir}/{sample.idx}_{sample.id}.untrimmed.zcat.OK"
-        tgt = f"{log_dir}/{sample.idx}_{sample.id}.untrimmed.zcat.fastqc.OK"
-        untrimmed_fastqc_multiqc_dep += f" {tgt}"
-        cmd = f"{fastqc} {input_file} -o {output_dir} > {log} 2> {err}"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.filtered.fastq.gz.OK"
+        dep = f"{log_dir}/demux.trimmed.OK"
+        cmd = f"{ft} filter -q {qscore} -l {len} -o {output_fastq_file} {input_fastq_file}"
         pg.add(tgt, dep, cmd)
 
         # trimmed filtered fastqc
         input_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
         output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/fastqc_result"
         trimmed_filtered_fastqc_directories += f"{output_dir}\n"
-        log = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.zcat.filtered.fastqc.log"
-        err = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.zcat.filtered.fastqc.err"
-        dep = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.zcat.filtered.OK"
-        tgt = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.zcat.filtered.fastqc.OK"
+        log = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.filtered.fastqc.log"
+        err = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.filtered.fastqc.err"
+        dep = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.filtered.fastq.gz.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.filtered.fastqc.OK"
         trimmed_filtered_fastqc_multiqc_dep += f" {tgt}"
         cmd = f"{fastqc} {input_file} -o {output_dir} > {log} 2> {err}"
-        pg.add(tgt, dep, cmd)
-
-        # untrimmed nanoplot
-        input_file = f"{untrimmed_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
-        output_dir = (
-            f"{analysis_dir}/{sample.idx}_{sample.id}/untrimmed_nanoplot_result"
-        )
-        log = f"{log_dir}/{sample.idx}_{sample.id}.untrimmed_nanoplot.log"
-        err = f"{log_dir}/{sample.idx}_{sample.id}.untrimmed_nanoplot.err"
-        dep = f"{log_dir}/{sample.idx}_{sample.id}.untrimmed.zcat.OK"
-        tgt = f"{log_dir}/{sample.idx}_{sample.id}.untrimmed_nanoplot.OK"
-        cmd = f"{nanoplot} --fastq {input_file} -o {output_dir} > {log} 2> {err}"
         pg.add(tgt, dep, cmd)
 
         # trimmed filtered nanoplot
         input_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
         output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/nanoplot_result"
-        log = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.zcat.filtered.nanoplot.log"
-        err = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.nanoplot.err"
-        dep = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.zcat.filtered.OK"
-        tgt = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.zcat.filtered.nanoplot.OK"
+        log = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.filtered.nanoplot.log"
+        err = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.filtered.nanoplot.err"
+        dep = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.filtered.fastq.gz.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.trimmed.filtered.nanoplot.OK"
         cmd = f"{nanoplot} --fastq {input_file} -o {output_dir} > {log} 2> {err}"
+        pg.add(tgt, dep, cmd)
+
+        # untrimmed reads
+        # samtools bam2fq SQK-NBD114-24_barcode01.bam  -T "*"
+        input_bam_file = f"{working_dir}/demux/untrimmed/{kit}_{sample.barcode}.bam"
+        if sample.barcode=="unclassified":
+            input_bam_file = f"{working_dir}/demux/untrimmed/unclassified.bam"
+        output_fastq_file = f"{untrimmed_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.untrimmed.fastq.gz.OK"
+        dep = f"{log_dir}/demux.untrimmed.OK"
+        cmd = f"{samtools} bam2fq -T \"*\" {input_bam_file} | gzip >  {output_fastq_file} "
+        pg.add(tgt, dep, cmd)
+
+        # untrimmed filtered fastqc
+        input_file = f"{untrimmed_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
+        output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/untrimmed_fastqc_result"
+        untrimmed_fastqc_directories += f"{output_dir}\n"
+        log = f"{log_dir}/{sample.idx}_{sample.id}.untrimmed.fastqc.log"
+        err = f"{log_dir}/{sample.idx}_{sample.id}.untrimmed.fastqc.err"
+        dep = f"{log_dir}/{sample.idx}_{sample.id}.untrimmed.fastq.gz.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.untrimmed.fastqc.OK"
+        untrimmed_fastqc_multiqc_dep += f" {tgt}"
+        cmd = f"{fastqc} {input_file} -o {output_dir} > {log} 2> {err}"
         pg.add(tgt, dep, cmd)
 
         # kraken2
@@ -287,7 +260,7 @@ def main(
         log = f"{output_dir}/report.log"
         err = f"{output_dir}/run.log"
         dep = (
-            f"{log_dir}/{sample.idx}_{sample.id}.trimmed.zcat.OK"
+            f"{log_dir}/{sample.idx}_{sample.id}.trimmed.filtered.fastq.gz.OK"
             if idx == 0
             else f"{log_dir}/{run.samples[idx-1].idx}_{run.samples[idx-1].id}.kraken2.OK"
         )
@@ -399,7 +372,7 @@ class PipelineGenerator(object):
 
 
 class Sample(object):
-    def __init__(self):
+    def __init__(self):  # type: ignore
         self.idx = ""
         self.id = ""
         self.barcode = ""
@@ -434,4 +407,4 @@ class Run(object):
 
 
 if __name__ == "__main__":
-    main()
+    main()  # type: ignore
