@@ -383,7 +383,7 @@ class Sample(object):
 
 class Run(object):
     def __init__(self, id):
-        self.idx = id[4::]
+        self.idx = id[3::]
         self.id = id
         self.samples = []
 
