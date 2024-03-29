@@ -72,21 +72,25 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
     with open(sample_file, "r") as file:
         index = 0
         for line in file:
+            print(line)
             if not line.startswith("#"):
                 index += 1
                 novogene_sample_id, fastq_infix = line.rstrip().split("\t")
                 #search directory for fastq files
-                novogene_fastq_sample_directory = f"{novogene_illumina_dir}/{novogene_sample_id}"
-                for file_name in os.listdir(novogene_fastq_sample_directory):
+                fastq_dir = f"{novogene_illumina_dir}/01.RawData"
+                sample_dir = f"{fastq_dir}/{novogene_sample_id}"
+                files = {}
+                novogene_fastq1s = ""
+                novogene_fastq2s = ""
+                for file_name in os.listdir(sample_dir):
                     if file_name.endswith("fq.gz"):
+                        print(file_name)
                         m = re.match("^(.+)_[12].fq.gz", file_name)
                         if m is not None:
-                            sample_id = int(m.group(1))
-                            name = m.group(1)
-                            print(f"{file_name} {sample_id} {name}")
-                            samples[sample_id] = name
+                            prefix_fastq_file_name = m.group(1)
+                            print(f"{prefix_fastq_file_name} {novogene_sample_id} {fastq_infix}")
 
-                run.add_sample(index, sample_id, fastq1, fastq2)
+                run.add_sample(index, novogene_sample_id, novogene_fastq1s, novogene_fastq2s, 1, fastq_infix)
 
     # create directories in destination folder directory
     analysis_dir = f"{dest_dir}/analysis"
@@ -293,21 +297,22 @@ class PipelineGenerator(object):
 
 class Sample(object):
 
-    def __init__(self, idx, id, novogene_fastq1, novogene_fastq2, no_novogene_fastq_files):
+    def __init__(self, idx, id, novogene_fastq1s, novogene_fastq2s, no_novogene_fastq_files, fastq_infix):
         self.idx = idx
         self.id = id
-        self.novogene_fastq1 = novogene_fastq1
-        self.novogene_fastq2 = novogene_fastq2
+        self.novogene_fastq1s = novogene_fastq1s
+        self.novogene_fastq2s = novogene_fastq2s
         self.no_files = no_novogene_fastq_files
+        self.fastq_infix = fastq_infix
         self.fastq1 = ""
         self.fastq2 = ""
 
     def print(self):
         print(f"index                    : {self.idx}")
         print(f"id                       : {self.id}")
-        print(f"novogene_fastq1          : {self.novogene_fastq1}")
-        print(f"novogene_fastq2          : {self.novogene_fastq2}")
-        print(f"no_novogene_fastq_files  : {self.novogene_fastq2}")
+        print(f"novogene_fastq1          : {self.novogene_fastq1s}")
+        print(f"novogene_fastq2          : {self.novogene_fastq2s}")
+        print(f"no_novogene_fastq_files  : {self.no_files}")
         print(f"fastq1                   : {self.fastq1}")
         print(f"fastq2                   : {self.fastq2}")
 
@@ -318,8 +323,8 @@ class Run(object):
         self.id = id
         self.samples = []
 
-    def add_sample(self, idx, sample_id, fastq1, fastq2):
-        self.samples.append(Sample(idx, sample_id, fastq1, fastq2))
+    def add_sample(self, idx, sample_id, novogene_fastq1s, novogene_fastq2s, no_novogene_files, fastq_infix):
+        self.samples.append(Sample(idx, sample_id, novogene_fastq1s, novogene_fastq2s, no_novogene_files, fastq_infix))
 
     def print(self):
         print(f"++++++++++++++++++++")
@@ -328,3 +333,6 @@ class Run(object):
         for sample in self.samples:
             sample.print()
         print(f"++++++++++++++++++++")
+
+if __name__ == "__main__":
+    main() # type: ignore
