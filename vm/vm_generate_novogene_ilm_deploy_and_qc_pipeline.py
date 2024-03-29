@@ -80,6 +80,7 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
                 fastq_dir = f"{novogene_illumina_dir}/01.RawData"
                 sample_dir = f"{fastq_dir}/{novogene_sample_id}"
                 files = {}
+                no_files = 0
                 novogene_fastq1s = ""
                 novogene_fastq2s = ""
                 for file_name in os.listdir(sample_dir):
@@ -91,6 +92,8 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
                             print(f"{prefix_fastq_file_name} {novogene_sample_id} {fastq_infix}")
 
                 run.add_sample(index, novogene_sample_id, novogene_fastq1s, novogene_fastq2s, 1, fastq_infix)
+
+    run.print()
 
     # create directories in destination folder directory
     analysis_dir = f"{dest_dir}/analysis"
