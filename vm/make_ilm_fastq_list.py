@@ -63,7 +63,3 @@ def main(ilm_dir, vanilla):
 
     for id, name in enumerate(samples):
         print(f"{id}\t{name}_R1_001.fastq.gz\t{name}_R2_001.fastq.gz")
-
-
-if __name__ == "__main__":
-    main()
