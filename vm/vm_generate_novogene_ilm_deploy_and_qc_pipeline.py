@@ -55,13 +55,13 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
     illumina_dir = os.path.abspath(novogene_illumina_dir)
     fastq_dir = illumina_dir
 
-    print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
-    print("\t{0:<20} :   {1:<10}".format("run_dir", run_id))
-    print("\t{0:<20} :   {1:<10}".format("novogene_illumina_dir", novogene_illumina_dir))
-    print("\t{0:<20} :   {1:<10}".format("working_dir", working_dir))
-    print("\t{0:<20} :   {1:<10}".format("sample_file", sample_file))
-    print("\t{0:<20} :   {1:<10}".format("dest_dir", dest_dir))
-    print("\t{0:<20} :   {1:<10}".format("fastq_path", fastq_dir))
+    print("\t{0:<21} :   {1:<10}".format("make_file", make_file))
+    print("\t{0:<21} :   {1:<10}".format("run_dir", run_id))
+    print("\t{0:<21} :   {1:<10}".format("novogene_illumina_dir", novogene_illumina_dir))
+    print("\t{0:<21} :   {1:<10}".format("working_dir", working_dir))
+    print("\t{0:<21} :   {1:<10}".format("sample_file", sample_file))
+    print("\t{0:<21} :   {1:<10}".format("dest_dir", dest_dir))
+    print("\t{0:<21} :   {1:<10}".format("fastq_path", fastq_dir))
 
     # read sample file
     ## novogene-sample-id fastq-infix
@@ -72,28 +72,35 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
     with open(sample_file, "r") as file:
         index = 0
         for line in file:
-            print(line)
             if not line.startswith("#"):
                 index += 1
-                novogene_sample_id, fastq_infix = line.rstrip().split("\t")
+                novogene_sample_id, sample_id = line.rstrip().split("\t")
                 #search directory for fastq files
                 fastq_dir = f"{novogene_illumina_dir}/01.RawData"
-                sample_dir = f"{fastq_dir}/{novogene_sample_id}"
+                sample_dir = f"{os.path.abspath(fastq_dir)}/{novogene_sample_id}"
                 files = {}
                 no_files = 0
                 novogene_fastq1s = ""
                 novogene_fastq2s = ""
                 for file_name in os.listdir(sample_dir):
                     if file_name.endswith("fq.gz"):
-                        print(file_name)
                         m = re.match("^(.+)_[12].fq.gz", file_name)
                         if m is not None:
                             prefix_fastq_file_name = m.group(1)
-                            print(f"{prefix_fastq_file_name} {novogene_sample_id} {fastq_infix}")
+                            if prefix_fastq_file_name in files:
+                                files[prefix_fastq_file_name] += 1
+                            else:
+                                files[prefix_fastq_file_name] = 1
 
-                run.add_sample(index, novogene_sample_id, novogene_fastq1s, novogene_fastq2s, 1, fastq_infix)
+                no_files = len(files.keys())
 
-    run.print()
+                for prefix_file_name in sorted(list(files.keys())):
+                    novogene_fastq1s += f"{sample_dir}/{prefix_file_name}_1.fq.gz "
+                    novogene_fastq2s += f"{sample_dir}/{prefix_file_name}_2.fq.gz "
+
+                run.add_sample(index, novogene_sample_id, sample_id, novogene_fastq1s, novogene_fastq2s, no_files)
+
+    #run.print()
 
     # create directories in destination folder directory
     analysis_dir = f"{dest_dir}/analysis"
@@ -119,25 +126,43 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
     multiqc_dep = ""
 
     # # analyze
+
     # fastqc_multiqc_dep = ""
     # kraken2_multiqc_dep = ""
     # kraken2_reports = ""
 
-    # for idx, sample in enumerate(run.samples):
-    #     # copy the files
-    #     src_fastq1 = f"{fastq_dir}/{sample.fastq1}"
-    #     dst_fastq1 = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz"
-    #     tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK"
-    #     dep = ""
-    #     cmd = f"cp {src_fastq1} {dst_fastq1}"
-    #     pg.add(tgt, dep, cmd)
+    for idx, sample in enumerate(run.samples):
+        # copy the files
+        if sample.no_files == 1:
+            src_fastq1 = f"{sample.novogene_fastq1s}"
+            dst_fastq1 = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz"
+            tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK"
+            dep = ""
+            cmd = f"cp {src_fastq1} {dst_fastq1}"
+            pg.add(tgt, dep, cmd)
 
-    #     src_fastq2 = f"{fastq_dir}/{sample.fastq2}"
-    #     dst_fastq2 = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz"
-    #     tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
-    #     dep = ""
-    #     cmd = f"cp {src_fastq2} {dst_fastq2}"
-    #     pg.add(tgt, dep, cmd)
+            src_fastq2 = f"{sample.novogene_fastq2s}"
+            dst_fastq2 = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz"
+            tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
+            dep = ""
+            cmd = f"cp {src_fastq2} {dst_fastq2}"
+            pg.add(tgt, dep, cmd)
+
+        else:
+            src_fastq1 = f"{sample.novogene_fastq1s}"
+            dst_fastq1 = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz"
+            tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK"
+            dep = ""
+            cmd = f"zcat {src_fastq1} | gzip > {dst_fastq1}"
+            pg.add(tgt, dep, cmd)
+
+            src_fastq2 = f"{sample.novogene_fastq2s}"
+            dst_fastq2 = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz"
+            tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
+            dep = ""
+            cmd = f"zcat {src_fastq2} | gzip > {dst_fastq2}"
+            pg.add(tgt, dep, cmd)
+
 
     #     sample.fastq1 = dst_fastq1
     #     sample.fastq2 = dst_fastq2
@@ -300,29 +325,30 @@ class PipelineGenerator(object):
 
 class Sample(object):
 
-    def __init__(self, idx, id, novogene_fastq1s, novogene_fastq2s, no_novogene_fastq_files, fastq_infix):
+    def __init__(self, idx, novogene_id, id, novogene_fastq1s, novogene_fastq2s, no_novogene_fastq_files):
         self.idx = idx
+        self.novogene_id = novogene_id
         self.id = id
         self.novogene_fastq1s = novogene_fastq1s
         self.novogene_fastq2s = novogene_fastq2s
         self.no_files = no_novogene_fastq_files
-        self.fastq_infix = fastq_infix
-        self.fastq1 = ""
-        self.fastq2 = ""
 
     def print(self):
         print(f"index                    : {self.idx}")
+        print(f"novogene id              : {self.novogene_id}")
         print(f"id                       : {self.id}")
-        print(f"novogene_fastq1          : {self.novogene_fastq1s}")
-        print(f"novogene_fastq2          : {self.novogene_fastq2s}")
+        print(f"novogene_fastq1s         : {self.novogene_fastq1s}")
+        print(f"novogene_fastq2s         : {self.novogene_fastq2s}")
         print(f"no_novogene_fastq_files  : {self.no_files}")
-        print(f"fastq1                   : {self.fastq1}")
-        print(f"fastq2                   : {self.fastq2}")
 
 
 class Run(object):
     def __init__(self, id):
-        self.idx = id[3::]
+        m = re.match("\D+(\d+)", id)
+        if m is not None:
+            self.idx = m.group(1)
+        else:
+            self.idx = 999
         self.id = id
         self.samples = []
 
