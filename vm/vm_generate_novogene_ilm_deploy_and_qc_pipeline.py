@@ -127,12 +127,15 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
 
     # # analyze
 
-    # fastqc_multiqc_dep = ""
-    # kraken2_multiqc_dep = ""
-    # kraken2_reports = ""
+    fastqc_multiqc_dep = ""
+    kraken2_multiqc_dep = ""
+    kraken2_reports = ""
 
     for idx, sample in enumerate(run.samples):
         # copy the files
+        dst_fastq1 = ""
+        dst_fastq2 = ""
+
         if sample.no_files == 1:
             src_fastq1 = f"{sample.novogene_fastq1s}"
             dst_fastq1 = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz"
@@ -148,6 +151,8 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
             cmd = f"cp {src_fastq2} {dst_fastq2}"
             pg.add(tgt, dep, cmd)
 
+            sample.fastq1 = dst_fastq1
+            sample.fastq2 = dst_fastq2
         else:
             src_fastq1 = f"{sample.novogene_fastq1s}"
             dst_fastq1 = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz"
@@ -163,125 +168,120 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
             cmd = f"zcat {src_fastq2} | gzip > {dst_fastq2}"
             pg.add(tgt, dep, cmd)
 
+            sample.fastq1 = dst_fastq1
+            sample.fastq2 = dst_fastq2
 
-    #     sample.fastq1 = dst_fastq1
-    #     sample.fastq2 = dst_fastq2
+        # fastqc
+        fastqc = "/usr/local/FastQC-0.11.9/fastqc"
+        fastqc_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/fastqc_result"
 
-    #     # fastqc
-    #     fastqc = "/usr/local/FastQC-0.11.9/fastqc"
-    #     fastqc_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/fastqc_result"
+        log = f"{log_dir}/{sample.idx}_{sample.id}_fastqc1.log"
+        err = f"{log_dir}/{sample.idx}_{sample.id}_fastqc1.err"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}_fastqc1.OK"
+        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK"
+        cmd = f"{fastqc} {sample.fastq1} -o {fastqc_dir} > {log} 2> {err}"
+        pg.add(tgt, dep, cmd)
+        fastqc_multiqc_dep += f" {tgt}"
 
-    #     log = f"{log_dir}/{sample.idx}_{sample.id}_fastqc1.log"
-    #     err = f"{log_dir}/{sample.idx}_{sample.id}_fastqc1.err"
-    #     tgt = f"{log_dir}/{sample.idx}_{sample.id}_fastqc1.OK"
-    #     dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK"
-    #     cmd = f"{fastqc} {sample.fastq1} -o {fastqc_dir} > {log} 2> {err}"
-    #     pg.add(tgt, dep, cmd)
-    #     fastqc_multiqc_dep += f" {tgt}"
+        log = f"{log_dir}/{sample.idx}_{sample.id}_fastqc2.log"
+        err = f"{log_dir}/{sample.idx}_{sample.id}_fastqc2.err"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}_fastqc2.OK"
+        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
+        cmd = f"{fastqc} {sample.fastq2} -o {fastqc_dir} > {log} 2> {err}"
+        pg.add(tgt, dep, cmd)
+        fastqc_multiqc_dep += f" {tgt}"
 
-    #     log = f"{log_dir}/{sample.idx}_{sample.id}_fastqc2.log"
-    #     err = f"{log_dir}/{sample.idx}_{sample.id}_fastqc2.err"
-    #     tgt = f"{log_dir}/{sample.idx}_{sample.id}_fastqc2.OK"
-    #     dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
-    #     cmd = f"{fastqc} {sample.fastq2} -o {fastqc_dir} > {log} 2> {err}"
-    #     pg.add(tgt, dep, cmd)
-    #     fastqc_multiqc_dep += f" {tgt}"
+        # kraken2
+        kraken2 = "/usr/local/kraken2-2.1.2/kraken2"
+        kraken2_std_db = "/usr/local/ref/kraken2/20210908_standard"
+        input_fastq_file1 = f"{sample.fastq1}"
+        input_fastq_file2 = f"{sample.fastq2}"
+        output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
+        report_file = f"{output_dir}/report.txt"
+        log = f"{output_dir}/report.log"
+        err = f"{output_dir}/run.log"
+        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
+        if idx == 0:
+            dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
+        else:
+            dep = f"{log_dir}/{run.idx}_{run.samples[idx-1].idx}_{run.samples[idx-1].id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{run.samples[idx-1].idx}_{run.samples[idx-1].id}_R2.fastq.gz.OK {log_dir}/{run.samples[idx-1].idx}_{run.samples[idx-1].id}.kraken2.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.OK"
+        kraken2_multiqc_dep += f" {tgt}"
+        kraken2_reports += f" {log}"
+        cmd = f"{kraken2} --db {kraken2_std_db} --paired {input_fastq_file1} {input_fastq_file2} --use-names --report {report_file} > {log} 2> {err}"
+        pg.add(tgt, dep, cmd)
 
-    #     # kraken2
-    #     kraken2 = "/usr/local/kraken2-2.1.2/kraken2"
-    #     kraken2_std_db = "/usr/local/ref/kraken2/20210908_standard"
-    #     input_fastq_file1 = f"{sample.fastq1}"
-    #     input_fastq_file2 = f"{sample.fastq2}"
-    #     output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
-    #     report_file = f"{output_dir}/report.txt"
-    #     log = f"{output_dir}/report.log"
-    #     err = f"{output_dir}/run.log"
-    #     dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
-    #     if idx == 0:
-    #         dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
-    #     else:
-    #         dep = f"{log_dir}/{run.idx}_{run.samples[idx-1].idx}_{run.samples[idx-1].id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{run.samples[idx-1].idx}_{run.samples[idx-1].id}_R2.fastq.gz.OK {log_dir}/{run.samples[idx-1].idx}_{run.samples[idx-1].id}.kraken2.OK"
-    #     tgt = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.OK"
-    #     kraken2_multiqc_dep += f" {tgt}"
-    #     kraken2_reports += f" {log}"
-    #     cmd = (
-    #         f"{kraken2} --db {kraken2_std_db} --paired {input_fastq_file1} {input_fastq_file2} --use-names --report {report_file} "
-    #         + '| perl -lane \'{@F=split("\\t"); $$F[2]=~/(.+) \(taxid (\d+)\)/; print "$$F[0]\\t$$F[1]\\t$$1\\t$$2\\t$$F[3]\\t$$F[4]"}\''
-    #         + f"> {log} 2> {err}"
-    #     )
-    #     pg.add(tgt, dep, cmd)
+        # plot kronatools radial tree
+        kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
+        output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
+        input_txt_file = f"{output_dir}/report.txt"
+        output_html_file = f"{output_dir}/krona_radial_tree.html"
+        log = f"{log_dir}/{sample.idx}_{sample.id}.krona_radial_tree.log"
+        err = f"{log_dir}/{sample.idx}_{sample.id}.krona_radial_tree.err"
+        dep = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.krona_radial_tree.OK"
+        cmd = f"{kt_import_taxonomy} -m 3 -t 5 {input_txt_file} -o {output_html_file} > {log} 2> {err}"
+        pg.add(tgt, dep, cmd)
 
-    #     # plot kronatools radial tree
-    #     kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
-    #     output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
-    #     input_txt_file = f"{output_dir}/report.log"
-    #     output_html_file = f"{output_dir}/krona_radial_tree.html"
-    #     log = f"{log_dir}/{sample.idx}_{sample.id}.krona_radial_tree.log"
-    #     err = f"{log_dir}/{sample.idx}_{sample.id}.krona_radial_tree.err"
-    #     dep = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.OK"
-    #     tgt = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.krona_radial_tree.OK"
-    #     cmd = f"{kt_import_taxonomy} -q 2 -t 4 {input_txt_file} -o {output_html_file} > {log} 2> {err}"
-    #     pg.add(tgt, dep, cmd)
+        # assemble
+        # /usr/local/SPAdes-3.15.2/bin/spades.py -1 Siniae-1086-20_S3_L001_R1_001.fastq.gz -2 Siniae-1086-20_S3_L001_R2_001.fastq.gz -o 1086 --isolate
+        spades = "/usr/local/SPAdes-3.15.4/bin/spades.py"
+        output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/spades_result/assembly"
+        input_fastq_file1 = f"{sample.fastq1}"
+        input_fastq_file2 = f"{sample.fastq2}"
+        log = f"{log_dir}/{sample.idx}_{sample.id}.spades_assembly.log"
+        err = f"{log_dir}/{sample.idx}_{sample.id}.spades_assembly.err"
+        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.spades_assembly.OK"
+        cmd = f"{spades} -1 {input_fastq_file1} -2 {input_fastq_file2} -o {output_dir} --isolate > {log} 2> {err}"
+        pg.add(tgt, dep, cmd)
 
-    #     # assemble
-    #     # /usr/local/SPAdes-3.15.2/bin/spades.py -1 Siniae-1086-20_S3_L001_R1_001.fastq.gz -2 Siniae-1086-20_S3_L001_R2_001.fastq.gz -o 1086 --isolate
-    #     spades = "/usr/local/SPAdes-3.15.4/bin/spades.py"
-    #     output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/spades_result/assembly"
-    #     input_fastq_file1 = f"{sample.fastq1}"
-    #     input_fastq_file2 = f"{sample.fastq2}"
-    #     log = f"{log_dir}/{sample.idx}_{sample.id}.spades_assembly.log"
-    #     err = f"{log_dir}/{sample.idx}_{sample.id}.spades_assembly.err"
-    #     dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
-    #     tgt = f"{log_dir}/{sample.idx}_{sample.id}.spades_assembly.OK"
-    #     cmd = f"{spades} -1 {input_fastq_file1} -2 {input_fastq_file2} -o {output_dir} --isolate > {log} 2> {err}"
-    #     pg.add(tgt, dep, cmd)
+        # evaluate assembly
+        # Salmonella enterica Enteritidis
+        # Salmonella enterica Typhimurium
+        # Escherichia coli
+        # Vibrio spp.
+        # Streptococcus iniae
+        # Streptococcus equi
+        # Streptococcus suis
+        # bp_genbank2gff --stdout --accession AM933172 > AM933172.gff
+        # /usr/local/quast-5.2.0/quast.py -o quat_report -r /home/atks/analysis/20221101_vm_ngs/ref/e_coli/NC_000913.3.fasta contigs.fasta -g /home/atks/analysis/20221101_vm_ngs/ref/e_coli/U00096.gff
+        # choose reference
 
-    #     # evaluate assembly
-    #     # Salmonella enterica Enteritidis
-    #     # Salmonella enterica Typhimurium
-    #     # Escherichia coli
-    #     # Vibrio spp.
-    #     # Streptococcus iniae
-    #     # Streptococcus equi
-    #     # Streptococcus suis
-    #     # bp_genbank2gff --stdout --accession AM933172 > AM933172.gff
-    #     # /usr/local/quast-5.2.0/quast.py -o quat_report -r /home/atks/analysis/20221101_vm_ngs/ref/e_coli/NC_000913.3.fasta contigs.fasta -g /home/atks/analysis/20221101_vm_ngs/ref/e_coli/U00096.gff
-    #     # choose reference
+    multiqc = "/usr/local/bin/multiqc"
 
-    # multiqc = "/usr/local/bin/multiqc"
+    # plot fastqc multiqc results
+    analysis = "fastqc"
+    output_dir = f"{analysis_dir}/all/{analysis}"
+    log = f"{log_dir}/{analysis}.multiqc_report.log"
+    err = f"{log_dir}/{analysis}.multiqc_report.err"
+    dep = fastqc_multiqc_dep
+    tgt = f"{log_dir}/{analysis}.multiqc_report.OK"
+    cmd = f"cd {analysis_dir}; {multiqc} . -m fastqc -o {output_dir} -n {analysis} -dd -1 --no-ansi > {log} 2> {err}"
+    pg.add(tgt, dep, cmd)
 
-    # # plot fastqc multiqc results
-    # analysis = "fastqc"
-    # output_dir = f"{analysis_dir}/all/{analysis}"
-    # log = f"{log_dir}/{analysis}.multiqc_report.log"
-    # err = f"{log_dir}/{analysis}.multiqc_report.err"
-    # dep = fastqc_multiqc_dep
-    # tgt = f"{log_dir}/{analysis}.multiqc_report.OK"
-    # cmd = f"cd {analysis_dir}; {multiqc} . -m fastqc -o {output_dir} -n {analysis} -dd -1 --no-ansi > {log} 2> {err}"
-    # pg.add(tgt, dep, cmd)
+    # plot kraken2 multiqc results
+    analysis = "kraken2"
+    output_dir = f"{analysis_dir}/all/{analysis}"
+    log = f"{log_dir}/{analysis}.multiqc_report.log"
+    err = f"{log_dir}/{analysis}.multiqc_report.err"
+    dep = kraken2_multiqc_dep
+    tgt = f"{log_dir}/{analysis}.multiqc_report.OK"
+    cmd = f"cd {analysis_dir}; {multiqc} . -m kraken -o {output_dir} -n {analysis} -dd -1 --no-ansi > {log} 2> {err}"
+    pg.add(tgt, dep, cmd)
 
-    # # plot kraken2 multiqc results
-    # analysis = "kraken2"
-    # output_dir = f"{analysis_dir}/all/{analysis}"
-    # log = f"{log_dir}/{analysis}.multiqc_report.log"
-    # err = f"{log_dir}/{analysis}.multiqc_report.err"
-    # dep = kraken2_multiqc_dep
-    # tgt = f"{log_dir}/{analysis}.multiqc_report.OK"
-    # cmd = f"cd {analysis_dir}; {multiqc} . -m kraken -o {output_dir} -n {analysis} -dd -1 --no-ansi > {log} 2> {err}"
-    # pg.add(tgt, dep, cmd)
-
-    # # plot kronatools radial tree
-    # kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
-    # analysis = "kraken2"
-    # output_dir = f"{analysis_dir}/all/{analysis}"
-    # input_txt_files = kraken2_reports
-    # output_html_file = f"{output_dir}/krona_radial_tree.html"
-    # log = f"{log_dir}/{analysis}.krona_radial_tree.log"
-    # err = f"{log_dir}/{analysis}.krona_radial_tree.err"
-    # dep = f"{kraken2_multiqc_dep}"
-    # tgt = f"{log_dir}/{analysis}.krona_radial_tree.OK"
-    # cmd = f"{kt_import_taxonomy} -q 2 -t 4 {input_txt_files} -o {output_html_file} > {log} 2> {err}"
-    # pg.add(tgt, dep, cmd)
+    # plot kronatools radial tree
+    kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
+    analysis = "kraken2"
+    output_dir = f"{analysis_dir}/all/{analysis}"
+    input_txt_files = kraken2_reports
+    output_html_file = f"{output_dir}/krona_radial_tree.html"
+    log = f"{log_dir}/{analysis}.krona_radial_tree.log"
+    err = f"{log_dir}/{analysis}.krona_radial_tree.err"
+    dep = f"{kraken2_multiqc_dep}"
+    tgt = f"{log_dir}/{analysis}.krona_radial_tree.OK"
+    cmd = f"{kt_import_taxonomy} -q 2 -t 4 {input_txt_files} -o {output_html_file} > {log} 2> {err}"
+    pg.add(tgt, dep, cmd)
 
     # write make file
     print("Writing pipeline")
@@ -332,6 +332,8 @@ class Sample(object):
         self.novogene_fastq1s = novogene_fastq1s
         self.novogene_fastq2s = novogene_fastq2s
         self.no_files = no_novogene_fastq_files
+        self.fastq1 = ""
+        self.fastq2 = ""
 
     def print(self):
         print(f"index                    : {self.idx}")
