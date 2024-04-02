@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # The MIT License
-# Copyright (c) 2022 Adrian Tan <adrian_tan@nparks.gov.sg>
+# Copyright (c) 2024 Adrian Tan <adrian_tan@nparks.gov.sg>
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the 'Software'), to deal
 # in the Software without restriction, including without limitation the rights
@@ -104,10 +104,13 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
 
     # create directories in destination folder directory
     analysis_dir = f"{dest_dir}/analysis"
+    contigs_dir = f"{dest_dir}/contigs"
     new_dir = ""
     try:
         os.makedirs(log_dir, exist_ok=True)
         new_dir = analysis_dir
+        os.makedirs(new_dir, exist_ok=True)
+        new_dir = contigs_dir
         os.makedirs(new_dir, exist_ok=True)
         for sample in run.samples:
             new_dir = f"{analysis_dir}/{sample.idx}_{sample.id}"
@@ -125,8 +128,7 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
     pg = PipelineGenerator(make_file)
     multiqc_dep = ""
 
-    # # analyze
-
+    # analyze
     fastqc_multiqc_dep = ""
     kraken2_multiqc_dep = ""
     kraken2_reports = ""
@@ -234,6 +236,14 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
         dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
         tgt = f"{log_dir}/{sample.idx}_{sample.id}.spades_assembly.OK"
         cmd = f"{spades} -1 {input_fastq_file1} -2 {input_fastq_file2} -o {output_dir} --isolate > {log} 2> {err}"
+        pg.add(tgt, dep, cmd)
+
+        #copy contigs to main directory
+        src_fasta = f"{output_dir}/contigs.fasta"
+        dst_fasta = f"{contigs_dir}/{run.idx}_{sample.idx}_{sample.id}.contigs.fasta"
+        dep = f"{log_dir}/{sample.idx}_{sample.id}.spades_assembly.OK"
+        tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.contigs.fasta.OK"
+        cmd = f"cp {src_fasta} {dst_fasta}"
         pg.add(tgt, dep, cmd)
 
         # evaluate assembly
@@ -346,7 +356,7 @@ class Sample(object):
 
 class Run(object):
     def __init__(self, id):
-        m = re.match("\D+(\d+)", id)
+        m = re.match(r"\D+(\d+)", id)
         if m is not None:
             self.idx = m.group(1)
         else:
