@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # The MIT License
-# Copyright (c) 2023 Adrian Tan <adrian_tan@nparks.gov.sg>
+# Copyright (c) 2024 Adrian Tan <adrian_tan@nparks.gov.sg>
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the 'Software'), to deal
 # in the Software without restriction, including without limitation the rights
@@ -24,7 +24,7 @@ import re
 
 
 @click.command()
-@click.argument("input_fasta_files", nargs=-1)
+@click.argument("input_genbank_files", nargs=-1)
 @click.option(
     "-w",
     "--write",
@@ -33,32 +33,30 @@ import re
     show_default=True,
     help="reference fasta file",
 )
-def main(input_fasta_files, write):
+def main(input_genbank_files, write):
     """
-    Rename FASTA header
+    Extract country IDs from genbank files.
 
-    e.g. rename_seq_header.py target.fa
+    e.g. genbank_extract_country_year.py
     """
     n = 0
     n_country_annotated = 0
-    n_submission_date_annotated = 0
-    n_collection_date_annotated = 0
+    n_date_annotated = 0
 
-    for input_fasta_file in input_fasta_files:
+    for genbank_file in input_genbank_files:
         n += 1
         acc = ""
         header = ""
-        with open(input_fasta_file) as file:
+        with open(genbank_file) as file:
             for line in file:
                 if line.startswith(">"):
                     header = line.strip()
                     acc = header.lstrip(">").split(" ")[0]
                     break
-        genbank_file = input_fasta_file.replace("fasta", "genbank")
+        genbank_file = input_fasta_file.replace("fasta", "seq")
         country = "no country"
-        sub_date = "no date"
-        sub_year = "no year"
-        col_date = "no date"
+        date = "no date"
+        year = "no year"
         if os.path.isfile(genbank_file):
             with open(genbank_file) as file:
                 for line in file:
@@ -73,22 +71,16 @@ def main(input_fasta_files, write):
                             continue
                         m = re.match(r"JOURNAL   Submitted \((.+)\).+", line)
                         if m:
-                            n_submission_date_annotated += 1
-                            sub_date = m.group(1)
-                            sub_year = sub_date.split("-")[2]
-                            continue
-                        m = re.match(r'/collection_date="(.+)"', line)
-                        if m:
-                            n_collection_date_annotated += 1
-                            col_date = m.group(1)
+                            n_date_annotated += 1
+                            date = m.group(1)
+                            year = date.split("-")[2]
                             continue
 
-        print(f"{acc}\t{country}\t{col_date}\t{sub_year}\t{header}")
+        print(f"{acc}\t{country}\t{year}\t{header}")
 
-    print(f"no fasta files                : {n}")
-    print(f"no country annotated          : {n_country_annotated}")
-    print(f"no submission date annotated  : {n_submission_date_annotated}")
-    print(f"no collection date annotated  : {n_collection_date_annotated}")
+    print(f"no fasta files       : {n}")
+    print(f"no country annotated : {n_country_annotated}")
+    print(f"no date annotated    : {n_date_annotated}")
 
     #  JOURNAL   Submitted (15-MAY-2007) Chapman D.A., Microbiology, Institute Of
     #             Animal Health, Pirbright Laboratory, Ash Road, Pirbright, Woking,
