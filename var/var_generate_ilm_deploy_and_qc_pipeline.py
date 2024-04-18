@@ -53,9 +53,8 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     """
     dest_dir = working_dir + "/" + run_id
     aux_dir = f"{working_dir}/aux"
-
-    fastq_dir = ""
     illumina_dir = os.path.abspath(illumina_dir)
+    fastq_dir = ""
     for dirpath, dirnames, filenames in os.walk(illumina_dir):
         for dirname in dirnames:
             if dirname == "Fastq":
@@ -74,14 +73,6 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     print("\t{0:<20} :   {1:<10}".format("sample_file", sample_file))
     print("\t{0:<20} :   {1:<10}".format("dest_dir", dest_dir))
     print("\t{0:<20} :   {1:<10}".format("fastq_path", fastq_dir))
-
-    # programs
-    bcl2fastq = "/usr/local/bin/bcl2fastq"
-    fastqc = "/usr/local/FastQC-0.12.1/fastqc"
-    kraken2 = "/usr/local/kraken2-2.1.2/kraken2"
-    kraken2_std_db = "/usr/local/ref/kraken2/20210908_standard"
-    kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
-    multiqc = "/usr/local/bin/multiqc"
 
     # read sample file
     run = Run(run_id)
@@ -121,6 +112,14 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
             os.makedirs(new_dir, exist_ok=True)
     except OSError as error:
         print(f"Directory {new_dir} cannot be created")
+
+    # programs
+    bcl2fastq = "/usr/local/bin/bcl2fastq"
+    fastqc = "/usr/local/FastQC-0.12.1/fastqc"
+    kraken2 = "/usr/local/kraken2-2.1.2/kraken2"
+    kraken2_std_db = "/usr/local/ref/kraken2/20210908_standard"
+    kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
+    multiqc = "/usr/local/bin/multiqc"
 
     # initialize
     pg = PipelineGenerator(make_file)
@@ -362,12 +361,6 @@ class PipelineGenerator(object):
 
 
 class Sample(object):
-    def __init__(self):
-        self.idx = ""
-        self.id = ""
-        self.fastq1 = ""
-        self.fastq2 = ""
-
     def __init__(self, idx, id, fastq1, fastq2):
         self.idx = idx
         self.id = id
@@ -400,4 +393,4 @@ class Run(object):
 
 
 if __name__ == "__main__":
-    main()
+    main() # type: ignore

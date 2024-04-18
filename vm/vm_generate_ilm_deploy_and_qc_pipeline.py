@@ -54,7 +54,11 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     log_dir = f"{working_dir}/log"
     dest_dir = working_dir + "/" + run_id
     illumina_dir = os.path.abspath(illumina_dir)
-    fastq_dir = illumina_dir
+    fastq_dir = ""
+    for dirpath, dirnames, filenames in os.walk(illumina_dir):
+        for dirname in dirnames:
+            if dirname == "Fastq":
+                fastq_dir = os.path.join(dirpath, dirname)
 
     print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
     print("\t{0:<20} :   {1:<10}".format("run_dir", run_id))
@@ -93,6 +97,15 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     except OSError as error:
         print(f"Directory {new_dir} cannot be created")
 
+    #programs
+    bcl2fastq = "/usr/local/bin/bcl2fastq"
+    fastqc = "/usr/local/FastQC-0.11.9/fastqc"
+    kraken2 = "/usr/local/kraken2-2.1.2/kraken2"
+    kraken2_std_db = "/usr/local/ref/kraken2/20210908_standard"
+    kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
+    multiqc = "/usr/local/bin/multiqc"
+    spades = "/usr/local/SPAdes-3.15.4/bin/spades.py"
+
     # initialize
     pg = PipelineGenerator(make_file)
     multiqc_dep = ""
@@ -122,7 +135,6 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         sample.fastq2 = dst_fastq2
 
         # fastqc
-        fastqc = "/usr/local/FastQC-0.11.9/fastqc"
         fastqc_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/fastqc_result"
 
         log = f"{log_dir}/{sample.idx}_{sample.id}_fastqc1.log"
@@ -142,44 +154,32 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         fastqc_multiqc_dep += f" {tgt}"
 
         # kraken2
-        kraken2 = "/usr/local/kraken2-2.1.2/kraken2"
-        kraken2_std_db = "/usr/local/ref/kraken2/20210908_standard"
-        input_fastq_file1 = f"{sample.fastq1}"
-        input_fastq_file2 = f"{sample.fastq2}"
-        output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
-        report_file = f"{output_dir}/report.txt"
-        log = f"{output_dir}/report.log"
-        err = f"{output_dir}/run.log"
-        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
-        if idx == 0:
-            dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
-        else:
-            dep = f"{log_dir}/{run.idx}_{run.samples[idx-1].idx}_{run.samples[idx-1].id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{run.samples[idx-1].idx}_{run.samples[idx-1].id}_R2.fastq.gz.OK {log_dir}/{run.samples[idx-1].idx}_{run.samples[idx-1].id}.kraken2.OK"
-        tgt = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.OK"
-        kraken2_multiqc_dep += f" {tgt}"
-        kraken2_reports += f" {log}"
-        cmd = (
-            f"{kraken2} --db {kraken2_std_db} --paired {input_fastq_file1} {input_fastq_file2} --use-names --report {report_file} "
-            + '| perl -lane \'{@F=split("\\t"); $$F[2]=~/(.+) \(taxid (\d+)\)/; print "$$F[0]\\t$$F[1]\\t$$1\\t$$2\\t$$F[3]\\t$$F[4]"}\''
-            + f"> {log} 2> {err}"
-        )
-        pg.add(tgt, dep, cmd)
+        # input_fastq_file1 = f"{sample.fastq1}"
+        # input_fastq_file2 = f"{sample.fastq2}"
+        # output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
+        # report_file = f"{output_dir}/report.txt"
+        # log = f"{output_dir}/report.log"
+        # err = f"{output_dir}/run.log"
+        # dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
+        # tgt = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.OK"
+        # kraken2_multiqc_dep += f" {tgt}"
+        # kraken2_reports += f" {log}"
+        # cmd = f"{kraken2} --db {kraken2_std_db} --threads 10 --paired {input_fastq_file1} {input_fastq_file2} --use-names --report {report_file} > {log} 2> {err}"
+        # pg.add_srun(tgt, dep, cmd, 1,60000)
 
-        # plot kronatools radial tree
-        kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
-        output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
-        input_txt_file = f"{output_dir}/report.log"
-        output_html_file = f"{output_dir}/krona_radial_tree.html"
-        log = f"{log_dir}/{sample.idx}_{sample.id}.krona_radial_tree.log"
-        err = f"{log_dir}/{sample.idx}_{sample.id}.krona_radial_tree.err"
-        dep = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.OK"
-        tgt = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.krona_radial_tree.OK"
-        cmd = f"{kt_import_taxonomy} -q 2 -t 4 {input_txt_file} -o {output_html_file} > {log} 2> {err}"
-        pg.add(tgt, dep, cmd)
+        # # plot kronatools radial tree
+        # output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
+        # input_txt_file = f"{output_dir}/report.log"
+        # output_html_file = f"{output_dir}/krona_radial_tree.html"
+        # log = f"{log_dir}/{sample.idx}_{sample.id}.krona_radial_tree.log"
+        # err = f"{log_dir}/{sample.idx}_{sample.id}.krona_radial_tree.err"
+        # dep = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.OK"
+        # tgt = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.krona_radial_tree.OK"
+        # cmd = f"{kt_import_taxonomy} -m 3 -t 5 {input_txt_file} -o {output_html_file} > {log} 2> {err}"
+        # pg.add(tgt, dep, cmd)
 
         # assemble
         # /usr/local/SPAdes-3.15.2/bin/spades.py -1 Siniae-1086-20_S3_L001_R1_001.fastq.gz -2 Siniae-1086-20_S3_L001_R2_001.fastq.gz -o 1086 --isolate
-        spades = "/usr/local/SPAdes-3.15.4/bin/spades.py"
         output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/spades_result/assembly"
         input_fastq_file1 = f"{sample.fastq1}"
         input_fastq_file2 = f"{sample.fastq2}"
@@ -188,21 +188,11 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
         tgt = f"{log_dir}/{sample.idx}_{sample.id}.spades_assembly.OK"
         cmd = f"{spades} -1 {input_fastq_file1} -2 {input_fastq_file2} -o {output_dir} --isolate > {log} 2> {err}"
-        pg.add(tgt, dep, cmd)
+        pg.add_srun(tgt, dep, cmd, 6, 5000)
 
-        # evaluate assembly
-        # Salmonella enterica Enteritidis
-        # Salmonella enterica Typhimurium
-        # Escherichia coli
-        # Vibrio spp.
-        # Streptococcus iniae
-        # Streptococcus equi
-        # Streptococcus suis
-        # bp_genbank2gff --stdout --accession AM933172 > AM933172.gff
-        # /usr/local/quast-5.2.0/quast.py -o quat_report -r /home/atks/analysis/20221101_vm_ngs/ref/e_coli/NC_000913.3.fasta contigs.fasta -g /home/atks/analysis/20221101_vm_ngs/ref/e_coli/U00096.gff
-        # choose reference
+        # align to de novo assembly
 
-    multiqc = "/usr/local/bin/multiqc"
+
 
     # plot fastqc multiqc results
     analysis = "fastqc"
@@ -225,7 +215,6 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     pg.add(tgt, dep, cmd)
 
     # plot kronatools radial tree
-    kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
     analysis = "kraken2"
     output_dir = f"{analysis_dir}/all/{analysis}"
     input_txt_files = kraken2_reports
@@ -249,6 +238,12 @@ class PipelineGenerator(object):
         self.deps = []
         self.cmds = []
         self.clean_cmd = ""
+
+    def add_srun(self, tgt, dep, cmd, cpu, mem):
+        self.tgts.append(tgt)
+        self.deps.append(dep)
+        self.cmds.append(f"srun --mincpus {cpu} {cmd}")
+        # self.cmds.append(f"srun --mincpus {cpu} --mem {mem} {cmd}")
 
     def add(self, tgt, dep, cmd):
         self.tgts.append(tgt)
@@ -278,11 +273,6 @@ class PipelineGenerator(object):
 
 
 class Sample(object):
-    def __init__(self):
-        self.idx = ""
-        self.id = ""
-        self.fastq1 = ""
-        self.fastq2 = ""
 
     def __init__(self, idx, id, fastq1, fastq2):
         self.idx = idx
@@ -299,7 +289,11 @@ class Sample(object):
 
 class Run(object):
     def __init__(self, id):
-        self.idx = id[3::]
+        m = re.match(r"\D+(\d+)", id)
+        if m is not None:
+            self.idx = m.group(1)
+        else:
+            self.idx = 999
         self.id = id
         self.samples = []
 
@@ -316,4 +310,4 @@ class Run(object):
 
 
 if __name__ == "__main__":
-    main()
+    main() # type: ignore

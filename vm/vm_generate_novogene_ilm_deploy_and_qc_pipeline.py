@@ -124,6 +124,14 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
     except OSError as error:
         print(f"Directory {new_dir} cannot be created")
 
+    #programs
+    fastqc = "/usr/local/FastQC-0.11.9/fastqc"
+    kraken2 = "/usr/local/kraken2-2.1.2/kraken2"
+    kraken2_std_db = "/usr/local/ref/kraken2/20210908_standard"
+    kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
+    multiqc = "/usr/local/bin/multiqc"
+    spades = "/usr/local/SPAdes-3.15.4/bin/spades.py"
+
     # initialize
     pg = PipelineGenerator(make_file)
     multiqc_dep = ""
@@ -174,7 +182,6 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
             sample.fastq2 = dst_fastq2
 
         # fastqc
-        fastqc = "/usr/local/FastQC-0.11.9/fastqc"
         fastqc_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/fastqc_result"
 
         log = f"{log_dir}/{sample.idx}_{sample.id}_fastqc1.log"
@@ -194,7 +201,6 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
         fastqc_multiqc_dep += f" {tgt}"
 
         # kraken2
-        kraken2 = "/usr/local/kraken2-2.1.2/kraken2"
         kraken2_std_db = "/usr/local/ref/kraken2/20210908_standard"
         input_fastq_file1 = f"{sample.fastq1}"
         input_fastq_file2 = f"{sample.fastq2}"
@@ -214,7 +220,6 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
         pg.add(tgt, dep, cmd)
 
         # plot kronatools radial tree
-        kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
         output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
         input_txt_file = f"{output_dir}/report.txt"
         output_html_file = f"{output_dir}/krona_radial_tree.html"
@@ -227,7 +232,6 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
 
         # assemble
         # /usr/local/SPAdes-3.15.2/bin/spades.py -1 Siniae-1086-20_S3_L001_R1_001.fastq.gz -2 Siniae-1086-20_S3_L001_R2_001.fastq.gz -o 1086 --isolate
-        spades = "/usr/local/SPAdes-3.15.4/bin/spades.py"
         output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/spades_result/assembly"
         input_fastq_file1 = f"{sample.fastq1}"
         input_fastq_file2 = f"{sample.fastq2}"
@@ -258,7 +262,6 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
         # /usr/local/quast-5.2.0/quast.py -o quat_report -r /home/atks/analysis/20221101_vm_ngs/ref/e_coli/NC_000913.3.fasta contigs.fasta -g /home/atks/analysis/20221101_vm_ngs/ref/e_coli/U00096.gff
         # choose reference
 
-    multiqc = "/usr/local/bin/multiqc"
 
     # plot fastqc multiqc results
     analysis = "fastqc"
