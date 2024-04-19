@@ -80,9 +80,11 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
 
     # create directories in destination folder directory
     analysis_dir = f"{dest_dir}/analysis"
+    contigs_dir = f"{dest_dir}/contigs"
     new_dir = ""
     try:
         os.makedirs(log_dir, exist_ok=True)
+        os.makedirs(contigs_dir, exist_ok=True)
         new_dir = analysis_dir
         os.makedirs(new_dir, exist_ok=True)
         for sample in run.samples:
@@ -190,6 +192,14 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         tgt = f"{log_dir}/{sample.idx}_{sample.id}.spades_assembly.OK"
         cmd = f"{spades} -1 {input_fastq_file1} -2 {input_fastq_file2} -o {output_dir} --threads 12 --isolate > {log} 2> {err}"
         pg.add_srun(tgt, dep, cmd, 12, 1000)
+
+        #copy contigs to main directory
+        src_fasta = f"{output_dir}/contigs.fasta"
+        dst_fasta = f"{contigs_dir}/{run.idx}_{sample.idx}_{sample.id}.contigs.fasta"
+        dep = f"{log_dir}/{sample.idx}_{sample.id}.spades_assembly.OK"
+        tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.contigs.fasta.OK"
+        cmd = f"cp {src_fasta} {dst_fasta}"
+        pg.add(tgt, dep, cmd)
 
         # align to de novo assembly
         pass
