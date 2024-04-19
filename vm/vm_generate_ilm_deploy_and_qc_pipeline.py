@@ -116,6 +116,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     kraken2_reports = ""
 
     for idx, sample in enumerate(run.samples):
+
         # copy the files
         src_fastq1 = f"{fastq_dir}/{sample.fastq1}"
         dst_fastq1 = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz"
@@ -154,29 +155,29 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         fastqc_multiqc_dep += f" {tgt}"
 
         # kraken2
-        # input_fastq_file1 = f"{sample.fastq1}"
-        # input_fastq_file2 = f"{sample.fastq2}"
-        # output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
-        # report_file = f"{output_dir}/report.txt"
-        # log = f"{output_dir}/report.log"
-        # err = f"{output_dir}/run.log"
-        # dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
-        # tgt = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.OK"
-        # kraken2_multiqc_dep += f" {tgt}"
-        # kraken2_reports += f" {log}"
-        # cmd = f"{kraken2} --db {kraken2_std_db} --threads 10 --paired {input_fastq_file1} {input_fastq_file2} --use-names --report {report_file} > {log} 2> {err}"
-        # pg.add_srun(tgt, dep, cmd, 1,60000)
+        input_fastq_file1 = f"{sample.fastq1}"
+        input_fastq_file2 = f"{sample.fastq2}"
+        output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
+        report_file = f"{output_dir}/report.txt"
+        log = f"{output_dir}/report.log"
+        err = f"{output_dir}/run.log"
+        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.OK"
+        kraken2_multiqc_dep += f" {tgt}"
+        kraken2_reports += f" {log}"
+        cmd = f"{kraken2} --db {kraken2_std_db} --threads 16 --paired {input_fastq_file1} {input_fastq_file2} --use-names --report {report_file} > {log} 2> {err}"
+        pg.add_srun(tgt, dep, cmd, 16, 60000)
 
-        # # plot kronatools radial tree
-        # output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
-        # input_txt_file = f"{output_dir}/report.log"
-        # output_html_file = f"{output_dir}/krona_radial_tree.html"
-        # log = f"{log_dir}/{sample.idx}_{sample.id}.krona_radial_tree.log"
-        # err = f"{log_dir}/{sample.idx}_{sample.id}.krona_radial_tree.err"
-        # dep = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.OK"
-        # tgt = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.krona_radial_tree.OK"
-        # cmd = f"{kt_import_taxonomy} -m 3 -t 5 {input_txt_file} -o {output_html_file} > {log} 2> {err}"
-        # pg.add(tgt, dep, cmd)
+        # plot kronatools radial tree
+        output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
+        input_txt_file = f"{output_dir}/report.log"
+        output_html_file = f"{output_dir}/krona_radial_tree.html"
+        log = f"{log_dir}/{sample.idx}_{sample.id}.krona_radial_tree.log"
+        err = f"{log_dir}/{sample.idx}_{sample.id}.krona_radial_tree.err"
+        dep = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.krona_radial_tree.OK"
+        cmd = f"{kt_import_taxonomy} -m 3 -t 5 {input_txt_file} -o {output_html_file} > {log} 2> {err}"
+        pg.add(tgt, dep, cmd)
 
         # assemble
         # /usr/local/SPAdes-3.15.2/bin/spades.py -1 Siniae-1086-20_S3_L001_R1_001.fastq.gz -2 Siniae-1086-20_S3_L001_R2_001.fastq.gz -o 1086 --isolate
@@ -187,11 +188,11 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         err = f"{log_dir}/{sample.idx}_{sample.id}.spades_assembly.err"
         dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
         tgt = f"{log_dir}/{sample.idx}_{sample.id}.spades_assembly.OK"
-        cmd = f"{spades} -1 {input_fastq_file1} -2 {input_fastq_file2} -o {output_dir} --isolate > {log} 2> {err}"
-        pg.add_srun(tgt, dep, cmd, 6, 5000)
+        cmd = f"{spades} -1 {input_fastq_file1} -2 {input_fastq_file2} -o {output_dir} --threads 12 --isolate > {log} 2> {err}"
+        pg.add_srun(tgt, dep, cmd, 12, 1000)
 
         # align to de novo assembly
-
+        pass
 
 
     # plot fastqc multiqc results
@@ -242,8 +243,8 @@ class PipelineGenerator(object):
     def add_srun(self, tgt, dep, cmd, cpu, mem):
         self.tgts.append(tgt)
         self.deps.append(dep)
-        self.cmds.append(f"srun --mincpus {cpu} {cmd}")
-        # self.cmds.append(f"srun --mincpus {cpu} --mem {mem} {cmd}")
+        # self.cmds.append(f"srun --mincpus {cpu} {cmd}")
+        self.cmds.append(f"srun --mincpus {cpu} --mem {mem} {cmd}")
 
     def add(self, tgt, dep, cmd):
         self.tgts.append(tgt)
