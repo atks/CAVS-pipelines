@@ -250,6 +250,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         tgt = f"{output_stats_file}.OK"
         pg.add(tgt, dep, cmd)
 
+
     # plot fastqc multiqc results
     analysis = "fastqc"
     output_dir = f"{analysis_dir}/all/{analysis}"
