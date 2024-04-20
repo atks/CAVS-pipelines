@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # The MIT License
-# Copyright (c) 2022 Adrian Tan <adrian_tan@nparks.gov.sg>
+# Copyright (c) 2024 Adrian Tan <adrian_tan@nparks.gov.sg>
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the 'Software'), to deal
 # in the Software without restriction, including without limitation the rights
@@ -96,17 +96,25 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
             os.makedirs(new_dir, exist_ok=True)
             new_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/spades_result"
             os.makedirs(new_dir, exist_ok=True)
+            new_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/align_result"
+            os.makedirs(new_dir, exist_ok=True)
+            new_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/align_result/ref"
+            os.makedirs(new_dir, exist_ok=True)
     except OSError as error:
         print(f"Directory {new_dir} cannot be created")
 
+    #version
+    version = "0.1"
+
     #programs
-    bcl2fastq = "/usr/local/bin/bcl2fastq"
     fastqc = "/usr/local/FastQC-0.11.9/fastqc"
     kraken2 = "/usr/local/kraken2-2.1.2/kraken2"
     kraken2_std_db = "/usr/local/ref/kraken2/20210908_standard"
     kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
     multiqc = "/usr/local/bin/multiqc"
     spades = "/usr/local/SPAdes-3.15.4/bin/spades.py"
+    bwa = "/usr/local/bwa-0.7.17/bwa"
+    samtools = "/usr/local/samtools-1.17/bin/samtools"
 
     # initialize
     pg = PipelineGenerator(make_file)
@@ -201,9 +209,46 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         cmd = f"cp {src_fasta} {dst_fasta}"
         pg.add(tgt, dep, cmd)
 
-        # align to de novo assembly
-        pass
+        #copy contigs to alignment directory
+        src_fasta = f"{output_dir}/contigs.fasta"
+        align_ref_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/align_result/ref"
+        dst_fasta = f"{align_ref_dir}/contigs.fasta"
+        dep = f"{log_dir}/{sample.idx}_{sample.id}.spades_assembly.OK"
+        tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.ref.contigs.fasta.OK"
+        cmd = f"cp {src_fasta} {dst_fasta}"
+        pg.add(tgt, dep, cmd)
 
+        ###########################
+        # align to de novo assembly
+        ###########################
+        align_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/align_result"
+        reference_fasta_file = f"{align_dir}/ref/contigs.fasta"
+        
+        # construct reference
+        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.ref.contigs.fasta.OK"
+        tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.ref.contigs.bwa_index.OK"
+        cmd = f"{bwa} index -a bwtsw {reference_fasta_file}"
+        pg.add(tgt, dep, cmd)
+
+        #  align
+        output_bam_file = f"{align_dir}/ilm.bam"
+        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.ref.contigs.bwa_index.OK"
+        tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.bam.OK"
+        cmd = f"{bwa} mem -t 2 -M {reference_fasta_file} {sample.fastq1} {sample.fastq2} | {samtools} view -h | {samtools} sort -o {output_bam_file}"
+        pg.add(tgt, dep, cmd)
+
+        #  index
+        input_bam_file = f"{align_dir}/ilm.bam"
+        cmd = f"{samtools} index {input_bam_file}"
+        tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.bam.bai.OK"
+        pg.add(tgt, dep, cmd)
+
+        #  coverage
+        input_bam_file = f"{align_dir}/ilm.bam"
+        output_stats_file = f"{align_dir}/ilm.stats.txt"
+        cmd = f"{samtools} coverage {input_bam_file} > {output_stats_file}"
+        tgt = f"{output_stats_file}.OK"
+        pg.add(tgt, dep, cmd)
 
     # plot fastqc multiqc results
     analysis = "fastqc"
@@ -294,9 +339,8 @@ class Sample(object):
     def print(self):
         print(f"index   : {self.idx}")
         print(f"id      : {self.id}")
-        print(f"barcode : {self.fastq1}")
-        print(f"barcode : {self.fastq2}")
-
+        print(f"fastq1  : {self.fastq1}")
+        print(f"fastq2  : {self.fastq2}")
 
 class Run(object):
     def __init__(self, id):
@@ -318,7 +362,6 @@ class Run(object):
         for sample in self.samples:
             sample.print()
         print(f"++++++++++++++++++++")
-
 
 if __name__ == "__main__":
     main() # type: ignore
