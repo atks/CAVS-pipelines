@@ -111,14 +111,14 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     kraken2 = "/usr/local/kraken2-2.1.2/kraken2"
     kraken2_std_db = "/usr/local/ref/kraken2/20210908_standard"
     kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
-    multiqc = "/usr/local/multiqc-1.12/multiqc"
+    multiqc = "docker run  -u \"$(id -u):$(id -g)\" -t -v  `pwd`:`pwd` -w `pwd` multiqc/multiqc multiqc "
+    #multiqc = "/usr/local/multiqc-1.12/multiqc"
     spades = "/usr/local/SPAdes-3.15.4/bin/spades.py"
     bwa = "/usr/local/bwa-0.7.17/bwa"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
 
     # initialize
     pg = PipelineGenerator(make_file)
-    multiqc_dep = ""
 
     # analyze
     fastqc_multiqc_dep = ""
@@ -232,23 +232,27 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         pg.add(tgt, dep, cmd)
 
         #  align
-        output_bam_file = f"{align_dir}/ilm.bam"
+        output_bam_file = f"{align_dir}/illu.bam"
+        log = f"{log_dir}/{sample.idx}_{sample.id}.align.log"
+        sort_log = f"{log_dir}/{sample.idx}_{sample.id}.align.sort.log"
         dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.ref.contigs.bwa_index.OK"
         tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.bam.OK"
-        cmd = f"{bwa} mem -t 2 -M {reference_fasta_file} {sample.fastq1} {sample.fastq2} | {samtools} view -h | {samtools} sort -o {output_bam_file}"
+        cmd = f"{bwa} mem -t 2 -M {reference_fasta_file} {sample.fastq1} {sample.fastq2} 2> {log} | {samtools} view -h | {samtools} sort -o {output_bam_file} 2> {sort_log}"
         pg.add(tgt, dep, cmd)
 
         #  index
-        input_bam_file = f"{align_dir}/ilm.bam"
+        input_bam_file = f"{align_dir}/illu.bam"
+        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.bam.OK"
+        tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.bam.bai.OK"
         cmd = f"{samtools} index {input_bam_file}"
-        tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.bam.OK"
         pg.add(tgt, dep, cmd)
 
         #  coverage
-        input_bam_file = f"{align_dir}/ilm.bam"
-        output_stats_file = f"{align_dir}/ilm.stats.txt"
+        input_bam_file = f"{align_dir}/illu.bam"
+        output_stats_file = f"{align_dir}/illu.coverage.stats.txt"
+        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.bam.bai.OK"
+        tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.coverage.stats.OK"
         cmd = f"{samtools} coverage {input_bam_file} > {output_stats_file}"
-        tgt = f"{output_stats_file}.OK"
         pg.add(tgt, dep, cmd)
 
 
@@ -259,7 +263,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     err = f"{log_dir}/{analysis}.multiqc_report.err"
     dep = fastqc_multiqc_dep
     tgt = f"{log_dir}/{analysis}.multiqc_report.OK"
-    cmd = f"cd {analysis_dir}; {multiqc} . -m fastqc -o {output_dir} -n {analysis} -dd -1 --no-ansi > {log} 2> {err}"
+    cmd = f"cd {analysis_dir}; {multiqc} . -m fastqc -o {output_dir} -n {analysis} --no-ansi > {log} 2> {err}"
     pg.add(tgt, dep, cmd)
 
     # plot kraken2 multiqc results
@@ -269,7 +273,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     err = f"{log_dir}/{analysis}.multiqc_report.err"
     dep = kraken2_multiqc_dep
     tgt = f"{log_dir}/{analysis}.multiqc_report.OK"
-    cmd = f"cd {analysis_dir}; {multiqc} . -m kraken -o {output_dir} -n {analysis} -dd -1 --no-ansi > {log} 2> {err}"
+    cmd = f"cd {analysis_dir}; {multiqc} . -m kraken -o {output_dir} -n {analysis} --no-ansi > {log} 2> {err}"
     pg.add(tgt, dep, cmd)
 
     # plot kronatools radial tree
