@@ -116,6 +116,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     spades = "/usr/local/SPAdes-3.15.4/bin/spades.py"
     bwa = "/usr/local/bwa-0.7.17/bwa"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
+    plot_bamstats = "/usr/local/samtools-1.17/bin/plot-bamstats"
 
     # initialize
     pg = PipelineGenerator(make_file)
@@ -124,6 +125,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     fastqc_multiqc_dep = ""
     kraken2_multiqc_dep = ""
     kraken2_reports = ""
+    samtools_multiqc_dep = ""
 
     for idx, sample in enumerate(run.samples):
 
@@ -168,19 +170,19 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         input_fastq_file1 = f"{sample.fastq1}"
         input_fastq_file2 = f"{sample.fastq2}"
         output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
-        report_file = f"{output_dir}/report.txt"
+        report_file = f"{output_dir}/{sample.idx}_{sample.id}.txt"
         log = f"{output_dir}/report.log"
         err = f"{output_dir}/run.log"
         dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
         tgt = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.OK"
         kraken2_multiqc_dep += f" {tgt}"
-        kraken2_reports += f" {log}"
+        kraken2_reports += f" {report_file}"
         cmd = f"{kraken2} --db {kraken2_std_db} --threads 16 --paired {input_fastq_file1} {input_fastq_file2} --use-names --report {report_file} > {log} 2> {err}"
         pg.add_srun(tgt, dep, cmd, 16, 60000)
 
         # plot kronatools radial tree
         output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
-        input_txt_file = f"{output_dir}/report.log"
+        input_txt_file = f"{output_dir}/{sample.idx}_{sample.id}.txt"
         output_html_file = f"{output_dir}/krona_radial_tree.html"
         log = f"{log_dir}/{sample.idx}_{sample.id}.krona_radial_tree.log"
         err = f"{log_dir}/{sample.idx}_{sample.id}.krona_radial_tree.err"
@@ -249,10 +251,27 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
 
         #  coverage
         input_bam_file = f"{align_dir}/illu.bam"
-        output_stats_file = f"{align_dir}/illu.coverage.stats.txt"
+        output_stats_file = f"{align_dir}/{sample.idx}_{sample.id}.coverage.txt"
         dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.bam.bai.OK"
         tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.coverage.stats.OK"
         cmd = f"{samtools} coverage {input_bam_file} > {output_stats_file}"
+        samtools_multiqc_dep += f" {tgt}"
+        pg.add(tgt, dep, cmd)
+
+        #  stats
+        input_bam_file = f"{align_dir}/illu.bam"
+        output_stats_file = f"{align_dir}/{sample.idx}_{sample.id}.stats.txt"
+        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.bam.bai.OK"
+        tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.stats.OK"
+        cmd = f"{samtools} stats {input_bam_file} > {output_stats_file}"
+        samtools_multiqc_dep += f" {tgt}"
+        pg.add(tgt, dep, cmd)
+
+        # plot samtools stats
+        input_stats_file = f"{align_dir}/{sample.idx}_{sample.id}.stats.txt"
+        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.stats.OK"
+        tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.plot_bamstats.OK"
+        cmd = f"{plot_bamstats} -p  {align_dir}/plot_bamstats/plot {input_stats_file}"
         pg.add(tgt, dep, cmd)
 
 
@@ -286,6 +305,16 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     dep = f"{kraken2_multiqc_dep}"
     tgt = f"{log_dir}/{analysis}.krona_radial_tree.OK"
     cmd = f"{kt_import_taxonomy} -q 2 -t 4 {input_txt_files} -o {output_html_file} > {log} 2> {err}"
+    pg.add(tgt, dep, cmd)
+
+    # plot samtools
+    analysis = "samtools"
+    output_dir = f"{analysis_dir}/all/{analysis}"
+    log = f"{log_dir}/{analysis}.multiqc_report.log"
+    err = f"{log_dir}/{analysis}.multiqc_report.err"
+    dep = samtools_multiqc_dep
+    tgt = f"{log_dir}/{analysis}.multiqc_report.OK"
+    cmd = f"cd {analysis_dir}; {multiqc} . -m samtools -o {output_dir} -n {analysis} --no-ansi > {log} 2> {err}"
     pg.add(tgt, dep, cmd)
 
     # write make file
