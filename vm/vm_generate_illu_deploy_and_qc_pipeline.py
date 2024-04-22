@@ -32,7 +32,7 @@ from datetime import datetime
     "-m",
     "--make_file",
     show_default=True,
-    default="ilm_deploy_and_qc.mk",
+    default="illu_deploy_and_qc.mk",
     help="make file name",
 )
 @click.option("-r", "--run_id", required=True, help="Run ID")
@@ -111,7 +111,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     kraken2 = "/usr/local/kraken2-2.1.2/kraken2"
     kraken2_std_db = "/usr/local/ref/kraken2/20210908_standard"
     kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
-    multiqc = "/usr/local/bin/multiqc"
+    multiqc = "/usr/local/multiqc-1.12/multiqc"
     spades = "/usr/local/SPAdes-3.15.4/bin/spades.py"
     bwa = "/usr/local/bwa-0.7.17/bwa"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
@@ -223,11 +223,12 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         ###########################
         align_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/align_result"
         reference_fasta_file = f"{align_dir}/ref/contigs.fasta"
-        
+
         # construct reference
+        log = f"{log_dir}/{sample.idx}_{sample.id}.ref.contigs.bwa_index.log"
         dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.ref.contigs.fasta.OK"
         tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.ref.contigs.bwa_index.OK"
-        cmd = f"{bwa} index -a bwtsw {reference_fasta_file}"
+        cmd = f"{bwa} index -a bwtsw {reference_fasta_file} 2> {log}"
         pg.add(tgt, dep, cmd)
 
         #  align
@@ -240,7 +241,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         #  index
         input_bam_file = f"{align_dir}/ilm.bam"
         cmd = f"{samtools} index {input_bam_file}"
-        tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.bam.bai.OK"
+        tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.bam.OK"
         pg.add(tgt, dep, cmd)
 
         #  coverage
