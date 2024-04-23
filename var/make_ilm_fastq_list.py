@@ -30,7 +30,7 @@ def main(illumina_raw_data_dir):
     """
     Takes in an Illumina raw data directory ilm directory and generates a fastq file list
 
-    e.g. make_illumina_fastq_list.py ilm38
+    e.g. make_illumina_fastq_list.py raw
     """
     fastq_path = ""
 
