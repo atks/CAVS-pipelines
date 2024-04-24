@@ -81,10 +81,15 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     # create directories in destination folder directory
     analysis_dir = f"{dest_dir}/analysis"
     contigs_dir = f"{dest_dir}/contigs"
+    trace_dir = f"{dest_dir}/trace"
     new_dir = ""
     try:
+        new_dir = log_dir
         os.makedirs(log_dir, exist_ok=True)
-        os.makedirs(contigs_dir, exist_ok=True)
+        new_dir = contigs_dir
+        os.makedirs(new_dir, exist_ok=True)
+        new_dir = trace_dir
+        os.makedirs(new_dir, exist_ok=True)
         new_dir = analysis_dir
         os.makedirs(new_dir, exist_ok=True)
         for sample in run.samples:
@@ -97,6 +102,10 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
             new_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/spades_result"
             os.makedirs(new_dir, exist_ok=True)
             new_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/align_result"
+            os.makedirs(new_dir, exist_ok=True)
+            new_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/align_result/general_stats"
+            os.makedirs(new_dir, exist_ok=True)
+            new_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/align_result/coverage_stats"
             os.makedirs(new_dir, exist_ok=True)
             new_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/align_result/ref"
             os.makedirs(new_dir, exist_ok=True)
@@ -111,8 +120,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     kraken2 = "/usr/local/kraken2-2.1.2/kraken2"
     kraken2_std_db = "/usr/local/ref/kraken2/20210908_standard"
     kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
-    multiqc = "docker run  -u \"$(id -u):$(id -g)\" -t -v  `pwd`:`pwd` -w `pwd` multiqc/multiqc multiqc "
-    #multiqc = "/usr/local/multiqc-1.12/multiqc"
+    multiqc = "docker run  -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` multiqc/multiqc multiqc "
     spades = "/usr/local/SPAdes-3.15.4/bin/spades.py"
     bwa = "/usr/local/bwa-0.7.17/bwa"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
@@ -147,22 +155,39 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         sample.fastq1 = dst_fastq1
         sample.fastq2 = dst_fastq2
 
-        # fastqc
+        # symbolic link for fastq files
         fastqc_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/fastqc_result"
 
+        src_fastq1 = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz"
+        dst_fastq1 = f"{fastqc_dir}/{sample.padded_idx}_{sample.id}_R1.fastq.gz"
+        tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}_R1.fastq.gz.OK"
+        dep = ""
+        cmd = f"ln -sf {src_fastq1} {dst_fastq1}"
+        pg.add(tgt, dep, cmd)
+
+        src_fastq1 = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz"
+        dst_fastq1 = f"{fastqc_dir}/{sample.padded_idx}_{sample.id}_R2.fastq.gz"
+        tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}_R2.fastq.gz.OK"
+        dep = ""
+        cmd = f"ln -sf {src_fastq1} {dst_fastq1}"
+        pg.add(tgt, dep, cmd)
+
+        # fastqc
+        input_fastq_file = f"{fastqc_dir}/{sample.padded_idx}_{sample.id}_R1.fastq.gz";
         log = f"{log_dir}/{sample.idx}_{sample.id}_fastqc1.log"
         err = f"{log_dir}/{sample.idx}_{sample.id}_fastqc1.err"
-        tgt = f"{log_dir}/{sample.idx}_{sample.id}_fastqc1.OK"
-        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK"
-        cmd = f"{fastqc} {sample.fastq1} -o {fastqc_dir} > {log} 2> {err}"
+        tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}_fastqc1.OK"
+        dep = f"{log_dir}/{sample.padded_idx}_{sample.id}_R1.fastq.gz.OK"
+        cmd = f"{fastqc} {input_fastq_file} -o {fastqc_dir} > {log} 2> {err}"
         pg.add(tgt, dep, cmd)
         fastqc_multiqc_dep += f" {tgt}"
 
+        input_fastq_file = f"{fastqc_dir}/{sample.padded_idx}_{sample.id}_R2.fastq.gz";
         log = f"{log_dir}/{sample.idx}_{sample.id}_fastqc2.log"
         err = f"{log_dir}/{sample.idx}_{sample.id}_fastqc2.err"
-        tgt = f"{log_dir}/{sample.idx}_{sample.id}_fastqc2.OK"
-        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
-        cmd = f"{fastqc} {sample.fastq2} -o {fastqc_dir} > {log} 2> {err}"
+        tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}_fastqc2.OK"
+        dep = f"{log_dir}/{sample.padded_idx}_{sample.id}_R2.fastq.gz.OK"
+        cmd = f"{fastqc} {input_fastq_file} -o {fastqc_dir} > {log} 2> {err}"
         pg.add(tgt, dep, cmd)
         fastqc_multiqc_dep += f" {tgt}"
 
@@ -170,7 +195,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         input_fastq_file1 = f"{sample.fastq1}"
         input_fastq_file2 = f"{sample.fastq2}"
         output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
-        report_file = f"{output_dir}/{sample.idx}_{sample.id}.txt"
+        report_file = f"{output_dir}/{sample.padded_idx}_{sample.id}.txt"
         log = f"{output_dir}/report.log"
         err = f"{output_dir}/run.log"
         dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
@@ -182,7 +207,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
 
         # plot kronatools radial tree
         output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
-        input_txt_file = f"{output_dir}/{sample.idx}_{sample.id}.txt"
+        input_txt_file = f"{output_dir}/{sample.padded_idx}_{sample.id}.txt"
         output_html_file = f"{output_dir}/krona_radial_tree.html"
         log = f"{log_dir}/{sample.idx}_{sample.id}.krona_radial_tree.log"
         err = f"{log_dir}/{sample.idx}_{sample.id}.krona_radial_tree.err"
@@ -251,7 +276,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
 
         #  coverage
         input_bam_file = f"{align_dir}/illu.bam"
-        output_stats_file = f"{align_dir}/{sample.idx}_{sample.id}.coverage.txt"
+        output_stats_file = f"{align_dir}/coverage_stats/{sample.padded_idx}_{sample.id}.txt"
         dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.bam.bai.OK"
         tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.coverage.stats.OK"
         cmd = f"{samtools} coverage {input_bam_file} > {output_stats_file}"
@@ -260,15 +285,33 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
 
         #  stats
         input_bam_file = f"{align_dir}/illu.bam"
-        output_stats_file = f"{align_dir}/{sample.idx}_{sample.id}.stats.txt"
+        output_stats_file = f"{align_dir}/general_stats/{sample.padded_idx}_{sample.id}.txt"
         dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.bam.bai.OK"
         tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.stats.OK"
         cmd = f"{samtools} stats {input_bam_file} > {output_stats_file}"
         samtools_multiqc_dep += f" {tgt}"
         pg.add(tgt, dep, cmd)
 
+        #  flag stats
+        input_bam_file = f"{align_dir}/illu.bam"
+        output_stats_file = f"{align_dir}/flag_stats/{sample.padded_idx}_{sample.id}.txt"
+        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.bam.bai.OK"
+        tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.flag.stats.OK"
+        cmd = f"{samtools} flagstat {input_bam_file} > {output_stats_file}"
+        samtools_multiqc_dep += f" {tgt}"
+        pg.add(tgt, dep, cmd)
+
+        #  idx stats
+        input_bam_file = f"{align_dir}/illu.bam"
+        output_stats_file = f"{align_dir}/flag_stats/{sample.padded_idx}_{sample.id}.txt"
+        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.bam.bai.OK"
+        tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.idx.stats.OK"
+        cmd = f"{samtools} idxstats {input_bam_file} > {output_stats_file}"
+        samtools_multiqc_dep += f" {tgt}"
+        pg.add(tgt, dep, cmd)
+
         # plot samtools stats
-        input_stats_file = f"{align_dir}/{sample.idx}_{sample.id}.stats.txt"
+        input_stats_file = f"{align_dir}/general_stats/{sample.padded_idx}_{sample.id}.txt"
         dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.stats.OK"
         tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.plot_bamstats.OK"
         cmd = f"{plot_bamstats} -p  {align_dir}/plot_bamstats/plot {input_stats_file}"
@@ -321,6 +364,10 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     print("Writing pipeline")
     pg.write()
 
+    #copy files to trace
+    copy2(__file__, trace_dir)
+    copy2(make_file, trace_dir)
+    copy2(sample_file, trace_dir)
 
 class PipelineGenerator(object):
     def __init__(self, make_file):
@@ -367,6 +414,7 @@ class Sample(object):
 
     def __init__(self, idx, id, fastq1, fastq2):
         self.idx = idx
+        self.padded_idx = f"{idx:02}"
         self.id = id
         self.fastq1 = fastq1
         self.fastq2 = fastq2

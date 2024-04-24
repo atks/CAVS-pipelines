@@ -366,6 +366,8 @@ class Sample(object):
         self.id = id
         self.fastq1 = fastq1
         self.fastq2 = fastq2
+        self.sample_report_name1 = fastq1
+        self.sample_report_name1 = fastq2
 
     def print(self):
         print(f"index   : {self.idx}")
