@@ -19,6 +19,7 @@
 # THE SOFTWARE.
 
 import os
+from tokenize import Ignore
 import click
 import re
 import fnmatch
@@ -39,29 +40,35 @@ def main(illumina_raw_data_dir):
             if dirname == "Fastq":
                 fastq_path = os.path.join(dirpath, dirname)
 
-    ilm_dir = os.path.abspath(fastq_path)
+    #print(f"FASTQ PATH: {fastq_path}")
+    fastq_dir = os.path.abspath(fastq_path)
 
-    no_fastq_files = int(len(fnmatch.filter(os.listdir(ilm_dir), "*.fastq.gz")) / 2)
-    # print(f'#fastq : {no_fastq_files}')
+    no_fastq_files = int(len(fnmatch.filter(os.listdir(fastq_dir), "*.fastq.gz")) / 2)
+    #print(f'#fastq : {no_fastq_files}')
 
-    samples = [""] * no_fastq_files
-    run_id = ""
-    for file_name in os.listdir(ilm_dir):
+    samples = []
+    observed_samples = set()
+    for file_name in os.listdir(fastq_dir):
+        #print(file_name)
         if file_name.endswith("fastq.gz"):
-            # print(file_name)
-            m = re.match("^(.+_S(\d+)_L\d+)_R[12].+.fastq.gz", file_name)
-            sample_id = int(m.group(2))
-            name = m.group(1)
-            # print(f'{sample_id} {name}')
-            samples[sample_id] = name
+            #print(file_name)
+            m = re.match("^(.+_S(\d+)_L\d+)_R[12].+.fastq.gz", file_name) # type: ignore , this is a valid regex
+            if m is not None:
+                sample_id = int(m.group(2))
+                name = m.group(1)
+                if sample_id not in observed_samples:
+                    observed_samples.add(sample_id)
+                    #print(f'{sample_id} {name}')
+                    #unclassified reads moved to the back
+                    if sample_id == 0:
+                        sample_id = 1000000
+                    samples.append((sample_id, name))
 
-    # shift undeterminate sample to last
-    temp = samples.pop(0)
-    samples.append(temp)
+    sorted_samples = sorted(samples, key = lambda x: x[0])
 
     print(f"#sample-id\tfastq1\tfastq2")
-    for id, name in enumerate(samples):
-        print(f"{id+1}\t{name}_R1_001.fastq.gz\t{name}_R2_001.fastq.gz")
+    for id, t in enumerate(sorted_samples):
+        print(f"{id+1}\t{t[1]}_R1_001.fastq.gz\t{t[1]}_R2_001.fastq.gz")
 
 
 if __name__ == "__main__":

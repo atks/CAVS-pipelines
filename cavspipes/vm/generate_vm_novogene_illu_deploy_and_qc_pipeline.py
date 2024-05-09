@@ -160,7 +160,7 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
     bwa = "/usr/local/bwa-0.7.17/bwa"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
     plot_bamstats = "/usr/local/samtools-1.17/bin/plot-bamstats"
-    check_fastq_runs = "/usr/local/cavspipes-1.0.0/check_fastqc_runs.py"
+    check_fastqc_run = "/usr/local/cavspipes-1.0.0/check_fastqc_run.py"
 
     # initialize
     pg = PipelineGenerator(make_file)
@@ -263,6 +263,7 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
         tgt = f"{log_dir}/{sample.idx}_{sample.id}_fastqc1.OK"
         dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK"
         cmd = f"{fastqc} {input_fastq1} -o {fastqc_dir} > {log} 2> {err}"
+        cmd += f"\n\t{check_fastqc_run} {fastqc_dir} {sample.padded_idx}_{sample.id}_R1  >> {log} 2>> {err}"
         pg.add(tgt, dep, cmd)
         fastqc_multiqc_dep += f" {tgt}"
 
@@ -272,6 +273,7 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
         tgt = f"{log_dir}/{sample.idx}_{sample.id}_fastqc2.OK"
         dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
         cmd = f"{fastqc} {input_fastq2} -o {fastqc_dir} > {log} 2> {err}"
+        cmd += f"\n\t{check_fastqc_run} {fastqc_dir} {sample.padded_idx}_{sample.id}_R2 >> {log} 2>> {err}"
         pg.add(tgt, dep, cmd)
         fastqc_multiqc_dep += f" {tgt}"
 
@@ -398,20 +400,12 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
         cmd = f"{plot_bamstats} -p  {align_dir}/plot_bamstats/plot {input_stats_file}"
         pg.add(tgt, dep, cmd)
 
-    # check fastqc files
-    analysis = "fastqc"
-    output_dir = f"{analysis_dir}/all/{analysis}"
-    err = f"{log_dir}/{analysis}.file_check.err"
-    dep = fastqc_multiqc_dep
-    tgt = f"{log_dir}/{analysis}.file_check.OK"
-    cmd = f"{check_fastq_runs} {analysis_dir}  2> {err}"
-    pg.add(tgt, dep, cmd)
-
     # plot fastqc multiqc results
+    analysis = "fastqc"
     output_dir = f"{analysis_dir}/all/{analysis}"
     log = f"{log_dir}/{analysis}.multiqc_report.log"
     err = f"{log_dir}/{analysis}.multiqc_report.err"
-    dep = f"{log_dir}/{analysis}.file_check.OK"
+    dep = fastqc_multiqc_dep
     tgt = f"{log_dir}/{analysis}.multiqc_report.OK"
     cmd = f"cd {analysis_dir}; {multiqc} . -m fastqc -f -o {output_dir} -n {analysis} --no-ansi > {log} 2> {err}"
     pg.add(tgt, dep, cmd)
