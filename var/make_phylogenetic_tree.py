@@ -47,7 +47,15 @@ from shutil import copy2
     show_default=True,
     help="reference fasta file",
 )
-def main(working_dir, fasta_file, ref_fasta_file):
+@click.option(
+    "-p",
+    "--prefix",
+    required=True,
+    default="tree",
+    show_default=True,
+    help="for RAXML file naming",
+)
+def main(working_dir, fasta_file, ref_fasta_file, prefix):
     """
     Generates a phylogenetic tree from a panel of sequences and reference sequences
 
@@ -62,19 +70,23 @@ def main(working_dir, fasta_file, ref_fasta_file):
     except OSError as error:
         print(f"{error.filename} cannot be created")
 
-    # if fasta_file not empty, compare sequences to reference
-    combined_fasta_file = f"{output_dir}/combined.fasta"
-    if fasta_file is None:
-        fasta_file = ""
-    combined_fasta_file = f"{output_dir}/combined.fasta"
-    cmd = f"cat {fasta_file} {ref_fasta_file} | seqkit replace -p \"[\s;:,\(\)\']\" -r \"_\"  > {combined_fasta_file}"
-    tgt = f"{combined_fasta_file}.OK"
-    desc = f"Create combined FASTA file for multiple sequence alignement"
-    run(cmd, tgt, desc)
-
     #programs
     mafft = "/usr/local/mafft-7.490/bin/mafft"
     raxml = "/usr/local/raxml-ng-1.1.0/raxml-ng"
+    seqkit = "/usr/local/seqkit-2.1.0/bin/seqkit"
+
+    #log text
+    log_text = ""
+
+    # if fasta_file not empty, compare sequences to reference
+    desc = f"Generating combined FASTA file with clean IDs for multiple sequence alignment"
+    if fasta_file is None:
+        fasta_file = ""
+        desc = f"Generating FASTA file with clean IDs from reference FASTA only for multiple sequence alignment"
+    combined_fasta_file = f"{output_dir}/combined.fasta"
+    cmd = f"cat {fasta_file} {ref_fasta_file} | {seqkit} replace -p \"[\s;:,\(\)\']\" -r \"_\"  > {combined_fasta_file}"
+    tgt = f"{combined_fasta_file}.OK"
+    run(cmd, tgt, desc)
 
     # perform multiple sequence alignment
     input_fasta_file = f"{output_dir}/{ref_fasta_file}"
@@ -89,21 +101,24 @@ def main(working_dir, fasta_file, ref_fasta_file):
 
     # construct phylogenetic tree with bootstrap
     input_msa_fasta_file = f"{output_dir}/msa.fasta"
-    log = f"{output_dir}/tree.log"
-    cmd = f"cd {output_dir}; {raxml} --threads 10 --msa {input_msa_fasta_file} --model GTR+G --prefix tree --bootstrap > {log}"
+    log = f"{output_dir}/construct_trees.log"
+    cmd = f"cd {output_dir}; {raxml} --threads 10 --msa {input_msa_fasta_file} --model GTR+G --prefix {prefix} --bootstrap > {log}"
     tgt = f"{output_dir}/construct_trees.OK"
     desc = f"Constructing phylogenetic tree"
     run(cmd, tgt, desc)
 
     # construct consensus tree
     input_msa_fasta_file = f"{output_dir}/msa.fasta"
-    cmd = f"cd {output_dir}; {raxml} --consense MRE --tree tree.raxml.bootstraps --prefix consMRE "
+    log = f"{output_dir}/consensus_tree.log"
+    cmd = f"cd {output_dir}; {raxml} --consense MRE --tree tree.raxml.bootstraps --redo --prefix {prefix} > {log}"
     tgt = f"{output_dir}/consensus_tree.OK"
     desc = f"Constructing consensus tree"
     run(cmd, tgt, desc)
 
     #copy files to trace
     copy2(__file__, trace_dir)
+    #write log file
+
 
 def run(cmd, tgt, desc):
     try:
