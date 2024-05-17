@@ -92,6 +92,10 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
     print("Writing pipeline")
     pg.write()
 
+    #copy files to trace
+    copy2(__file__, trace_dir)
+    copy2(make_file, trace_dir)
+    copy2(sample_file, trace_dir)
 
 class PipelineGenerator(object):
     def __init__(self, make_file):

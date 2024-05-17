@@ -84,12 +84,9 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     trace_dir = f"{dest_dir}/trace"
     new_dir = ""
     try:
-        new_dir = log_dir
         os.makedirs(log_dir, exist_ok=True)
-        new_dir = contigs_dir
-        os.makedirs(new_dir, exist_ok=True)
-        new_dir = trace_dir
-        os.makedirs(new_dir, exist_ok=True)
+        os.makedirs(contigs_dir, exist_ok=True)
+        os.makedirs(trace_dir, exist_ok=True)
         new_dir = analysis_dir
         os.makedirs(new_dir, exist_ok=True)
         for sample in run.samples:
@@ -114,7 +111,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
             new_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/align_result/ref"
             os.makedirs(new_dir, exist_ok=True)
     except OSError as error:
-        print(f"Directory {new_dir} cannot be created")
+        print(f"{error.filename} cannot be created")
 
     #version
     version = "1.0.0"
