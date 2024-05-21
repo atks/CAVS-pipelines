@@ -82,34 +82,23 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     analysis_dir = f"{dest_dir}/analysis"
     contigs_dir = f"{dest_dir}/contigs"
     trace_dir = f"{dest_dir}/trace"
-    new_dir = ""
     try:
-        os.makedirs(log_dir, exist_ok=True)
+        os.makedirs(analysis_dir, exist_ok=True)
         os.makedirs(contigs_dir, exist_ok=True)
+        os.makedirs(log_dir, exist_ok=True)
         os.makedirs(trace_dir, exist_ok=True)
-        new_dir = analysis_dir
-        os.makedirs(new_dir, exist_ok=True)
         for sample in run.samples:
-            new_dir = f"{analysis_dir}/{sample.idx}_{sample.id}"
-            os.makedirs(new_dir, exist_ok=True)
-            new_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
-            os.makedirs(new_dir, exist_ok=True)
-            new_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/fastqc_result"
-            os.makedirs(new_dir, exist_ok=True)
-            new_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/spades_result"
-            os.makedirs(new_dir, exist_ok=True)
-            new_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/align_result"
-            os.makedirs(new_dir, exist_ok=True)
-            new_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/align_result/general_stats"
-            os.makedirs(new_dir, exist_ok=True)
-            new_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/align_result/coverage_stats"
-            os.makedirs(new_dir, exist_ok=True)
-            new_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/align_result/flag_stats"
-            os.makedirs(new_dir, exist_ok=True)
-            new_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/align_result/idx_stats"
-            os.makedirs(new_dir, exist_ok=True)
-            new_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/align_result/ref"
-            os.makedirs(new_dir, exist_ok=True)
+            sample_dir = f"{analysis_dir}/{sample.idx}_{sample.id}"
+            os.makedirs(sample_dir, exist_ok=True)
+            os.makedirs(f"{sample_dir}/kraken2_result", exist_ok=True)
+            os.makedirs(f"{sample_dir}/fastqc_result", exist_ok=True)
+            os.makedirs(f"{sample_dir}/spades_result", exist_ok=True)
+            os.makedirs(f"{sample_dir}/align_result", exist_ok=True)
+            os.makedirs(f"{sample_dir}/align_result/ref", exist_ok=True)
+            os.makedirs(f"{sample_dir}/align_result/general_stats", exist_ok=True)
+            os.makedirs(f"{sample_dir}/align_result/coverage_stats", exist_ok=True)
+            os.makedirs(f"{sample_dir}/align_result/flag_stats", exist_ok=True)
+            os.makedirs(f"{sample_dir}/align_result/idx_stats", exist_ok=True)
     except OSError as error:
         print(f"{error.filename} cannot be created")
 
