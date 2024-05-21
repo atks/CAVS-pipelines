@@ -30,7 +30,7 @@ from shutil import copy2
 @click.option(
     "-w",
     "--working_dir",
-    default=os.getcwd(),
+    default="",
     show_default=True,
     help="working directory",
 )
@@ -62,8 +62,9 @@ def main(working_dir, fasta_file, ref_fasta_file, prefix):
 
     e.g. make_phylogenetic_tree.py -s lsdv.fasta -r lsdv_ref.fasta
     """
-
-    output_dir = f"{working_dir}/phylo"
+    output_dir = f"{os.getcwd()}/phylo"
+    if working_dir != "":
+        output_dir = os.path.abspath(working_dir)
     trace_dir = f"{output_dir}/trace"
     try:
         os.makedirs(output_dir, exist_ok=True)
@@ -155,6 +156,7 @@ class MiniPipeManager(object):
         self.log_msg.append(msg)
 
     def print_log(self):
+        self.log(f"logs written to {self.log_file}")
         with open(self.log_file, "w") as f:
             f.write("\n".join(self.log_msg))
 
