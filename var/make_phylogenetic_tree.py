@@ -25,6 +25,7 @@ import subprocess
 import re
 from shutil import copy2
 
+
 @click.command()
 @click.option(
     "-w",
@@ -70,23 +71,31 @@ def main(working_dir, fasta_file, ref_fasta_file, prefix):
     except OSError as error:
         print(f"{error.filename} cannot be created")
 
-    #programs
+    # version
+    version = "1.0.0"
+
+    # programs
     mafft = "/usr/local/mafft-7.490/bin/mafft"
     raxml = "/usr/local/raxml-ng-1.1.0/raxml-ng"
     seqkit = "/usr/local/seqkit-2.1.0/bin/seqkit"
 
-    #log text
+    # initialize
+    mpm = MiniPipeManager(f"{output_dir}/make_phylogenetic_tree.log")
+
+    # log text
     log_text = ""
 
     # if fasta_file not empty, compare sequences to reference
-    desc = f"Generating combined FASTA file with clean IDs for multiple sequence alignment"
+    desc = (
+        f"Generating combined FASTA file with clean IDs for multiple sequence alignment"
+    )
     if fasta_file is None:
         fasta_file = ""
         desc = f"Generating FASTA file with clean IDs from reference FASTA only for multiple sequence alignment"
     combined_fasta_file = f"{output_dir}/combined.fasta"
-    cmd = f"cat {fasta_file} {ref_fasta_file} | {seqkit} replace -p \"[\s;:,\(\)\']\" -r \"_\"  > {combined_fasta_file}"
+    cmd = f'cat {fasta_file} {ref_fasta_file} | {seqkit} replace -p "[\s;:,\(\)\']" -r "_"  > {combined_fasta_file}'
     tgt = f"{combined_fasta_file}.OK"
-    run(cmd, tgt, desc)
+    mpm.run(cmd, tgt, desc)
 
     # perform multiple sequence alignment
     input_fasta_file = f"{output_dir}/{ref_fasta_file}"
@@ -97,7 +106,7 @@ def main(working_dir, fasta_file, ref_fasta_file, prefix):
     cmd = f"{mafft} {input_fasta_file} > {output_fasta_file} 2>{log}"
     tgt = f"{output_fasta_file}.OK"
     desc = f"Multiple sequence alignment"
-    run(cmd, tgt, desc)
+    mpm.run(cmd, tgt, desc)
 
     # construct phylogenetic tree with bootstrap
     input_msa_fasta_file = f"{output_dir}/msa.fasta"
@@ -105,34 +114,49 @@ def main(working_dir, fasta_file, ref_fasta_file, prefix):
     cmd = f"cd {output_dir}; {raxml} --threads 10 --msa {input_msa_fasta_file} --model GTR+G --prefix {prefix} --bootstrap > {log}"
     tgt = f"{output_dir}/construct_trees.OK"
     desc = f"Constructing phylogenetic tree"
-    run(cmd, tgt, desc)
+    mpm.run(cmd, tgt, desc)
 
     # construct consensus tree
     input_msa_fasta_file = f"{output_dir}/msa.fasta"
     log = f"{output_dir}/consensus_tree.log"
-    cmd = f"cd {output_dir}; {raxml} --consense MRE --tree tree.raxml.bootstraps --redo --prefix {prefix} > {log}"
+    cmd = f"cd {output_dir}; {raxml} --consense MRE --tree {prefix}.raxml.bootstraps --redo --prefix {prefix} > {log}"
     tgt = f"{output_dir}/consensus_tree.OK"
     desc = f"Constructing consensus tree"
-    run(cmd, tgt, desc)
+    mpm.run(cmd, tgt, desc)
 
-    #copy files to trace
+    # copy files to trace
     copy2(__file__, trace_dir)
-    #write log file
+
+    # write log file
+    mpm.print_log()
 
 
-def run(cmd, tgt, desc):
-    try:
-        if os.path.exists(tgt):
-            print(f"{desc} -  already executed")
-            return
-        else:
-            print(f"{cmd}")
-            subprocess.run(cmd, shell=True, check=True)
-            subprocess.run(f"touch {tgt}", shell=True, check=True)
-            print(f"{desc} -  successfully executed")
-    except subprocess.CalledProcessError as e:
-        print(f" - failed")
-        exit(1)
+class MiniPipeManager(object):
+    def __init__(self, log_file):
+        self.log_file = log_file
+        self.log_msg = []
+
+    def run(self, cmd, tgt, desc):
+        try:
+            if os.path.exists(tgt):
+                self.log(f"{desc} -  already executed")
+                return
+            else:
+                self.log(cmd)
+                subprocess.run(cmd, shell=True, check=True)
+                subprocess.run(f"touch {tgt}", shell=True, check=True)
+                self.log(f"{desc} -  successfully executed")
+        except subprocess.CalledProcessError as e:
+            self.log(f" - failed")
+            exit(1)
+
+    def log(self, msg):
+        print(msg)
+        self.log_msg.append(msg)
+
+    def print_log(self):
+        with open(self.log_file, "w") as f:
+            f.write("\n".join(self.log_msg))
 
 
 if __name__ == "__main__":
