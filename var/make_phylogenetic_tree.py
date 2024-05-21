@@ -141,12 +141,13 @@ class MiniPipeManager(object):
         try:
             if os.path.exists(tgt):
                 self.log(f"{desc} -  already executed")
+                self.log(cmd)
                 return
             else:
-                self.log(cmd)
+                self.log(f"{desc}")
                 subprocess.run(cmd, shell=True, check=True)
                 subprocess.run(f"touch {tgt}", shell=True, check=True)
-                self.log(f"{desc} -  successfully executed")
+                self.log(cmd)
         except subprocess.CalledProcessError as e:
             self.log(f" - failed")
             exit(1)
@@ -156,7 +157,7 @@ class MiniPipeManager(object):
         self.log_msg.append(msg)
 
     def print_log(self):
-        self.log(f"logs written to {self.log_file}")
+        self.log(f"\nlogs written to {self.log_file}")
         with open(self.log_file, "w") as f:
             f.write("\n".join(self.log_msg))
 
