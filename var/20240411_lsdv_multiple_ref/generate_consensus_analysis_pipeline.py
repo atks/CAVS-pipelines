@@ -69,7 +69,7 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
     # initialize
     pg = PipelineGenerator(make_file)
 
-    Sequence = []
+    sequence = []
     # read from reference sample file
     ##acc-id	country	collection_year	submission_year	fasta_header
     with open(sample_file, "r") as file:
@@ -80,7 +80,7 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
                 )
 
                 fasta_file = f"/net/singapura/var/projects/lsdv/ref/src/{acc_id}.fasta"
-                Sequence.append(
+                sequence.append(
                     Sequence(
                         acc_id,
                         country,
