@@ -69,33 +69,43 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
     # initialize
     pg = PipelineGenerator(make_file)
 
+    Sequence = []
+    # read from reference sample file
+    ##acc-id	country	collection_year	submission_year	fasta_header
     with open(sample_file, "r") as file:
         for line in file:
             if not line.startswith("#"):
-                id, ilm_fastq1, ilm_fastq2, ont_fastq = line.rstrip().split("\t")
-                output_dir = f"{working_dir}/{id}"
-                dep = ""
-                tgt = f"{log_dir}/{id}.OK"
-                log = f"{log_dir}/{id}.log"
-                err = f"{log_dir}/{id}.err"
-                cmd = ""
-                if ilm_fastq1 != "n/a" and ilm_fastq2 != "n/a" and ont_fastq == "n/a":
-                    cmd = f"{align_and_consensus} -s {id} -w {output_dir} -r {reference_fasta_file} -1 {ilm_fastq1} -2 {ilm_fastq2} > {log} 2> {err}"
-                elif ilm_fastq1 == "n/a" and ilm_fastq2 == "n/a" and ont_fastq != "n/a":
-                    cmd = f"{align_and_consensus} -s {id} -w {output_dir} -r {reference_fasta_file} -n {ont_fastq} > {log} 2> {err}"
-                else:
-                    cmd = f"{align_and_consensus} -s {id} -w {output_dir} -r {reference_fasta_file} -1 {ilm_fastq1} -2 {ilm_fastq2} -n {ont_fastq} > {log} 2> {err}"
+                acc_id, country, collection_tear, submission_year, fasta_header = (
+                    line.rstrip().split("\t")
+                )
 
-                pg.add(tgt, dep, cmd)
+                fasta_file = f"/net/singapura/var/projects/lsdv/ref/src/{acc_id}.fasta"
+                Sequence.append(
+                    Sequence(
+                        acc_id,
+                        country,
+                        collection_tear,
+                        submission_year,
+                        fasta_header,
+                        fast_file,
+                    )
+                )
+
+    # align and consensus
+    for s in Sequence:
+        log_file = f"{log_dir}/{s.acc_id}.log"
+        cmd = f"{align_and_consensus} -r {reference_fasta_file} -i {s.fasta_file} -o {s.fasta_file} > {log_file} 2>&1"
+        pg.add(f"{s.fasta_file}.consensus", s.fasta_file, cmd)
 
     # write make file
     print("Writing pipeline")
     pg.write()
 
-    #copy files to trace
+    # copy files to trace
     copy2(__file__, trace_dir)
     copy2(make_file, trace_dir)
     copy2(sample_file, trace_dir)
+
 
 class PipelineGenerator(object):
     def __init__(self, make_file):
@@ -138,18 +148,30 @@ class PipelineGenerator(object):
                 f.write(f"\t{self.clean_cmd}\n")
 
 
-class Sample(object):
+class Sequenceample(object):
     def __init__(self):
-        self.id = ""
-        self.seq_tech = ""
-        self.fastq1 = ""
-        self.fastq2 = ""
+        # acc-id	country	collection_year	submission_year	fasta_header
+        self.acc_id = ""
+        self.country = ""
+        self.collection_year = ""
+        self.submission_year = ""
+        self.fasta_header = ""
 
-    def __init__(self, id, seq_tech, fastq1, fastq2):
-        self.id = id
-        self.seq_tech = seq_tech
-        self.fastq1 = fastq1
-        self.fastq2 = fastq2
+    def __init__(
+        self,
+        acc_id,
+        country,
+        collection_year,
+        submission_year,
+        fasta_header,
+        fasta_file,
+    ):
+        self.acc_id = acc_id
+        self.country = country
+        self.collection_year = collection_year
+        self.submission_year = submission_year
+        self.fasta_header = fasta_header
+        self.fasta_file = fasta_file
 
     def print(self):
         print(f"id         : {self.id}")
