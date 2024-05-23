@@ -1,3 +1,6 @@
+This repository contains various scripts used for analysis in CAVS
+
+
 aphcbc    - scripts pertaining to APHC Bonding Committee
 cavspipes - internal major pipelines for CAVS
 cleanup   - cleanup scripts for network drives
