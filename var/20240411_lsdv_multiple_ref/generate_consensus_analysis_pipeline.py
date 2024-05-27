@@ -20,7 +20,7 @@
 
 import os
 import click
-import sys
+from shutil import copy2
 
 
 @click.command()
@@ -59,8 +59,11 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
 
     # create directories in destination folder directory
     log_dir = f"{working_dir}/log"
+    trace_dir = f"{working_dir}/trace"
+
     try:
         os.makedirs(log_dir, exist_ok=True)
+        os.makedirs(trace_dir, exist_ok=True)
     except OSError as error:
         print(f"Directory cannot be created")
 
@@ -87,12 +90,12 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
                         collection_tear,
                         submission_year,
                         fasta_header,
-                        fast_file,
+                        fasta_file,
                     )
                 )
 
     # align and consensus
-    for s in Sequence:
+    for s in sequence:
         log_file = f"{log_dir}/{s.acc_id}.log"
         cmd = f"{align_and_consensus} -r {reference_fasta_file} -i {s.fasta_file} -o {s.fasta_file} > {log_file} 2>&1"
         pg.add(f"{s.fasta_file}.consensus", s.fasta_file, cmd)
@@ -148,15 +151,7 @@ class PipelineGenerator(object):
                 f.write(f"\t{self.clean_cmd}\n")
 
 
-class Sequenceample(object):
-    def __init__(self):
-        # acc-id	country	collection_year	submission_year	fasta_header
-        self.acc_id = ""
-        self.country = ""
-        self.collection_year = ""
-        self.submission_year = ""
-        self.fasta_header = ""
-
+class Sequence(object):
     def __init__(
         self,
         acc_id,
@@ -174,11 +169,13 @@ class Sequenceample(object):
         self.fasta_file = fasta_file
 
     def print(self):
-        print(f"id         : {self.id}")
-        print(f"seq tech   : {self.seq_tech}")
-        print(f"fastq1     : {self.fastq1}")
-        print(f"fastq2     : {self.fastq2}")
+        print(f"acc id            : {self.acc_id}")
+        print(f"country           : {self.country}")
+        print(f"collection year   : {self.collection_year}")
+        print(f"submission year   : {self.submission_year}")
+        print(f"fasta header      : {self.fasta_header}")
+        print(f"fasta file        : {self.fasta_file}")
 
 
 if __name__ == "__main__":
-    main()
+    main() # type: ignore

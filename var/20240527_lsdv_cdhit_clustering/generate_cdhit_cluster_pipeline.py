@@ -20,15 +20,14 @@
 
 import os
 import click
-import sys
-
+from shutil import copy2
 
 @click.command()
 @click.option(
     "-m",
     "--make_file",
     show_default=True,
-    default="run_consensus_analysis.mk",
+    default="run_cdhit_clustering.mk",
     help="make file name",
 )
 @click.option(
@@ -38,23 +37,15 @@ import sys
     show_default=True,
     help="working directory",
 )
-@click.option(
-    "-r",
-    "--reference_fasta_file",
-    required=True,
-    show_default=True,
-    help="reference fasta file",
-)
-@click.option("-s", "--sample_file", required=True, help="sample file")
+@click.option("-r", "--reference_fasta_file", required=True, help="sample file")
 def main(make_file, working_dir, sample_file, reference_fasta_file):
     """
-    Consensus and coverage calculations
+    Cluster reference sequences over a set of thresholds for clustering
 
-    e.g. generate_coverage_consensus_analysis_pipeline
+    e.g. generate_cdhit_cluster_pipeline
     """
     print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
     print("\t{0:<20} :   {1:<10}".format("working_dir", working_dir))
-    print("\t{0:<20} :   {1:<10}".format("reference FASTA file", reference_fasta_file))
     print("\t{0:<20} :   {1:<10}".format("sample_file", sample_file))
 
     # create directories in destination folder directory
@@ -62,40 +53,25 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
     try:
         os.makedirs(log_dir, exist_ok=True)
     except OSError as error:
-        print(f"Directory cannot be created")
+        print(f"{error.filename} cannot be created")
 
-    align_and_consensus = "/home/atks/programs/cavspipes/var/align_and_consensus.py"
+    trace_dir = f"{working_dir}/trace"
 
     # initialize
     pg = PipelineGenerator(make_file)
 
-    sequence = []
-    # read from reference sample file
-    ##acc-id	country	collection_year	submission_year	fasta_header
-    with open(sample_file, "r") as file:
-        for line in file:
-            if not line.startswith("#"):
-                acc_id, country, collection_tear, submission_year, fasta_header = (
-                    line.rstrip().split("\t")
-                )
+    #programs
+    cdhit =  "/usr/local/cd-hit-v4.8.1/cd-hit"
 
-                fasta_file = f"/net/singapura/var/projects/lsdv/ref/src/{acc_id}.fasta"
-                sequence.append(
-                    Sequence(
-                        acc_id,
-                        country,
-                        collection_tear,
-                        submission_year,
-                        fasta_header,
-                        fast_file,
-                    )
-                )
-
-    # align and consensus
-    for s in Sequence:
-        log_file = f"{log_dir}/{s.acc_id}.log"
-        cmd = f"{align_and_consensus} -r {reference_fasta_file} -i {s.fasta_file} -o {s.fasta_file} > {log_file} 2>&1"
-        pg.add(f"{s.fasta_file}.consensus", s.fasta_file, cmd)
+    # cluster sequences
+    for cutoff in [0.80, 0.85, 0.90, 0.91, 0.92, 0.93, 0.94, 0.95, 0.96, 0.97, 0.98, 0.99, 1.00]:
+        #cdhit -i nr -o nr100 -c 1.00 -n 5 -M 2000
+        clustered_fasta_file = f"{working_dir}/clustered_{cutoff*100}.fasta"
+        log_file = f"{log_dir}/{cutoff}.cutoff.log"
+        dep = ""
+        cmd = f"{cdhit} -i {reference_fasta_file} -o {clustered_fasta_file} -c {cutoff} -T 10 -M 2000> {log_file} 2>&1"
+        tgt = ""
+        pg.add_srun(tgt, dep, cmd, 10)
 
     # write make file
     print("Writing pipeline")
@@ -106,7 +82,6 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
     copy2(make_file, trace_dir)
     copy2(sample_file, trace_dir)
 
-
 class PipelineGenerator(object):
     def __init__(self, make_file):
         self.make_file = make_file
@@ -114,6 +89,11 @@ class PipelineGenerator(object):
         self.deps = []
         self.cmds = []
         self.clean_cmd = ""
+
+    def add_srun(self, tgt, dep, cmd, cpu):
+        self.tgts.append(tgt)
+        self.deps.append(dep)
+        self.cmds.append(f"srun --mincpus {cpu} {cmd}")
 
     def add(self, tgt, dep, cmd):
         self.tgts.append(tgt)
@@ -123,15 +103,9 @@ class PipelineGenerator(object):
     def add_clean(self, cmd):
         self.clean_cmd = cmd
 
-    def print(self):
-        print(".DELETE_ON_ERROR:")
-        for i in range(len(self.tgts)):
-            print(f"{self.tgts[i]} : {self.deps[i]}")
-            print(f"\t{self.cmds[i]}")
-            print(f"\ttouch {self.tgts[i]}")
-
     def write(self):
         with open(self.make_file, "w") as f:
+            f.write("SHELL:=/bin/bash\n")
             f.write(".DELETE_ON_ERROR:\n\n")
             f.write("all : ")
             for i in range(len(self.tgts)):
@@ -148,37 +122,5 @@ class PipelineGenerator(object):
                 f.write(f"\t{self.clean_cmd}\n")
 
 
-class Sequenceample(object):
-    def __init__(self):
-        # acc-id	country	collection_year	submission_year	fasta_header
-        self.acc_id = ""
-        self.country = ""
-        self.collection_year = ""
-        self.submission_year = ""
-        self.fasta_header = ""
-
-    def __init__(
-        self,
-        acc_id,
-        country,
-        collection_year,
-        submission_year,
-        fasta_header,
-        fasta_file,
-    ):
-        self.acc_id = acc_id
-        self.country = country
-        self.collection_year = collection_year
-        self.submission_year = submission_year
-        self.fasta_header = fasta_header
-        self.fasta_file = fasta_file
-
-    def print(self):
-        print(f"id         : {self.id}")
-        print(f"seq tech   : {self.seq_tech}")
-        print(f"fastq1     : {self.fastq1}")
-        print(f"fastq2     : {self.fastq2}")
-
-
 if __name__ == "__main__":
-    main()
+    main() # type: ignore
