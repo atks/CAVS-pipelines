@@ -37,8 +37,8 @@ from shutil import copy2
     show_default=True,
     help="working directory",
 )
-@click.option("-r", "--reference_fasta_file", required=True, help="sample file")
-def main(make_file, working_dir, sample_file, reference_fasta_file):
+@click.option("-r", "--ref_fasta_file", required=True, help="sample file")
+def main(make_file, working_dir, ref_fasta_file):
     """
     Cluster reference sequences over a set of thresholds for clustering
 
@@ -46,7 +46,7 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
     """
     print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
     print("\t{0:<20} :   {1:<10}".format("working_dir", working_dir))
-    print("\t{0:<20} :   {1:<10}".format("sample_file", sample_file))
+    print("\t{0:<20} :   {1:<10}".format("ref_fasta_file", ref_fasta_file))
 
     # create directories in destination folder directory
     log_dir = f"{working_dir}/log"
@@ -61,16 +61,16 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
     pg = PipelineGenerator(make_file)
 
     #programs
-    cdhit =  "/usr/local/cd-hit-v4.8.1/cd-hit"
+    cdhit =  "/usr/local/cd-hit-4.8.1/cd-hit"
 
     # cluster sequences
     for cutoff in [0.80, 0.85, 0.90, 0.91, 0.92, 0.93, 0.94, 0.95, 0.96, 0.97, 0.98, 0.99, 1.00]:
         #cdhit -i nr -o nr100 -c 1.00 -n 5 -M 2000
-        clustered_fasta_file = f"{working_dir}/clustered_{cutoff*100}.fasta"
+        clustered_fasta_file = f"{working_dir}/clustered.{cutoff*100}.fasta"
         log_file = f"{log_dir}/{cutoff}.cutoff.log"
         dep = ""
-        cmd = f"{cdhit} -i {reference_fasta_file} -o {clustered_fasta_file} -c {cutoff} -T 10 -M 2000> {log_file} 2>&1"
-        tgt = ""
+        cmd = f"{cdhit} -i {ref_fasta_file} -o {clustered_fasta_file} -c {cutoff} -T 10 -M 2000 > {log_file}"
+        tgt = f"{clustered_fasta_file}.OK"
         pg.add_srun(tgt, dep, cmd, 10)
 
     # write make file
@@ -80,7 +80,7 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
     # copy files to trace
     copy2(__file__, trace_dir)
     copy2(make_file, trace_dir)
-    copy2(sample_file, trace_dir)
+    copy2(ref_fasta_file, trace_dir)
 
 class PipelineGenerator(object):
     def __init__(self, make_file):
