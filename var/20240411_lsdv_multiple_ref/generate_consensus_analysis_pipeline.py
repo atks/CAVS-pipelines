@@ -38,15 +38,8 @@ from shutil import copy2
     show_default=True,
     help="working directory",
 )
-@click.option(
-    "-r",
-    "--reference_fasta_file",
-    required=True,
-    show_default=True,
-    help="reference fasta file",
-)
 @click.option("-s", "--sample_file", required=True, help="sample file")
-def main(make_file, working_dir, sample_file, reference_fasta_file):
+def main(make_file, working_dir, sample_file):
     """
     Consensus and coverage calculations
 
@@ -54,7 +47,6 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
     """
     print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
     print("\t{0:<20} :   {1:<10}".format("working_dir", working_dir))
-    print("\t{0:<20} :   {1:<10}".format("reference FASTA file", reference_fasta_file))
     print("\t{0:<20} :   {1:<10}".format("sample_file", sample_file))
 
     # create directories in destination folder directory
@@ -67,7 +59,9 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
     except OSError as error:
         print(f"Directory cannot be created")
 
-    align_and_consensus = "/home/atks/programs/cavspipes/var/align_and_consensus.py"
+    align_and_consensus = (
+        "/home/atks/programs/CAVS-pipelines/minipipes/align_and_consensus.py"
+    )
 
     # initialize
     pg = PipelineGenerator(make_file)
@@ -78,27 +72,53 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
     with open(sample_file, "r") as file:
         for line in file:
             if not line.startswith("#"):
-                acc_id, country, collection_tear, submission_year, fasta_header = (
+                acc_id, country, collection_year, submission_year, fasta_header = (
                     line.rstrip().split("\t")
                 )
 
-                fasta_file = f"/net/singapura/var/projects/lsdv/ref/src/{acc_id}.fasta"
+                fasta_file = f"/net/singapura/var/projects/lsdv/lsdv_ref/{acc_id}.fasta"
                 sequence.append(
                     Sequence(
                         acc_id,
                         country,
-                        collection_tear,
+                        collection_year,
                         submission_year,
                         fasta_header,
                         fasta_file,
                     )
                 )
 
+    # combine data
+    ##acc-id	country	collection_year	submission_year	fasta_header
+    ilm_fastq1 = (
+        "/net/singapura/var/hts/ilm53/53_1_M220323_LSDV_skinswab2_R1.fastq.gz,"
+        "/net/singapura/var/hts/ilm53/53_2_M220323_LSDV_skinswab3_R1.fastq.gz,"
+        "/net/singapura/var/hts/ilm53/53_3_unclassified_R1.fastq.gz"
+    )
+
+    ilm_fastq2 = (
+        "/net/singapura/var/hts/ilm53/53_1_M220323_LSDV_skinswab2_R2.fastq.gz,"
+        "/net/singapura/var/hts/ilm53/53_2_M220323_LSDV_skinswab3_R2.fastq.gz,"
+        "/net/singapura/var/hts/ilm53/53_3_unclassified_R2.fastq.gz"
+    )
+
+    ont_fastq = (
+        "/net/singapura/var/hts/ont22/22_1_M220338_LSDV_nasal2.fastq.gz,"
+        "/net/singapura/var/hts/ont22/22_2_M220338_LSDV_nasal7.fastq.gz,"
+        "/net/singapura/var/hts/ont22/22_3_M220338_LSDV_skin1.fastq.gz,"
+        "/net/singapura/var/hts/ont22/22_4_M220338_LSDV_skin2.fastq.gz,"
+        "/net/singapura/var/hts/ont22/22_5_negative_control.fastq.gz,"
+        "/net/singapura/var/hts/ont22/22_6_unclassified.fastq.gz"
+    )
+
     # align and consensus
     for s in sequence:
         log_file = f"{log_dir}/{s.acc_id}.log"
-        cmd = f"{align_and_consensus} -r {reference_fasta_file} -i {s.fasta_file} -o {s.fasta_file} > {log_file} 2>&1"
-        pg.add(f"{s.fasta_file}.consensus", s.fasta_file, cmd)
+        output_dir = f"{working_dir}/{s.acc_id}"
+        dep = ""
+        cmd = f"{align_and_consensus} -1 {ilm_fastq1} -2 {ilm_fastq2} -n {ont_fastq} -r {s.fasta_file} -s {s.acc_id} -w {output_dir} > {log_file}"
+        tgt = f"{log_dir}/{s.acc_id}.OK"
+        pg.add(tgt, dep, cmd)
 
     # write make file
     print("Writing pipeline")
@@ -178,4 +198,4 @@ class Sequence(object):
 
 
 if __name__ == "__main__":
-    main() # type: ignore
+    main()  # type: ignore
