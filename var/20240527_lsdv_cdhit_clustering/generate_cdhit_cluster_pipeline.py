@@ -63,8 +63,19 @@ def main(make_file, working_dir, ref_fasta_file):
     #programs
     cdhit =  "/usr/local/cd-hit-4.8.1/cd-hit"
 
+    cutoffs = [0.80, 0.85, 0.90, 0.91, 0.92, 0.93, 0.94, 0.95, 0.96, 0.97, 0.98, 0.99]
+    for i in range(1,10):
+        cutoffs.append(0.99 + i*0.001)
+    for i in range(1,10):
+        cutoffs.append(0.999 + i*0.0001)
+    for i in range(1,10):
+        cutoffs.append(0.9999 + i*0.00001)
+    for i in range(1,10):
+        cutoffs.append(0.99999 + i*0.000001)
+    cutoffs.append(1.00)
+
     # cluster sequences
-    for cutoff in [0.80, 0.85, 0.90, 0.91, 0.92, 0.93, 0.94, 0.95, 0.96, 0.97, 0.98, 0.99, 0.991, 0.992, 0.993, 0.994, 0.995, 0.996, 0.997, 0.998, 0.999, 1.00]:
+    for cutoff in cutoffs:
         #cdhit -i nr -o nr100 -c 1.00 -n 5 -M 2000
         clustered_fasta_file = f"{working_dir}/clustered.{cutoff*100}.fasta"
         log_file = f"{log_dir}/{cutoff}.cutoff.log"
