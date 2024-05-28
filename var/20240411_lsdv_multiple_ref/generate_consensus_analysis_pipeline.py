@@ -76,7 +76,7 @@ def main(make_file, working_dir, sample_file):
                     line.rstrip().split("\t")
                 )
 
-                fasta_file = f"/net/singapura/var/projects/lsdv/lsdv_ref/{acc_id}.fasta"
+                fasta_file = f"{working_dir}/lsdv_ref/{acc_id}.fasta"
                 sequence.append(
                     Sequence(
                         acc_id,
