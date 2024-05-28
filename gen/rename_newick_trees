@@ -28,6 +28,8 @@ import click
 @click.option("-s", "--sample_file", required=True, help="sample file")
 def main(input_newick_file, output_newick_file, sample_file):
 
+    sequence = []
+
     with open(sample_file, "r") as file:
         for line in file:
             if not line.startswith("#"):
@@ -35,7 +37,7 @@ def main(input_newick_file, output_newick_file, sample_file):
                     line.rstrip().split("\t")
                 )
 
-                fasta_file = f"{working_dir}/lsdv_ref/{acc_id}.fasta"
+                fasta_file = f"{acc_id}.fasta"
                 sequence.append(
                     Sequence(
                         acc_id,
@@ -52,7 +54,15 @@ def main(input_newick_file, output_newick_file, sample_file):
             for line in file:
                 for s in sequence:
                     if s.acc_id in line:
-                        line = line.replace(s.fasta_header, s.acc_id)
+                        old_name = s.fasta_header.replace(" ", "_")
+                        old_name = old_name.replace(",", "_")
+                        old_name = old_name.replace(":", "_")
+                        old_name = old_name.replace("(", "_")
+                        old_name = old_name.replace(")", "_")
+                        old_name = old_name.replace(">", "")
+                        new_name = f"{s.country} {s.collection_year} {s.acc_id}"
+                        print(f"replacing {old_name} with {new_name}")
+                        line = line.replace(old_name, f"{new_name}")
                 out.write(line)
 
 
