@@ -74,15 +74,18 @@ def main(make_file, working_dir, ref_fasta_file):
         cutoffs.append(0.99999 + i*0.000001)
     cutoffs.append(1.00)
 
+
+
     # cluster sequences
     for cutoff in cutoffs:
+        #print(f"Clustering at {cutoff:#.6f} cutoff")
         #cdhit -i nr -o nr100 -c 1.00 -n 5 -M 2000
-        clustered_fasta_file = f"{working_dir}/clustered.{cutoff*100}.fasta"
+        clustered_fasta_file = f"{working_dir}/clustered.{cutoff*100:#.6f}.fasta"
         log_file = f"{log_dir}/{cutoff}.cutoff.log"
         dep = ""
-        cmd = f"{cdhit} -i {ref_fasta_file} -o {clustered_fasta_file} -c {cutoff} -T 10 -M 2000 > {log_file}"
+        cmd = f"{cdhit} -i {ref_fasta_file} -o {clustered_fasta_file} -c {cutoff} -T 2 -M 2000 > {log_file}"
         tgt = f"{clustered_fasta_file}.OK"
-        pg.add_srun(tgt, dep, cmd, 10)
+        pg.add_srun(tgt, dep, cmd, 2)
 
     # write make file
     print("Writing pipeline")
