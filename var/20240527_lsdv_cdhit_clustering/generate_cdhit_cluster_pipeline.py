@@ -50,12 +50,12 @@ def main(make_file, working_dir, ref_fasta_file):
 
     # create directories in destination folder directory
     log_dir = f"{working_dir}/log"
+    trace_dir = f"{working_dir}/trace"
     try:
         os.makedirs(log_dir, exist_ok=True)
+        os.makedirs(trace_dir, exist_ok=True)
     except OSError as error:
         print(f"{error.filename} cannot be created")
-
-    trace_dir = f"{working_dir}/trace"
 
     # initialize
     pg = PipelineGenerator(make_file)
@@ -74,14 +74,12 @@ def main(make_file, working_dir, ref_fasta_file):
         cutoffs.append(0.99999 + i*0.000001)
     cutoffs.append(1.00)
 
-
-
     # cluster sequences
     for cutoff in cutoffs:
         #print(f"Clustering at {cutoff:#.6f} cutoff")
         #cdhit -i nr -o nr100 -c 1.00 -n 5 -M 2000
-        clustered_fasta_file = f"{working_dir}/clustered.{cutoff*100:#.6f}.fasta"
-        log_file = f"{log_dir}/{cutoff}.cutoff.log"
+        clustered_fasta_file = f"{working_dir}/clustered.{cutoff:#.6f}.fasta"
+        log_file = f"{log_dir}/{cutoff:#.6f}.cutoff.log"
         dep = ""
         cmd = f"{cdhit} -i {ref_fasta_file} -o {clustered_fasta_file} -c {cutoff} -T 2 -M 2000 > {log_file}"
         tgt = f"{clustered_fasta_file}.OK"
