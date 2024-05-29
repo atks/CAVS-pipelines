@@ -33,9 +33,14 @@ def main(input_newick_file, output_newick_file, sample_file):
     with open(sample_file, "r") as file:
         for line in file:
             if not line.startswith("#"):
-                acc_id, country, collection_year, submission_year, fasta_header = (
-                    line.rstrip().split("\t")
-                )
+                (
+                    acc_id,
+                    country,
+                    collection_year,
+                    submission_year,
+                    fasta_header,
+                    friendly_name,
+                ) = line.rstrip().split("\t")
 
                 fasta_file = f"{acc_id}.fasta"
                 sequence.append(
@@ -46,6 +51,7 @@ def main(input_newick_file, output_newick_file, sample_file):
                         submission_year,
                         fasta_header,
                         fasta_file,
+                        friendly_name,
                     )
                 )
 
@@ -75,6 +81,7 @@ class Sequence(object):
         submission_year,
         fasta_header,
         fasta_file,
+        friendly_name,
     ):
         self.acc_id = acc_id
         self.country = country
@@ -82,6 +89,7 @@ class Sequence(object):
         self.submission_year = submission_year
         self.fasta_header = fasta_header
         self.fasta_file = fasta_file
+        self.friendly_name = friendly_name
 
     def print(self):
         print(f"acc id            : {self.acc_id}")
@@ -90,6 +98,7 @@ class Sequence(object):
         print(f"submission year   : {self.submission_year}")
         print(f"fasta header      : {self.fasta_header}")
         print(f"fasta file        : {self.fasta_file}")
+        print(f"friendly name     : {self.friendly_name}")
 
 
 if __name__ == "__main__":
