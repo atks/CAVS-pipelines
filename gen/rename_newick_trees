@@ -66,7 +66,7 @@ def main(input_newick_file, output_newick_file, sample_file):
                         old_name = old_name.replace("(", "_")
                         old_name = old_name.replace(")", "_")
                         old_name = old_name.replace(">", "")
-                        new_name = f"{s.country} {s.collection_year} {s.acc_id}"
+                        new_name = f"{s.friendly_name}"
                         print(f"replacing {old_name} with {new_name}")
                         line = line.replace(old_name, f"{new_name}")
                 out.write(line)
