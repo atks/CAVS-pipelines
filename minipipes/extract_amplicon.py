@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # The MIT License
-# Copyright (c) 2023 Adrian Tan <adrian_tan@nparks.gov.sg>
+# Copyright (c) 2024 Adrian Tan <adrian_tan@nparks.gov.sg>
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the 'Software'), to deal
 # in the Software without restriction, including without limitation the rights
@@ -23,13 +23,14 @@ import os
 import click
 import subprocess
 import re
+from shutil import copy2
 
 
 @click.command()
 @click.option(
     "-o",
     "--output_dir",
-    default=os.getcwd(),
+    default=f"os.getcwd()/extract_amplicon_output",
     show_default=True,
     help="output directory",
 )
@@ -61,7 +62,7 @@ def main(output_dir, primer_fasta_file, reference_fasta_file):
     water = "/usr/local/emboss-6.6.0/bin/water"
 
     # initialize
-    mpm = MiniPipeManager(f"{output_dir}/make_phylogenetic_tree.log")
+    mpm = MiniPipeManager(f"{output_dir}/extract_amplicon.log")
 
     # read reference sequences
     seq = ""
@@ -90,50 +91,15 @@ def main(output_dir, primer_fasta_file, reference_fasta_file):
 
     # reverse_complement
     seq1_forward = seq1.upper()
-    seq1_reverse = (
-        seq1_forward[::-1]
-        .replace("A", "t")
-        .replace("T", "a")
-        .replace("G", "c")
-        .replace("C", "g")
-        .replace("M", "k")
-        .replace("R", "y")
-        .replace("W", "w")
-        .replace("S", "s")
-        .replace("Y", "r")
-        .replace("K", "m")
-        .replace("V", "b")
-        .replace("H", "d")
-        .replace("D", "h")
-        .replace("B", "v")
-        .replace("N", "n")
-        .upper()
-    )
+    seq1_reverse = reverse_complement(seq1_forward)
     seq2_forward = seq2.upper()
-    seq2_reverse = (
-        seq2_forward[::-1]
-        .replace("A", "t")
-        .replace("T", "a")
-        .replace("G", "c")
-        .replace("C", "g")
-        .replace("M", "k")
-        .replace("R", "y")
-        .replace("W", "w")
-        .replace("S", "s")
-        .replace("Y", "r")
-        .replace("K", "m")
-        .replace("V", "b")
-        .replace("H", "d")
-        .replace("D", "h")
-        .replace("B", "v")
-        .replace("N", "n")
-        .upper()
-    )
+    seq2_reverse = reverse_complement(seq2_forward)
 
     # write out to separate files
-    output_dir = f"{output_dir}/extract_amplicon_output"
+    trace_dir = f"{output_dir}/trace"
     try:
         os.makedirs(output_dir, exist_ok=True)
+        os.makedirs(trace_dir, exist_ok=True)
     except OSError as error:
         print(f"{error.filename} cannot be created")
 
@@ -146,7 +112,8 @@ def main(output_dir, primer_fasta_file, reference_fasta_file):
     output_file = f"{output_dir}/p1_reverse.fasta"
     with open(output_file, "w") as file:
         file.write(">primer1_reverse\n")
-        file.write(seq1_reverse)
+        if seq1_reverse is not None:
+            file.write(seq1_reverse)
         file.write("\n")
 
     output_file = f"{output_dir}/p2_forward.fasta"
@@ -158,38 +125,37 @@ def main(output_dir, primer_fasta_file, reference_fasta_file):
     output_file = f"{output_dir}/p2_reverse.fasta"
     with open(output_file, "w") as file:
         file.write(">primer2_reverse\n")
-        file.write(seq2_reverse)
+        if seq2_reverse is not None:
+            file.write(seq2_reverse)
         file.write("\n")
 
     # invoke smith waterman alignment for each direction
-
-
-    primer_fasta_file = f"{output_dir}/P1_forward.fasta"
-    water_alignment_file = f"{output_dir}/P1_forward.water"
+    primer_fasta_file = f"{output_dir}/p1_forward.fasta"
+    water_alignment_file = f"{output_dir}/p1_forward.water"
     cmd = f"{water} {primer_fasta_file} {reference_fasta_file}  {water_alignment_file} -gapopen 10 -gapextend 0.5"
     tgt = f"{primer_fasta_file}.OK"
     desc = f"P1F sequence alignment"
     mpm.run(cmd, tgt, desc)
     p1_forward_alignment = parse_water_alignment(water_alignment_file)
 
-    primer_fasta_file = f"{output_dir}/P1_reverse.fasta"
-    water_alignment_file = f"{output_dir}/P1_reverse.water"
+    primer_fasta_file = f"{output_dir}/p1_reverse.fasta"
+    water_alignment_file = f"{output_dir}/p1_reverse.water"
     cmd = f"{water} {primer_fasta_file} {reference_fasta_file}  {water_alignment_file} -gapopen 10 -gapextend 0.5"
     tgt = f"{primer_fasta_file}.OK"
     desc = f"P1R sequence alignment"
     mpm.run(cmd, tgt, desc)
     p1_reverse_alignment = parse_water_alignment(water_alignment_file)
 
-    primer_fasta_file = f"{output_dir}/P2_forward.fasta"
-    water_alignment_file = f"{output_dir}/P2_forward.water"
+    primer_fasta_file = f"{output_dir}/p2_forward.fasta"
+    water_alignment_file = f"{output_dir}/p2_forward.water"
     cmd = f"{water} {primer_fasta_file} {reference_fasta_file}  {water_alignment_file} -gapopen 10 -gapextend 0.5"
     tgt = f"{primer_fasta_file}.OK"
     desc = f"P2F sequence alignment"
     mpm.run(cmd, tgt, desc)
     p2_forward_alignment = parse_water_alignment(water_alignment_file)
 
-    primer_fasta_file = f"{output_dir}/P2_reverse.fasta"
-    water_alignment_file = f"{output_dir}/P2_reverse.water"
+    primer_fasta_file = f"{output_dir}/p2_reverse.fasta"
+    water_alignment_file = f"{output_dir}/p2_reverse.water"
     cmd = f"{water} {primer_fasta_file} {reference_fasta_file} {water_alignment_file} -gapopen 10 -gapextend 0.5"
     tgt = f"{primer_fasta_file}.OK"
     desc = f"P2R sequence alignment"
@@ -234,11 +200,33 @@ def main(output_dir, primer_fasta_file, reference_fasta_file):
     best_p2_alignment.print()
     print("==========")
 
-    # p1_forward_alignment.print()
-    # p1_reverse_alignment.print()
-    # p2_forward_alignment.print()
-    # p2_reverse_alignment.print()
+    # copy files to trace
+    copy2(__file__, trace_dir)
 
+    # write log file
+    mpm.print_log()
+
+def reverse_complement(seq):
+    return (
+        seq[::-1]
+        .upper()
+        .replace("A", "t")
+        .replace("T", "a")
+        .replace("G", "c")
+        .replace("C", "g")
+        .replace("M", "k")
+        .replace("R", "y")
+        .replace("W", "w")
+        .replace("S", "s")
+        .replace("Y", "r")
+        .replace("K", "m")
+        .replace("V", "b")
+        .replace("H", "d")
+        .replace("D", "h")
+        .replace("B", "v")
+        .replace("N", "n")
+        .upper()
+    )
 
 # Aligned_sequences: 2
 # 1: primer2_reverse
@@ -262,6 +250,7 @@ def parse_water_alignment(file):
         score = 0
         beg = 10000000000
         end = -1
+        align = ""
         for line in file:
             if line.startswith("# 1:"):
                 m = re.search(r"\# 1: (.+)", line)
@@ -292,15 +281,15 @@ def parse_water_alignment(file):
                 if m is not None:
                     beg = int(m.group(1)) if int(m.group(1)) < beg else beg
                     end = int(m.group(2)) if int(m.group(2)) > end else end
-            else:
-                pass
 
-        alignment = Alignment(qseq, rseq, length, identity, gaps, score, beg, end)
-        return alignment
+            if not line.startswith("#") and len(line) > 1:
+                align += line
+
+        return Alignment(qseq, rseq, length, identity, gaps, score, beg, end, align)
 
 
 class Alignment(object):
-    def __init__(self, qseq, rseq, length, identity, gaps, score, beg, end):
+    def __init__(self, qseq, rseq, length, identity, gaps, score, beg, end, align):
         self.qseq = qseq
         self.rseq = rseq
         self.length = length
@@ -309,6 +298,7 @@ class Alignment(object):
         self.score = score
         self.beg = beg
         self.end = end
+        self.align = align
 
     def print(self):
         print(f"qseq      : {self.qseq}")
@@ -319,6 +309,7 @@ class Alignment(object):
         print(f"score     : {self.score}")
         print(f"beg       : {self.beg}")
         print(f"end       : {self.end}")
+        print(f"\n{self.align}")
 
 class MiniPipeManager(object):
     def __init__(self, log_file):
