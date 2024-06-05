@@ -27,11 +27,11 @@ import re
 
 @click.command()
 @click.option(
-    "-w",
-    "--working_dir",
+    "-o",
+    "--output_dir",
     default=os.getcwd(),
     show_default=True,
-    help="working directory",
+    help="output directory",
 )
 @click.option(
     "-p",
@@ -47,12 +47,21 @@ import re
     show_default=True,
     help="reference fasta file",
 )
-def main(working_dir, primer_fasta_file, reference_fasta_file):
+def main(output_dir, primer_fasta_file, reference_fasta_file):
     """
     Extracts amplicon from a reference sequence file and a pair of primers
 
     e.g. extract_amplicon -p primers.fasta -r ref.fasta
     """
+
+    # version
+    version = "1.0.0"
+
+    # programs
+    water = "/usr/local/emboss-6.6.0/bin/water"
+
+    # initialize
+    mpm = MiniPipeManager(f"{output_dir}/make_phylogenetic_tree.log")
 
     # read reference sequences
     seq = ""
@@ -122,11 +131,11 @@ def main(working_dir, primer_fasta_file, reference_fasta_file):
     )
 
     # write out to separate files
-    output_dir = f"{working_dir}/extract_amplicon_output"
+    output_dir = f"{output_dir}/extract_amplicon_output"
     try:
         os.makedirs(output_dir, exist_ok=True)
     except OSError as error:
-        print(f"Directory cannot be created")
+        print(f"{error.filename} cannot be created")
 
     output_file = f"{output_dir}/p1_forward.fasta"
     with open(output_file, "w") as file:
@@ -153,72 +162,39 @@ def main(working_dir, primer_fasta_file, reference_fasta_file):
         file.write("\n")
 
     # invoke smith waterman alignment for each direction
-    water = "/usr/local/emboss-6.6.0/bin/water"
-    p1_forward_water_alignment_file = f"{output_dir}/p1_forward.water"
-    p1_reverse_water_alignment_file = f"{output_dir}/p1_reverse.water"
-    p2_forward_water_alignment_file = f"{output_dir}/p2_forward.water"
-    p2_reverse_water_alignment_file = f"{output_dir}/p2_reverse.water"
 
-    # result = subprocess.run(
-    # [f'{water} {output_dir}/p1_forward.fasta {reference_fasta_file} output.water -gapopen 10 -gapextend 0.5'], capture_output=True)
-    result = subprocess.run(
-        [
-            water,
-            f"{output_dir}/p1_forward.fasta",
-            reference_fasta_file,
-            p1_forward_water_alignment_file,
-            "-gapopen",
-            "10",
-            "-gapextend",
-            "0.5",
-        ],
-        capture_output=True,
-    )
-    result = subprocess.run(
-        [
-            water,
-            f"{output_dir}/p1_reverse.fasta",
-            reference_fasta_file,
-            p1_reverse_water_alignment_file,
-            "-gapopen",
-            "10",
-            "-gapextend",
-            "0.5",
-        ],
-        capture_output=True,
-    )
-    result = subprocess.run(
-        [
-            water,
-            f"{output_dir}/p2_forward.fasta",
-            reference_fasta_file,
-            p2_forward_water_alignment_file,
-            "-gapopen",
-            "10",
-            "-gapextend",
-            "0.5",
-        ],
-        capture_output=True,
-    )
-    result = subprocess.run(
-        [
-            water,
-            f"{output_dir}/p2_reverse.fasta",
-            reference_fasta_file,
-            p2_reverse_water_alignment_file,
-            "-gapopen",
-            "10",
-            "-gapextend",
-            "0.5",
-        ],
-        capture_output=True,
-    )
 
-    # examine alignments
-    p1_forward_alignment = parse_water_alignment(p1_forward_water_alignment_file)
-    p1_reverse_alignment = parse_water_alignment(p1_reverse_water_alignment_file)
-    p2_forward_alignment = parse_water_alignment(p2_forward_water_alignment_file)
-    p2_reverse_alignment = parse_water_alignment(p2_reverse_water_alignment_file)
+    primer_fasta_file = f"{output_dir}/P1_forward.fasta"
+    water_alignment_file = f"{output_dir}/P1_forward.water"
+    cmd = f"{water} {primer_fasta_file} {reference_fasta_file}  {water_alignment_file} -gapopen 10 -gapextend 0.5"
+    tgt = f"{primer_fasta_file}.OK"
+    desc = f"P1F sequence alignment"
+    mpm.run(cmd, tgt, desc)
+    p1_forward_alignment = parse_water_alignment(water_alignment_file)
+
+    primer_fasta_file = f"{output_dir}/P1_reverse.fasta"
+    water_alignment_file = f"{output_dir}/P1_reverse.water"
+    cmd = f"{water} {primer_fasta_file} {reference_fasta_file}  {water_alignment_file} -gapopen 10 -gapextend 0.5"
+    tgt = f"{primer_fasta_file}.OK"
+    desc = f"P1R sequence alignment"
+    mpm.run(cmd, tgt, desc)
+    p1_reverse_alignment = parse_water_alignment(water_alignment_file)
+
+    primer_fasta_file = f"{output_dir}/P2_forward.fasta"
+    water_alignment_file = f"{output_dir}/P2_forward.water"
+    cmd = f"{water} {primer_fasta_file} {reference_fasta_file}  {water_alignment_file} -gapopen 10 -gapextend 0.5"
+    tgt = f"{primer_fasta_file}.OK"
+    desc = f"P2F sequence alignment"
+    mpm.run(cmd, tgt, desc)
+    p2_forward_alignment = parse_water_alignment(water_alignment_file)
+
+    primer_fasta_file = f"{output_dir}/P2_reverse.fasta"
+    water_alignment_file = f"{output_dir}/P2_reverse.water"
+    cmd = f"{water} {primer_fasta_file} {reference_fasta_file} {water_alignment_file} -gapopen 10 -gapextend 0.5"
+    tgt = f"{primer_fasta_file}.OK"
+    desc = f"P2R sequence alignment"
+    mpm.run(cmd, tgt, desc)
+    p2_reverse_alignment = parse_water_alignment(water_alignment_file)
 
     # for good match - extract amplicon, report length
     # yes I know the issue here.  need to ensure it is the right pair and they are consistent with one another to amplify
@@ -344,5 +320,36 @@ class Alignment(object):
         print(f"beg       : {self.beg}")
         print(f"end       : {self.end}")
 
+class MiniPipeManager(object):
+    def __init__(self, log_file):
+        self.log_file = log_file
+        self.log_msg = []
+
+    def run(self, cmd, tgt, desc):
+        try:
+            if os.path.exists(tgt):
+                self.log(f"{desc} -  already executed")
+                self.log(cmd)
+                return
+            else:
+                self.log(f"{desc}")
+                subprocess.run(cmd, shell=True, check=True)
+                subprocess.run(f"touch {tgt}", shell=True, check=True)
+                self.log(cmd)
+        except subprocess.CalledProcessError as e:
+            self.log(f" - failed")
+            exit(1)
+
+    def log(self, msg):
+        print(msg)
+        self.log_msg.append(msg)
+
+    def print_log(self):
+        self.log(f"\nlogs written to {self.log_file}")
+        with open(self.log_file, "w") as f:
+            f.write("\n".join(self.log_msg))
+
+
+
 if __name__ == "__main__":
-    main() # type: ignore
+    main() # type: ignore[arg-type]
