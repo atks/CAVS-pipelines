@@ -87,6 +87,17 @@ def main(working_dir, primer_fasta_file, reference_fasta_file):
         .replace("T", "a")
         .replace("G", "c")
         .replace("C", "g")
+        .replace("M", "k")
+        .replace("R", "y")
+        .replace("W", "w")
+        .replace("S", "s")
+        .replace("Y", "r")
+        .replace("K", "m")
+        .replace("V", "b")
+        .replace("H", "d")
+        .replace("D", "h")
+        .replace("B", "v")
+        .replace("N", "n")
         .upper()
     )
     seq2_forward = seq2.upper()
@@ -96,6 +107,17 @@ def main(working_dir, primer_fasta_file, reference_fasta_file):
         .replace("T", "a")
         .replace("G", "c")
         .replace("C", "g")
+        .replace("M", "k")
+        .replace("R", "y")
+        .replace("W", "w")
+        .replace("S", "s")
+        .replace("Y", "r")
+        .replace("K", "m")
+        .replace("V", "b")
+        .replace("H", "d")
+        .replace("D", "h")
+        .replace("B", "v")
+        .replace("N", "n")
         .upper()
     )
 
@@ -266,27 +288,34 @@ def parse_water_alignment(file):
         end = -1
         for line in file:
             if line.startswith("# 1:"):
-                m = re.search("\# 1: (.+)", line)
-                qseq = m.group(1)
+                m = re.search(r"\# 1: (.+)", line)
+                if m is not None:
+                    qseq = m.group(1)
             elif line.startswith("# 2:"):
-                m = re.search("\# 2: (.+)", line)
-                rseq = m.group(1)
+                m = re.search(r"\# 2: (.+)", line)
+                if m is not None:
+                    rseq = m.group(1)
             elif line.startswith("# Length"):
-                m = re.search("(\d+)", line)
-                length = m.group(1)
+                m = re.search(r"(\d+)", line)
+                if m is not None:
+                   length = m.group(1)
             elif line.startswith("# Identity"):
-                m = re.search("(\d+)\/", line)
-                identity = m.group(1)
+                m = re.search(r"(\d+)\/", line)
+                if m is not None:
+                    identity = int(m.group(1))
             elif line.startswith("# Gaps"):
-                m = re.search("(\d+)\/", line)
-                gaps = m.group(1)
+                m = re.search(r"(\d+)\/", line)
+                if m is not None:
+                    gaps = m.group(1)
             elif line.startswith("# Score"):
-                m = re.search("([\d\.]+)", line)
-                score = m.group(1)
+                m = re.search(r"([\d\.]+)", line)
+                if m is not None:
+                    score = m.group(1)
             elif len(rseq) != 0 and line.startswith(rseq[:13]):
-                m = re.search(f"{rseq[:13]}\s+([\d\.]+) [^\d]+ ([\d\.]+)", line)
-                beg = int(m.group(1)) if int(m.group(1)) < beg else beg
-                end = int(m.group(2)) if int(m.group(2)) > end else end
+                m = re.search(fr"{rseq[:13]}\s+([\d\.]+) [^\d]+ ([\d\.]+)", line)
+                if m is not None:
+                    beg = int(m.group(1)) if int(m.group(1)) < beg else beg
+                    end = int(m.group(2)) if int(m.group(2)) > end else end
             else:
                 pass
 
@@ -295,16 +324,6 @@ def parse_water_alignment(file):
 
 
 class Alignment(object):
-    def __init__(self):
-        self.qseq = ""
-        self.rseq = ""
-        self.length = 0
-        self.identity = 0
-        self.gaps = 0
-        self.score = 0
-        self.beg = 0
-        self.end = 0
-
     def __init__(self, qseq, rseq, length, identity, gaps, score, beg, end):
         self.qseq = qseq
         self.rseq = rseq
@@ -325,6 +344,5 @@ class Alignment(object):
         print(f"beg       : {self.beg}")
         print(f"end       : {self.end}")
 
-
 if __name__ == "__main__":
-    main()
+    main() # type: ignore

@@ -94,7 +94,7 @@ def main(working_dir, fasta_file, ref_fasta_file, prefix):
         fasta_file = ""
         desc = f"Generating FASTA file with clean IDs from reference FASTA only for multiple sequence alignment"
     combined_fasta_file = f"{output_dir}/combined.fasta"
-    cmd = f'cat {fasta_file} {ref_fasta_file} | {seqkit} replace -p "[\s;:,\(\)\']" -r "_"  > {combined_fasta_file}'
+    cmd = fr'cat {fasta_file} {ref_fasta_file} | {seqkit} replace -p "[\s;:,\(\)\']" -r "_"  > {combined_fasta_file}'
     tgt = f"{combined_fasta_file}.OK"
     mpm.run(cmd, tgt, desc)
 
@@ -163,4 +163,4 @@ class MiniPipeManager(object):
 
 
 if __name__ == "__main__":
-    main()
+    main() # type: ignore[arg-type]
