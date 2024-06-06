@@ -58,11 +58,12 @@ def main(make_file, output_dir):
         capture_output=True,
     ).stdout.rstrip()
 
-    m = re.search("Release: ([\d_]+),", release_notes)
+    m = re.search(r"Release: ([\d_]+),", release_notes)
 
     print(release_notes)
 
-    release_number = m.group(1)
+    if m is not None:
+        release_number = m.group(1)
     print(f"UniRef {release_number}")
 
     # https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref90/uniref90.fasta.gz
@@ -137,4 +138,4 @@ class PipelineGenerator(object):
 
 
 if __name__ == "__main__":
-    main()
+    main() # type: ignore[arg-type]

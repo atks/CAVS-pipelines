@@ -44,24 +44,59 @@ from shutil import copy2
 @click.option(
     "-r",
     "--ref_fasta_file",
-    required=True,
+    required=False,
     show_default=True,
     help="reference fasta file",
+)
+@click.option(
+    "-m",
+    "--ref_msa_file",
+    required=False,
+    show_default=True,
+    help="reference multiple sequence alignment file",
 )
 @click.option(
     "-p",
     "--prefix",
     required=True,
-    default="tree",
+    default="genus_species",
     show_default=True,
     help="for RAXML file naming",
 )
-def main(working_dir, fasta_file, ref_fasta_file, prefix):
+def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, prefix):
     """
     Generates a phylogenetic tree from a panel of sequences and reference sequences
 
-    e.g. make_phylogenetic_tree.py -s lsdv.fasta -r lsdv_ref.fasta
+    e.g. #combines both fasta files, multiple align, build tere
+         make_phylogenetic_tree.py -f lsdv.fasta -r lsdv_ref.fasta
+         #multiple aligh reference fasta file, build tree
+         make_phylogenetic_tree.py -r lsdv_ref.fasta
+         #multiple align sequences in fasta file to existing multiple alignment, build tree
+         make_phylogenetic_tree.py -f lsdv.fasta -m lsdv_ref.msa
+         #build tree from the multiple sequence alignment
+         make_phylogenetic_tree.py -m lsdv_ref.fasta
     """
+
+    #make sure at least one of the two files is provided
+    if (ref_fasta_file is None and ref_msa_file is None) or (ref_fasta_file is not None and ref_msa_file is not None):
+        print("Please provide either a reference fasta file or a reference multiple sequence alignment file")
+        sys.exit(1)
+
+    combined_fasta_file = True
+    multiple_align = "all"
+
+    if fasta_file is not None and ref_fasta_file is None:
+        combined_fasta_file = False
+
+    if ref_msa_file is None:
+        multiple_align = "all"
+    elif fasta_file is not None and ref_msa_file is not None:
+        multiple_align = "add"
+    else:
+        multiple_align = "none"
+
+    print(f"msa status = {multiple_align}")
+
     output_dir = f"{os.getcwd()}/phylo"
     if working_dir != "":
         output_dir = os.path.abspath(working_dir)
@@ -93,32 +128,44 @@ def main(working_dir, fasta_file, ref_fasta_file, prefix):
     if fasta_file is None:
         fasta_file = ""
         desc = f"Generating FASTA file with clean IDs from reference FASTA only for multiple sequence alignment"
+    if ref_fasta_file is None:
+        ref_fasta_file = ""
+        desc = f"Generating FASTA file with clean IDs from reference multiple sequence alignment only for multiple sequence alignment"
     combined_fasta_file = f"{output_dir}/combined.fasta"
     cmd = fr'cat {fasta_file} {ref_fasta_file} | {seqkit} replace -p "[\s;:,\(\)\']" -r "_"  > {combined_fasta_file}'
     tgt = f"{combined_fasta_file}.OK"
     mpm.run(cmd, tgt, desc)
 
-    # perform multiple sequence alignment
-    input_fasta_file = f"{output_dir}/{ref_fasta_file}"
-    if fasta_file is not None:
+    if multiple_align == "all":
+        # perform multiple sequence alignment
         input_fasta_file = f"{output_dir}/combined.fasta"
-    output_fasta_file = f"{output_dir}/msa.fasta"
-    log = f"{output_dir}/msa.log"
-    cmd = f"{mafft} {input_fasta_file} > {output_fasta_file} 2>{log}"
-    tgt = f"{output_fasta_file}.OK"
-    desc = f"Multiple sequence alignment"
-    mpm.run(cmd, tgt, desc)
+        output_msa_file = f"{output_dir}/{prefix}.msa"
+        log = f"{output_dir}/msa.log"
+        cmd = f"{mafft} {input_fasta_file} > {output_msa_file} 2>{log}"
+        tgt = f"{output_msa_file}.OK"
+        desc = f"Multiple sequence alignment"
+        mpm.run(cmd, tgt, desc)
+    elif multiple_align == "add":
+        # perform add on to multiple sequence alignment
+        input_fasta_file = f"{combined_fasta_file}"
+        output_msa_file = f"{output_dir}/{prefix}.msa"
+        log = f"{output_dir}/msa.log"
+        cmd = f"{mafft} --add {input_fasta_file} {ref_msa_file} > {output_msa_file} 2>{log}"
+        tgt = f"{output_msa_file}.OK"
+        desc = f"Additive multiple sequence alignment"
+        mpm.run(cmd, tgt, desc)
+    else:
+        pass
 
     # construct phylogenetic tree with bootstrap
-    input_msa_fasta_file = f"{output_dir}/msa.fasta"
+    input_msa_file = f"{output_dir}/{prefix}.msa"
     log = f"{output_dir}/construct_trees.log"
-    cmd = f"cd {output_dir}; {raxml} --threads 10 --msa {input_msa_fasta_file} --model GTR+G --prefix {prefix} --bootstrap > {log}"
+    cmd = f"cd {output_dir}; {raxml} --threads 10 --msa {input_msa_file} --model GTR+G --prefix {prefix} --bootstrap > {log}"
     tgt = f"{output_dir}/construct_trees.OK"
     desc = f"Constructing phylogenetic tree"
     mpm.run(cmd, tgt, desc)
 
     # construct consensus tree
-    input_msa_fasta_file = f"{output_dir}/msa.fasta"
     log = f"{output_dir}/consensus_tree.log"
     cmd = f"cd {output_dir}; {raxml} --consense MRE --tree {prefix}.raxml.bootstraps --redo --prefix {prefix} > {log}"
     tgt = f"{output_dir}/consensus_tree.OK"
