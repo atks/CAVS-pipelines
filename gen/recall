@@ -19,8 +19,6 @@
 # THE SOFTWARE.
 
 import click
-import subprocess
-
 
 @click.command()
 def main():
@@ -32,4 +30,4 @@ def main():
     print("mafft --add 2seq.fasta 72seq.msa > 74seq.msa")
 
 if __name__ == "__main__":
-    main()
+    main() # type: ignore[arg-type]

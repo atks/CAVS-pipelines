@@ -79,7 +79,7 @@ def main(
     """
     Aligns all fastq files to a reference sequence file and generates a consensus sequence.
 
-    e.g. align_and_consensus -1   -2   -n  -r ref.fasta
+    e.g. align_and_consensus -1 r1.fastq.gz -2 r2.fastq.gz -n ont.fastq.qz  -r ref.fasta
     """
     illumina = len(input_ilm_read1_fastq_files) != 0
     nanopore = len(input_ont_fastq_files) != 0

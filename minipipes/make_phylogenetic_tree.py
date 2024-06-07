@@ -97,7 +97,7 @@ def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, prefix):
 
     print(f"msa status = {multiple_align}")
 
-    output_dir = f"{os.getcwd()}/phylo"
+    output_dir = f"{os.getcwd()}/{prefix}_phylo"
     if working_dir != "":
         output_dir = os.path.abspath(working_dir)
     trace_dir = f"{output_dir}/trace"
@@ -192,9 +192,9 @@ class MiniPipeManager(object):
                 return
             else:
                 self.log(f"{desc}")
+                self.log(cmd)
                 subprocess.run(cmd, shell=True, check=True)
                 subprocess.run(f"touch {tgt}", shell=True, check=True)
-                self.log(cmd)
         except subprocess.CalledProcessError as e:
             self.log(f" - failed")
             exit(1)
