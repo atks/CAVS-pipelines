@@ -56,6 +56,13 @@ from shutil import copy2
     help="reference multiple sequence alignment file",
 )
 @click.option(
+    "-s",
+    "--sample_file",
+    required=False,
+    show_default=True,
+    help="for naming the nodes of the tree",
+)
+@click.option(
     "-p",
     "--prefix",
     required=True,
@@ -63,7 +70,7 @@ from shutil import copy2
     show_default=True,
     help="for RAXML file naming",
 )
-def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, prefix):
+def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, sample_file, prefix):
     """
     Generates a phylogenetic tree from a panel of sequences and reference sequences
 
@@ -96,6 +103,21 @@ def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, prefix):
         multiple_align = "none"
 
     print(f"msa status = {multiple_align}")
+
+    rename_samples = False
+
+
+    if sample_file is not None:
+        rename_samples = True
+
+    %acc2name = {}
+    with open(sample_file, "r") as f:
+        for line in f:
+            line = line.strip()
+            acc, name = line.split("\t")
+            %acc2name[acc] = name
+
+
 
     output_dir = f"{os.getcwd()}/{prefix}_phylo"
     if working_dir != "":
