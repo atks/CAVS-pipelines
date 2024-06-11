@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+
+# The MIT License
+# Copyright (c) 2024 Adrian Tan <adrian_tan@nparks.gov.sg>
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the 'Software'), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+# THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
+import os
+import click
+
+
+@click.command()
+@click.argument("input_newick_file")
+@click.option("-o", "--output_newick_file", required=True, help="output newick file")
+@click.option("-s", "--sample_file", required=True, help="sample file")
+def main(input_newick_file, output_newick_file, sample_file):
+    """
+    Renames samples in newick file.
+
+    e.g. rename_newick_trees lsdv.tree -o lsdv.renamed.tree -s lsdv_ref.sa
+    """
+    sequence = []
+
+    with open(sample_file, "r") as file:
+        for line in file:
+            if not line.startswith("#"):
+                (
+                    acc_id,
+                    country,
+                    collection_year,
+                    submission_year,
+                    fasta_header,
+                    friendly_name,
+                ) = line.rstrip().split("\t")
+
+                fasta_file = f"{acc_id}.fasta"
+                sequence.append(
+                    Sequence(
+                        acc_id,
+                        country,
+                        collection_year,
+                        submission_year,
+                        fasta_header,
+                        fasta_file,
+                        friendly_name,
+                    )
+                )
+
+    no_replaced = 0
+    with open(input_newick_file, "r") as file:
+        with open(output_newick_file, "w") as out:
+            for line in file:
+                for s in sequence:
+                    if s.acc_id in line:
+                        old_name = s.fasta_header.replace(" ", "_")
+                        old_name = old_name.replace(",", "_")
+                        old_name = old_name.replace(":", "_")
+                        old_name = old_name.replace("(", "_")
+                        old_name = old_name.replace(")", "_")
+                        old_name = old_name.replace(">", "")
+                        new_name = f"{s.friendly_name}"
+                        print(f"replacing {old_name} with {new_name}")
+                        line = line.replace(old_name, f"{new_name}")
+                        no_replaced += 1
+                out.write(line)
+
+
+    print(f"no of samples replaced: {no_replaced}")
+
+class Sequence(object):
+    def __init__(
+        self,
+        acc_id,
+        country,
+        collection_year,
+        submission_year,
+        fasta_header,
+        fasta_file,
+        friendly_name,
+    ):
+        self.acc_id = acc_id
+        self.country = country
+        self.collection_year = collection_year
+        self.submission_year = submission_year
+        self.fasta_header = fasta_header
+        self.fasta_file = fasta_file
+        self.friendly_name = friendly_name
+
+    def print(self):
+        print(f"acc id            : {self.acc_id}")
+        print(f"country           : {self.country}")
+        print(f"collection year   : {self.collection_year}")
+        print(f"submission year   : {self.submission_year}")
+        print(f"fasta header      : {self.fasta_header}")
+        print(f"fasta file        : {self.fasta_file}")
+        print(f"friendly name     : {self.friendly_name}")
+
+
+if __name__ == "__main__":
+    main() # type: ignore[arg-type]

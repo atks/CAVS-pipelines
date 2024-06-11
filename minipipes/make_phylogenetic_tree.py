@@ -121,6 +121,7 @@ def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, sample_file, pre
     mafft = "/usr/local/mafft-7.490/bin/mafft"
     raxml = "/usr/local/raxml-ng-1.1.0/raxml-ng"
     seqkit = "/usr/local/seqkit-2.1.0/bin/seqkit"
+    rename_newick_tree = "/home/atks/programs/CAVS-pipelines/gen/rename_newick_trees"
 
     # initialize
     mpm = MiniPipeManager(f"{output_dir}/make_phylogenetic_tree.log")
@@ -179,43 +180,47 @@ def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, sample_file, pre
     desc = f"Constructing consensus tree"
     mpm.run(cmd, tgt, desc)
 
-    #prepare renaming file
-    log = f"{output_dir}/consensus_tree.log"
-    cmd = f"cd {output_dir}; {raxml} --consense MRE --tree {prefix}.raxml.bootstraps --redo --prefix {prefix} > {log}"
-    tgt = f"{output_dir}/c_tree.OK"
-    desc = f"Constructing consensus tree"
-    mpm.run_func(write_rename_file, tgt, desc)
-
-    print(f"Preparing rename file")
-
-
-    # rename bootstrap trees
-
-    # rename consensus tree
-
-    # copy files to trace
-    copy2(__file__, trace_dir)
-
-    # write log file
-    mpm.print_log()
-
-    def write_rename_file():
+    if sample_file is not None:
+        #prepare renaming file
         fasta_hdr_idx = 0
-        friendly_name_idx = 0
-        rename_file = f"{output_dir}/rename_key_value.txt"
+        tree_node_name_idx = 0
+        rename_file = f"{output_dir}/rename_tree.txt"
         with open(rename_file, "w") as out:
             with open(sample_file, "r") as f:
                 for line in f:
                     if line.startswith("#"):
                         header_names = line.lstrip('#').strip().split("\t")
                         fasta_hdr_idx = header_names.index("fasta_header")
-                        friendly_name_idx = header_names.index("friendly_name")
+                        tree_node_name_idx = header_names.index("tree_node_name")
                         out.write(f"#old_name\tnew_name\n")
                     else:
                         values = line.strip().split("\t")
-                        old_name = re.sub(r"[\s;:,()']", "_", values[fasta_hdr_idx])
-                        out.write(f"{old_name}\t{values[friendly_name_idx]}\n")
+                        old_name = re.sub(r"[\s;:,()']", "_", values[fasta_hdr_idx].lstrip(">"))
+                        out.write(f"{old_name}\t{values[tree_node_name_idx]}\n")
 
+        # rename bootstrap trees
+        input_tree_file = f"{output_dir}/{prefix}.raxml.bootstraps"
+        output_tree_file = f"{output_dir}/{prefix}.raxml.bootstraps.renamed.tree"
+        log = f"{output_dir}/rename_bootstrap_trees.log"
+        cmd = f"{rename_newick_tree} {input_tree_file} -o {output_tree_file} -s {rename_file} > {log}"
+        tgt = f"{output_dir}/rename_bootstrap_trees.OK"
+        desc = f"Renaming bootstrap trees"
+        mpm.run(cmd, tgt, desc)
+
+        # rename consensus tree
+        input_tree_file = f"{output_dir}/{prefix}.raxml.consensusTreeMRE"
+        output_tree_file = f"{output_dir}/{prefix}.raxml.consensus.renamed.tree"
+        log = f"{output_dir}/rename_consensus_tree.log"
+        cmd = f"{rename_newick_tree} {input_tree_file} -o {output_tree_file} -s {rename_file} > {log}"
+        tgt = f"{output_dir}/rename_consensus_tree.OK"
+        desc = f"Renaming consensus tree"
+        mpm.run(cmd, tgt, desc)
+
+    # copy files to trace
+    copy2(__file__, trace_dir)
+
+    # write log file
+    mpm.print_log()
 
 class MiniPipeManager(object):
     def __init__(self, log_file):
@@ -236,18 +241,6 @@ class MiniPipeManager(object):
         except subprocess.CalledProcessError as e:
             self.log(f" - failed")
             exit(1)
-
-    def run_func(self, func, tgt, desc):
-        cmd = func.__name__
-        if os.path.exists(tgt):
-            self.log(f"{desc} -  already executed")
-            self.log(cmd)
-            return
-        else:
-            self.log(f"{desc}")
-            self.log(cmd)
-            func()
-            subprocess.run(f"touch {tgt}", shell=True, check=True)
 
     def log(self, msg):
         print(msg)
