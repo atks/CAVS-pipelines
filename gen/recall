@@ -25,8 +25,13 @@ def main():
     """
     Generate bioinformatics commands examples
     """
-    print("efetch -db nuccore -id NC_004003.1 -format fasta > NC_004003.1.genbank")
+    print("#download NC_004003.1 in FASTA format from NCBI")
+    print("efetch -db nuccore -id NC_004003.1 -format fasta > NC_004003.1.fasta")
+    print("#download NC_004003.1 in GENBANK format from NCBI")
     print("efetch -db nuccore -id NC_004003.1 -format genbank > NC_004003.1.genbank")
+    print("#multiply align sequences in 72seq.fasta")
+    print("mafft 72seq.fasta > 72seq.msa")
+    print("#add sequences in 2seq.fasta to 72 sequence multiple alignment")
     print("mafft --add 2seq.fasta 72seq.msa > 74seq.msa")
 
 if __name__ == "__main__":

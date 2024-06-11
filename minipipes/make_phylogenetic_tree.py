@@ -104,21 +104,6 @@ def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, sample_file, pre
 
     print(f"msa status = {multiple_align}")
 
-    rename_samples = False
-
-
-    if sample_file is not None:
-        rename_samples = True
-
-    %acc2name = {}
-    with open(sample_file, "r") as f:
-        for line in f:
-            line = line.strip()
-            acc, name = line.split("\t")
-            %acc2name[acc] = name
-
-
-
     output_dir = f"{os.getcwd()}/{prefix}_phylo"
     if working_dir != "":
         output_dir = os.path.abspath(working_dir)
@@ -182,7 +167,7 @@ def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, sample_file, pre
     # construct phylogenetic tree with bootstrap
     input_msa_file = f"{output_dir}/{prefix}.msa"
     log = f"{output_dir}/construct_trees.log"
-    cmd = f"cd {output_dir}; {raxml} --threads 10 --msa {input_msa_file} --model GTR+G --prefix {prefix} --bootstrap > {log}"
+    cmd = f"cd {output_dir}; {raxml} --threads 10 --msa {input_msa_file} --model GTR+G --redo --prefix {prefix} --bootstrap > {log}"
     tgt = f"{output_dir}/construct_trees.OK"
     desc = f"Constructing phylogenetic tree"
     mpm.run(cmd, tgt, desc)
@@ -194,11 +179,42 @@ def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, sample_file, pre
     desc = f"Constructing consensus tree"
     mpm.run(cmd, tgt, desc)
 
+    #prepare renaming file
+    log = f"{output_dir}/consensus_tree.log"
+    cmd = f"cd {output_dir}; {raxml} --consense MRE --tree {prefix}.raxml.bootstraps --redo --prefix {prefix} > {log}"
+    tgt = f"{output_dir}/c_tree.OK"
+    desc = f"Constructing consensus tree"
+    mpm.run_func(write_rename_file, tgt, desc)
+
+    print(f"Preparing rename file")
+
+
+    # rename bootstrap trees
+
+    # rename consensus tree
+
     # copy files to trace
     copy2(__file__, trace_dir)
 
     # write log file
     mpm.print_log()
+
+    def write_rename_file():
+        fasta_hdr_idx = 0
+        friendly_name_idx = 0
+        rename_file = f"{output_dir}/rename_key_value.txt"
+        with open(rename_file, "w") as out:
+            with open(sample_file, "r") as f:
+                for line in f:
+                    if line.startswith("#"):
+                        header_names = line.lstrip('#').strip().split("\t")
+                        fasta_hdr_idx = header_names.index("fasta_header")
+                        friendly_name_idx = header_names.index("friendly_name")
+                        out.write(f"#old_name\tnew_name\n")
+                    else:
+                        values = line.strip().split("\t")
+                        old_name = re.sub(r"[\s;:,()']", "_", values[fasta_hdr_idx])
+                        out.write(f"{old_name}\t{values[friendly_name_idx]}\n")
 
 
 class MiniPipeManager(object):
@@ -220,6 +236,18 @@ class MiniPipeManager(object):
         except subprocess.CalledProcessError as e:
             self.log(f" - failed")
             exit(1)
+
+    def run_func(self, func, tgt, desc):
+        cmd = func.__name__
+        if os.path.exists(tgt):
+            self.log(f"{desc} -  already executed")
+            self.log(cmd)
+            return
+        else:
+            self.log(f"{desc}")
+            self.log(cmd)
+            func()
+            subprocess.run(f"touch {tgt}", shell=True, check=True)
 
     def log(self, msg):
         print(msg)
