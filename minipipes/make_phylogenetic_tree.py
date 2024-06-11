@@ -122,6 +122,7 @@ def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, sample_file, pre
     raxml = "/usr/local/raxml-ng-1.1.0/raxml-ng"
     seqkit = "/usr/local/seqkit-2.1.0/bin/seqkit"
     rename_newick_tree = "/home/atks/programs/CAVS-pipelines/gen/rename_newick_trees"
+    gotree = "/usr/local/gotree-0.4.5/gotree"
 
     # initialize
     mpm = MiniPipeManager(f"{output_dir}/make_phylogenetic_tree.log")
@@ -202,7 +203,7 @@ def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, sample_file, pre
         input_tree_file = f"{output_dir}/{prefix}.raxml.bootstraps"
         output_tree_file = f"{output_dir}/{prefix}.raxml.bootstraps.renamed.tree"
         log = f"{output_dir}/rename_bootstrap_trees.log"
-        cmd = f"{rename_newick_tree} {input_tree_file} -o {output_tree_file} -s {rename_file} > {log}"
+        cmd = f"{gotree} rename -i {input_tree_file} -o {output_tree_file} -m {rename_file} > {log}"
         tgt = f"{output_dir}/rename_bootstrap_trees.OK"
         desc = f"Renaming bootstrap trees"
         mpm.run(cmd, tgt, desc)
@@ -211,7 +212,7 @@ def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, sample_file, pre
         input_tree_file = f"{output_dir}/{prefix}.raxml.consensusTreeMRE"
         output_tree_file = f"{output_dir}/{prefix}.raxml.consensus.renamed.tree"
         log = f"{output_dir}/rename_consensus_tree.log"
-        cmd = f"{rename_newick_tree} {input_tree_file} -o {output_tree_file} -s {rename_file} > {log}"
+        cmd = f"{gotree} rename -i {input_tree_file} -o {output_tree_file} -m {rename_file} > {log}"
         tgt = f"{output_dir}/rename_consensus_tree.OK"
         desc = f"Renaming consensus tree"
         mpm.run(cmd, tgt, desc)
