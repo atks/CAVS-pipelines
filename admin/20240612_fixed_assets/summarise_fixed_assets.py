@@ -23,6 +23,7 @@ import click
 import pandas as pd
 import numpy as np
 import csv
+from shutil import copy2
 
 @click.command()
 @click.argument("file_name")
@@ -32,7 +33,12 @@ def main(file_name):
 
     e.g. summarise_fixed_asset.py
     """
-    print("test")
+    trace_dir = f"{os.getcwd()}/trace"
+    try:
+        os.makedirs(trace_dir, exist_ok=True)
+    except OSError as error:
+        print(f"{error.filename} cannot be created")
+
 
     df = pd.read_excel(file_name, sheet_name="VAR")
     print(df.head())
@@ -40,6 +46,10 @@ def main(file_name):
     print(f"no of columns: {df.shape}")
 
     df.to_csv('var_fixed_assets.txt', sep='\t', index=False)
+
+
+    # copy files to trace
+    copy2(__file__, trace_dir)
 
 if __name__ == "__main__":
     main() # type: ignore[arg-type]

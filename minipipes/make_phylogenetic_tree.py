@@ -107,7 +107,7 @@ def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, sample_file, pre
     output_dir = f"{os.getcwd()}/{prefix}_phylo"
     if working_dir != "":
         output_dir = os.path.abspath(working_dir)
-    trace_dir = f"{output_dir}/trace"
+        trace_dir = f"{output_dir}/trace"
     try:
         os.makedirs(output_dir, exist_ok=True)
         os.makedirs(trace_dir, exist_ok=True)
