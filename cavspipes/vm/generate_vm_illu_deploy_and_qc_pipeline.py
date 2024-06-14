@@ -49,9 +49,8 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     """
     Moves Illumina fastq files to a destination and performs QC
 
-    e.g. vm_generate_illu_deploy_and_qc_pipeline -r illu1 -i raw -si illu1.sa
+    e.g. generate_vm_illu_deploy_and_qc_pipeline -r illu1 -i raw -si illu1.sa
     """
-    log_dir = f"{working_dir}/log"
     dest_dir = working_dir + "/" + run_id
     illumina_dir = os.path.abspath(illumina_dir)
     fastq_dir = ""
@@ -79,13 +78,14 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
                 run.add_sample(index, sample_id, fastq1, fastq2)
 
     # create directories in destination folder directory
+    log_dir = f"{working_dir}/log"
     analysis_dir = f"{dest_dir}/analysis"
     contigs_dir = f"{dest_dir}/contigs"
     trace_dir = f"{dest_dir}/trace"
     try:
+        os.makedirs(log_dir, exist_ok=True)
         os.makedirs(analysis_dir, exist_ok=True)
         os.makedirs(contigs_dir, exist_ok=True)
-        os.makedirs(log_dir, exist_ok=True)
         os.makedirs(trace_dir, exist_ok=True)
         for sample in run.samples:
             sample_dir = f"{analysis_dir}/{sample.idx}_{sample.id}"
@@ -103,10 +103,10 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         print(f"{error.filename} cannot be created")
 
     #version
-    version = "1.0.0"
+    version = "1.0.1"
 
     #programs
-    fastqc = "/usr/local/FastQC-0.11.9/fastqc"
+    fastqc = "/usr/local/FastQC-0.12.1/fastqc"
     kraken2 = "/usr/local/kraken2-2.1.2/kraken2"
     kraken2_std_db = "/usr/local/ref/kraken2/20210908_standard"
     kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
@@ -115,7 +115,6 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     bwa = "/usr/local/bwa-0.7.17/bwa"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
     plot_bamstats = "/usr/local/samtools-1.17/bin/plot-bamstats"
-    check_fastqc_run = "/usr/local/cavspipes-1.0.0/check_fastqc_run.py"
 
     # initialize
     pg = PipelineGenerator(make_file)
@@ -126,7 +125,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     kraken2_reports = ""
     samtools_multiqc_dep = ""
 
-    for idx, sample in enumerate(run.samples):
+    for sample in run.samples:
 
         # copy the files
         src_fastq1 = f"{fastq_dir}/{sample.fastq1}"
@@ -156,11 +155,11 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         cmd = f"ln -sf {src_fastq1} {dst_fastq1}"
         pg.add(tgt, dep, cmd)
 
-        src_fastq1 = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz"
-        dst_fastq1 = f"{fastqc_dir}/{sample.padded_idx}_{sample.id}_R2.fastq.gz"
+        src_fastq2 = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz"
+        dst_fastq2 = f"{fastqc_dir}/{sample.padded_idx}_{sample.id}_R2.fastq.gz"
         tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}_R2.fastq.gz.OK"
         dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
-        cmd = f"ln -sf {src_fastq1} {dst_fastq1}"
+        cmd = f"ln -sf {src_fastq2} {dst_fastq2}"
         pg.add(tgt, dep, cmd)
 
         # fastqc
@@ -170,7 +169,6 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}_fastqc1.OK"
         dep = f"{log_dir}/{sample.padded_idx}_{sample.id}_R1.fastq.gz.OK"
         cmd = f"{fastqc} {input_fastq_file} -o {fastqc_dir} > {log} 2> {err}"
-        cmd += f"\n\t{check_fastqc_run} {fastqc_dir} {sample.padded_idx}_{sample.id}_R1  >> {log} 2>> {err}"
         pg.add(tgt, dep, cmd)
         fastqc_multiqc_dep += f" {tgt}"
 
@@ -180,7 +178,6 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}_fastqc2.OK"
         dep = f"{log_dir}/{sample.padded_idx}_{sample.id}_R2.fastq.gz.OK"
         cmd = f"{fastqc} {input_fastq_file} -o {fastqc_dir} > {log} 2> {err}"
-        cmd += f"\n\t{check_fastqc_run} {fastqc_dir} {sample.padded_idx}_{sample.id}_R2 >> {log} 2>> {err}"
         pg.add(tgt, dep, cmd)
         fastqc_multiqc_dep += f" {tgt}"
 
