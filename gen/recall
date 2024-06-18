@@ -33,6 +33,12 @@ def main():
     print("mafft 72seq.fasta > 72seq.msa")
     print("#add sequences in 2seq.fasta to 72 sequence multiple alignment")
     print("mafft --add 2seq.fasta 72seq.msa > 74seq.msa")
+    print("#quast report")
+    print("quast.py contigs_1.fasta contigs_2.fasta -r ref.fasta -g genes.txt -1 r1.fastq.gz -2 r2.fastq.gz -o quast_results")
+    print("#quast report")
+    print("quast.py contigs_1.fasta contigs_2.fasta -r ref.fasta -g genes.txt -1 r1.fastq.gz -2 r2.fastq.gz -o quast_results")
+    print("quast.py ilm57/contigs/57_1_1_A112_22-1_ASFV_spleen.contigs.fasta -1 ilm57/57_1_1_A112_22-1_ASFV_spleen_R1.fastq.gz  -2 ilm57/57_1_1_A112_22-1_ASFV_spleen_R2.fastq.gz  -o quast_result")
+
 
 if __name__ == "__main__":
     main() # type: ignore[arg-type]
