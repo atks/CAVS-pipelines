@@ -20,6 +20,7 @@
 
 import os
 import click
+import re
 
 
 @click.command()
@@ -60,11 +61,8 @@ def main(input_newick_file, output_newick_file, sample_file):
             for line in file:
                 for s in sequence:
                     if s.acc_id in line:
-                        old_name = s.fasta_header.replace(" ", "_")
-                        old_name = old_name.replace(",", "_")
-                        old_name = old_name.replace(":", "_")
-                        old_name = old_name.replace("(", "_")
-                        old_name = old_name.replace(")", "_")
+                        # "[\s;:,\(\)\']" -r "_"
+                        old_name = re.sub("[\s;:,\(\)']", "_", s.fasta_header)
                         old_name = old_name.replace(">", "")
                         new_name = f"{s.friendly_name}"
                         print(f"replacing {old_name} with {new_name}")
