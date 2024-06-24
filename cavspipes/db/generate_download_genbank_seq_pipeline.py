@@ -29,9 +29,19 @@ import sys
 @click.option(
     "-m",
     "--make_file",
-    default="download_uniprot_sequences.mk",
+    default="download_genbank_sequences.mk",
     show_default=True,
     help="make file name",
+)
+@click.option(
+    "-s", "--sequence_id_file", required=True, help="list of sequence accension IDs"
+)
+@click.option(
+    "-t",
+    "--download_type",
+    default="fasta",
+    type=click.Choice(["fasta", "genbank"]),
+    help="download type - fasta or genbank",
 )
 @click.option(
     "-o",
@@ -40,52 +50,79 @@ import sys
     show_default=True,
     help="output directory",
 )
-def main(make_file, output_dir):
+def main(make_file, sequence_id_file, download_type, output_dir):
     """
     Download genbank sequences
 
     e.g.  generate_download_genbank_seq_pipeline -s id.txt -m download_gb_seq.mk -o /home/atks/downloads
     """
     print("\t{0:<20} :   {1:<10}".format("make file", make_file))
+    print("\t{0:<20} :   {1:<10}".format("sequence ID file", sequence_id_file))
+    print("\t{0:<20} :   {1:<10}".format("download type", download_type))
     print("\t{0:<20} :   {1:<10}".format("output dir", output_dir))
 
-    release_notes = subprocess.run(
-        [
-            "curl",
-            f"https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref90/uniref90.release_note",
-        ],
+    ext = "fasta"
+    if download_type == "genbank":
+        ext = "genbank"
+
+    release_number = subprocess.run(
+        ["curl", f"https://ftp.ncbi.nlm.nih.gov/genbank/GB_Release_Number"],
         text=True,
         capture_output=True,
     ).stdout.rstrip()
 
-    m = re.search(r"Release: ([\d_]+),", release_notes)
-
-    print(release_notes)
-
-    if m is not None:
-        release_number = m.group(1)
-    print(f"UniRef {release_number}")
-
-    # https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref90/uniref90.fasta.gz
-    # https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz
-    # https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref100/uniref100.fasta.gz
-    # https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz
+    ids = []
+    with open(sequence_id_file, "r") as file:
+        for line in file:
+            line = line.rstrip()
+            if "-" in line:
+                print(line, end="\t")
+                result = re.search("(\D+)(\d+)-(\D+)(\d+)", line)
+                prefix1 = result.group(1)
+                num1 = result.group(2)
+                prefix2 = result.group(3)
+                num2 = result.group(4)
+                if prefix1 != prefix2:
+                    print("prefix not the same")
+                    exit()
+                if len(num1) != len(num2):
+                    print("numeric length not the same")
+                    exit()
+                prefix = prefix1
+                nlen = len(num1)
+                num1 = int(num1)
+                num2 = int(num2)
+                if num1 >= num2:
+                    print("num1 > num2")
+                    exit()
+                # generate sequence
+                no_ids = 0
+                for i in range(num1, num2 + 1):
+                    str_i = f"{i}"
+                    id = f"{prefix}{str_i.zfill(nlen)}"
+                    ids.append(id)
+                    no_ids += 1
+                print(f"generated {no_ids} IDs")
+            else:
+                ids.append(line)
+    print(
+        f"Will download {len(ids)} {download_type} records from GenBank release {release_number}"
+    )
 
     # generate make file
     print("Generating pipeline")
     pg = PipelineGenerator(make_file)
 
-    # download
-    input_fasta_file = (
-        "https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref90/uniref90.fasta"
-    )
-    output_uniprot_file = f"uniref90.{release_number}.fasta.gz"
-    log = f"{output_uniprot_file}.log"
-    err = f"{output_uniprot_file}.err"
-    dep = ""
-    tgt = f"{output_uniprot_file}.OK"
-    cmd = f"wget -c {input_fasta_file} -P {output_dir} -O {output_uniprot_file} > {log} 2> {err}"
-    pg.add(tgt, dep, cmd)
+    efetch = "/usr/local/edirect-17.0/efetch"
+
+    for id in ids:
+        output_sequence_file = f"{output_dir}/{id}.{ext}"
+        log = ""
+        err = f"{output_sequence_file}.err"
+        tgt = f"{output_sequence_file}.OK"
+        dep = ""
+        cmd = f"{efetch} -db nuccore -id {id} -format {download_type} > {output_sequence_file} 2> {err}"
+        pg.add(tgt, dep, cmd)
 
     # clean files
     cmd = f"rm -fr {output_dir}/*.OK  {output_dir}/*.err"
@@ -138,4 +175,4 @@ class PipelineGenerator(object):
 
 
 if __name__ == "__main__":
-    main() # type: ignore[arg-type]
+    main()

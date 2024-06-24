@@ -44,28 +44,70 @@ from shutil import copy2
 @click.option(
     "-r",
     "--ref_fasta_file",
-    required=True,
+    required=False,
     show_default=True,
     help="reference fasta file",
+)
+@click.option(
+    "-m",
+    "--ref_msa_file",
+    required=False,
+    show_default=True,
+    help="reference multiple sequence alignment file",
+)
+@click.option(
+    "-s",
+    "--sample_file",
+    required=False,
+    show_default=True,
+    help="for naming the nodes of the tree",
 )
 @click.option(
     "-p",
     "--prefix",
     required=True,
-    default="tree",
+    default="genus_species",
     show_default=True,
     help="for RAXML file naming",
 )
-def main(working_dir, fasta_file, ref_fasta_file, prefix):
+def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, sample_file, prefix):
     """
     Generates a phylogenetic tree from a panel of sequences and reference sequences
 
-    e.g. make_phylogenetic_tree.py -s lsdv.fasta -r lsdv_ref.fasta
+    e.g. #combines both fasta files, multiple align, build tere
+         make_phylogenetic_tree.py -f lsdv.fasta -r lsdv_ref.fasta
+         #multiple aligh reference fasta file, build tree
+         make_phylogenetic_tree.py -r lsdv_ref.fasta
+         #multiple align sequences in fasta file to existing multiple alignment, build tree
+         make_phylogenetic_tree.py -f lsdv.fasta -m lsdv_ref.msa
+         #build tree from the multiple sequence alignment
+         make_phylogenetic_tree.py -m lsdv_ref.fasta
     """
-    output_dir = f"{os.getcwd()}/phylo"
+
+    #make sure at least one of the two files is provided
+    if (ref_fasta_file is None and ref_msa_file is None) or (ref_fasta_file is not None and ref_msa_file is not None):
+        print("Please provide either a reference fasta file or a reference multiple sequence alignment file")
+        sys.exit(1)
+
+    combined_fasta_file = True
+    multiple_align = "all"
+
+    if fasta_file is not None and ref_fasta_file is None:
+        combined_fasta_file = False
+
+    if ref_msa_file is None:
+        multiple_align = "all"
+    elif fasta_file is not None and ref_msa_file is not None:
+        multiple_align = "add"
+    else:
+        multiple_align = "none"
+
+    print(f"msa status = {multiple_align}")
+
+    output_dir = f"{os.getcwd()}/{prefix}_phylo"
     if working_dir != "":
         output_dir = os.path.abspath(working_dir)
-    trace_dir = f"{output_dir}/trace"
+        trace_dir = f"{output_dir}/trace"
     try:
         os.makedirs(output_dir, exist_ok=True)
         os.makedirs(trace_dir, exist_ok=True)
@@ -79,6 +121,8 @@ def main(working_dir, fasta_file, ref_fasta_file, prefix):
     mafft = "/usr/local/mafft-7.490/bin/mafft"
     raxml = "/usr/local/raxml-ng-1.1.0/raxml-ng"
     seqkit = "/usr/local/seqkit-2.1.0/bin/seqkit"
+    rename_newick_tree = "/home/atks/programs/CAVS-pipelines/gen/rename_newick_trees"
+    gotree = "/usr/local/gotree-0.4.5/gotree"
 
     # initialize
     mpm = MiniPipeManager(f"{output_dir}/make_phylogenetic_tree.log")
@@ -93,44 +137,91 @@ def main(working_dir, fasta_file, ref_fasta_file, prefix):
     if fasta_file is None:
         fasta_file = ""
         desc = f"Generating FASTA file with clean IDs from reference FASTA only for multiple sequence alignment"
+    if ref_fasta_file is None:
+        ref_fasta_file = ""
+        desc = f"Generating FASTA file with clean IDs from reference multiple sequence alignment only for multiple sequence alignment"
     combined_fasta_file = f"{output_dir}/combined.fasta"
-    cmd = f'cat {fasta_file} {ref_fasta_file} | {seqkit} replace -p "[\s;:,\(\)\']" -r "_"  > {combined_fasta_file}'
+    cmd = fr'cat {fasta_file} {ref_fasta_file} | {seqkit} replace -p "[\s;:,\(\)\']" -r "_"  > {combined_fasta_file}'
     tgt = f"{combined_fasta_file}.OK"
     mpm.run(cmd, tgt, desc)
 
-    # perform multiple sequence alignment
-    input_fasta_file = f"{output_dir}/{ref_fasta_file}"
-    if fasta_file is not None:
+    if multiple_align == "all":
+        # perform multiple sequence alignment
         input_fasta_file = f"{output_dir}/combined.fasta"
-    output_fasta_file = f"{output_dir}/msa.fasta"
-    log = f"{output_dir}/msa.log"
-    cmd = f"{mafft} {input_fasta_file} > {output_fasta_file} 2>{log}"
-    tgt = f"{output_fasta_file}.OK"
-    desc = f"Multiple sequence alignment"
-    mpm.run(cmd, tgt, desc)
+        output_msa_file = f"{output_dir}/{prefix}.msa"
+        log = f"{output_dir}/msa.log"
+        cmd = f"{mafft} {input_fasta_file} > {output_msa_file} 2>{log}"
+        tgt = f"{output_msa_file}.OK"
+        desc = f"Multiple sequence alignment"
+        mpm.run(cmd, tgt, desc)
+    elif multiple_align == "add":
+        # perform add on to multiple sequence alignment
+        input_fasta_file = f"{combined_fasta_file}"
+        output_msa_file = f"{output_dir}/{prefix}.msa"
+        log = f"{output_dir}/msa.log"
+        cmd = f"{mafft} --add {input_fasta_file} {ref_msa_file} > {output_msa_file} 2>{log}"
+        tgt = f"{output_msa_file}.OK"
+        desc = f"Additive multiple sequence alignment"
+        mpm.run(cmd, tgt, desc)
+    else:
+        pass
 
     # construct phylogenetic tree with bootstrap
-    input_msa_fasta_file = f"{output_dir}/msa.fasta"
+    input_msa_file = f"{output_dir}/{prefix}.msa"
     log = f"{output_dir}/construct_trees.log"
-    cmd = f"cd {output_dir}; {raxml} --threads 10 --msa {input_msa_fasta_file} --model GTR+G --prefix {prefix} --bootstrap > {log}"
+    cmd = f"cd {output_dir}; {raxml} --threads 10 --msa {input_msa_file} --model GTR+G --redo --prefix {prefix} --bootstrap > {log}"
     tgt = f"{output_dir}/construct_trees.OK"
     desc = f"Constructing phylogenetic tree"
     mpm.run(cmd, tgt, desc)
 
     # construct consensus tree
-    input_msa_fasta_file = f"{output_dir}/msa.fasta"
     log = f"{output_dir}/consensus_tree.log"
     cmd = f"cd {output_dir}; {raxml} --consense MRE --tree {prefix}.raxml.bootstraps --redo --prefix {prefix} > {log}"
     tgt = f"{output_dir}/consensus_tree.OK"
     desc = f"Constructing consensus tree"
     mpm.run(cmd, tgt, desc)
 
+    if sample_file is not None:
+        #prepare renaming file
+        fasta_hdr_idx = 0
+        tree_node_name_idx = 0
+        rename_file = f"{output_dir}/rename_tree.txt"
+        with open(rename_file, "w") as out:
+            with open(sample_file, "r") as f:
+                for line in f:
+                    if line.startswith("#"):
+                        header_names = line.lstrip('#').strip().split("\t")
+                        fasta_hdr_idx = header_names.index("fasta_header")
+                        tree_node_name_idx = header_names.index("tree_node_name")
+                        out.write(f"#old_name\tnew_name\n")
+                    else:
+                        values = line.strip().split("\t")
+                        old_name = re.sub(r"[\s;:,()']", "_", values[fasta_hdr_idx].lstrip(">"))
+                        out.write(f"{old_name}\t{values[tree_node_name_idx]}\n")
+
+        # rename bootstrap trees
+        input_tree_file = f"{output_dir}/{prefix}.raxml.bootstraps"
+        output_tree_file = f"{output_dir}/{prefix}.raxml.bootstraps.renamed.tree"
+        log = f"{output_dir}/rename_bootstrap_trees.log"
+        cmd = f"{gotree} rename -i {input_tree_file} -o {output_tree_file} -m {rename_file} > {log}"
+        tgt = f"{output_dir}/rename_bootstrap_trees.OK"
+        desc = f"Renaming bootstrap trees"
+        mpm.run(cmd, tgt, desc)
+
+        # rename consensus tree
+        input_tree_file = f"{output_dir}/{prefix}.raxml.consensusTreeMRE"
+        output_tree_file = f"{output_dir}/{prefix}.raxml.consensus.renamed.tree"
+        log = f"{output_dir}/rename_consensus_tree.log"
+        cmd = f"{gotree} rename -i {input_tree_file} -o {output_tree_file} -m {rename_file} > {log}"
+        tgt = f"{output_dir}/rename_consensus_tree.OK"
+        desc = f"Renaming consensus tree"
+        mpm.run(cmd, tgt, desc)
+
     # copy files to trace
     copy2(__file__, trace_dir)
 
     # write log file
     mpm.print_log()
-
 
 class MiniPipeManager(object):
     def __init__(self, log_file):
@@ -145,9 +236,9 @@ class MiniPipeManager(object):
                 return
             else:
                 self.log(f"{desc}")
+                self.log(cmd)
                 subprocess.run(cmd, shell=True, check=True)
                 subprocess.run(f"touch {tgt}", shell=True, check=True)
-                self.log(cmd)
         except subprocess.CalledProcessError as e:
             self.log(f" - failed")
             exit(1)
@@ -163,4 +254,4 @@ class MiniPipeManager(object):
 
 
 if __name__ == "__main__":
-    main()
+    main() # type: ignore[arg-type]

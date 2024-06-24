@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # The MIT License
-# Copyright (c) 2024 Adrian Tan <adrian_tan@nparks.gov.sg>
+# Copyright (c) 2023 Adrian Tan <adrian_tan@nparks.gov.sg>
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the 'Software'), to deal
 # in the Software without restriction, including without limitation the rights
@@ -268,7 +268,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         kraken2_multiqc_dep += f" {tgt}"
         kraken2_reports += f" {report_file}"
         cmd = f"{kraken2} --db {kraken2_std_db} --paired {input_fastq_file1} {input_fastq_file2} --use-names --report {report_file} > {log} 2> {err}"
-        pg.add_srun(tgt, dep, cmd, 15)
+        pg.add(tgt, dep, cmd)
 
         # plot kronatools radial tree
         output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
@@ -332,11 +332,6 @@ class PipelineGenerator(object):
         self.deps = []
         self.cmds = []
         self.clean_cmd = ""
-
-    def add_srun(self, tgt, dep, cmd, cpu):
-        self.tgts.append(tgt)
-        self.deps.append(dep)
-        self.cmds.append(f"srun --mincpus {cpu} {cmd}")
 
     def add(self, tgt, dep, cmd):
         self.tgts.append(tgt)

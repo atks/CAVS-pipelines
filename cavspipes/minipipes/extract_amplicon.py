@@ -30,7 +30,7 @@ from shutil import copy2
 @click.option(
     "-o",
     "--output_dir",
-    default=f"{os.getcwd()}/extract_amplicon_output",
+    default=f"os.getcwd()/extract_amplicon_output",
     show_default=True,
     help="output directory",
 )

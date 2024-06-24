@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # The MIT License
-# Copyright (c) 2022 Adrian Tan <adrian_tan@nparks.gov.sg>
+# Copyright (c) 2024 Adrian Tan <adrian_tan@nparks.gov.sg>
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the 'Software'), to deal
 # in the Software without restriction, including without limitation the rights
@@ -18,82 +18,80 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import click
 import os
-import re
-import subprocess
-import sys
+import click
+from shutil import copy2
 
 
 @click.command()
 @click.option(
     "-m",
     "--make_file",
-    default="download_uniprot_sequences.mk",
     show_default=True,
+    default="run_consensus_analysis.mk",
     help="make file name",
 )
 @click.option(
-    "-o",
-    "--output_dir",
+    "-w",
+    "--working_dir",
     default=os.getcwd(),
     show_default=True,
-    help="output directory",
+    help="working directory",
 )
-def main(make_file, output_dir):
+@click.option("-s", "--sample_file", required=True, help="sample file")
+@click.option("-r", "--reference_fasta_file", required=True, help="reference FASTA file")
+def main(make_file, working_dir, sample_file, reference_fasta_file):
     """
-    Download genbank sequences
+    Consensus and coverage calculations
 
-    e.g.  generate_download_genbank_seq_pipeline -s id.txt -m download_gb_seq.mk -o /home/atks/downloads
+    e.g. generate_coverage_consensus_analysis_pipeline
     """
-    print("\t{0:<20} :   {1:<10}".format("make file", make_file))
-    print("\t{0:<20} :   {1:<10}".format("output dir", output_dir))
+    print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
+    print("\t{0:<20} :   {1:<10}".format("working_dir", working_dir))
+    print("\t{0:<20} :   {1:<10}".format("sample_file", sample_file))
+    print("\t{0:<20} :   {1:<10}".format("reference_fasta_file", reference_fasta_file))
 
-    release_notes = subprocess.run(
-        [
-            "curl",
-            f"https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref90/uniref90.release_note",
-        ],
-        text=True,
-        capture_output=True,
-    ).stdout.rstrip()
+    # create directories in destination folder directory
+    log_dir = f"{working_dir}/log"
+    trace_dir = f"{working_dir}/trace"
 
-    m = re.search(r"Release: ([\d_]+),", release_notes)
+    try:
+        os.makedirs(log_dir, exist_ok=True)
+        os.makedirs(trace_dir, exist_ok=True)
+    except OSError as error:
+        print(f"Directory cannot be created")
 
-    print(release_notes)
+    align_and_consensus = (
+        "/home/atks/programs/CAVS-pipelines/minipipes/align_and_consensus.py"
+    )
 
-    if m is not None:
-        release_number = m.group(1)
-    print(f"UniRef {release_number}")
-
-    # https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref90/uniref90.fasta.gz
-    # https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz
-    # https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref100/uniref100.fasta.gz
-    # https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz
-
-    # generate make file
-    print("Generating pipeline")
+    # initialize
     pg = PipelineGenerator(make_file)
 
-    # download
-    input_fasta_file = (
-        "https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref90/uniref90.fasta"
-    )
-    output_uniprot_file = f"uniref90.{release_number}.fasta.gz"
-    log = f"{output_uniprot_file}.log"
-    err = f"{output_uniprot_file}.err"
-    dep = ""
-    tgt = f"{output_uniprot_file}.OK"
-    cmd = f"wget -c {input_fasta_file} -P {output_dir} -O {output_uniprot_file} > {log} 2> {err}"
-    pg.add(tgt, dep, cmd)
+    samples = []
+    with open(sample_file, "r") as file:
+        for line in file:
+            if not line.startswith("#"):
+                sample_id, fastq1, fastq2 = line.rstrip().split("\t")
+                samples.append(Sample(sample_id, fastq1, fastq2))
 
-    # clean files
-    cmd = f"rm -fr {output_dir}/*.OK  {output_dir}/*.err"
-    pg.add_clean(cmd)
+    # align and consensus
+    for s in samples:
+        log_file = f"{log_dir}/{s.id}.log"
+        output_dir = f"{working_dir}/{s.id}"
+        dep = ""
+        cmd = f"{align_and_consensus} -1 {s.fastq1} -2 {s.fastq2} -r {reference_fasta_file} -s {s.id} -w {output_dir} > {log_file}"
+        tgt = f"{log_dir}/{s.id}.OK"
+        pg.add(tgt, dep, cmd)
 
     # write make file
     print("Writing pipeline")
     pg.write()
+
+    # copy files to trace
+    copy2(__file__, trace_dir)
+    copy2(make_file, trace_dir)
+    copy2(sample_file, trace_dir)
 
 
 class PipelineGenerator(object):
@@ -137,5 +135,16 @@ class PipelineGenerator(object):
                 f.write(f"\t{self.clean_cmd}\n")
 
 
+class Sample(object):
+    def __init__(self, id, fastq1, fastq2):
+        self.id = id
+        self.fastq1 = fastq1
+        self.fastq2 = fastq2
+
+    def print(self):
+        print(f"id        : {self.id}")
+        print(f"fastq1    : {self.fastq1}")
+        print(f"fastq2    : {self.fastq2}")
+
 if __name__ == "__main__":
-    main() # type: ignore[arg-type]
+    main()  # type: ignore

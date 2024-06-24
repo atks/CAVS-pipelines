@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+
+# The MIT License
+# Copyright (c) 2024 Adrian Tan <adrian_tan@nparks.gov.sg>
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the 'Software'), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+# THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
+import click
+
+@click.command()
+def main():
+    """
+    Generate bioinformatics commands examples
+    """
+    print("#download NC_004003.1 in FASTA format from NCBI")
+    print("efetch -db nuccore -id NC_004003.1 -format fasta > NC_004003.1.fasta")
+    print("#download NC_004003.1 in GENBANK format from NCBI")
+    print("efetch -db nuccore -id NC_004003.1 -format genbank > NC_004003.1.genbank")
+    print("#multiply align sequences in 72seq.fasta")
+    print("mafft 72seq.fasta > 72seq.msa")
+    print("#add sequences in 2seq.fasta to 72 sequence multiple alignment")
+    print("mafft --add 2seq.fasta 72seq.msa > 74seq.msa")
+    print("#quast report")
+    print("quast.py contigs_1.fasta contigs_2.fasta -r ref.fasta -g genes.txt -1 r1.fastq.gz -2 r2.fastq.gz -o quast_results")
+    print("#quast report")
+    print("quast.py contigs_1.fasta contigs_2.fasta -r ref.fasta -g genes.txt -1 r1.fastq.gz -2 r2.fastq.gz -o quast_results")
+    print("quast.py ilm57/contigs/57_1_1_A112_22-1_ASFV_spleen.contigs.fasta -1 ilm57/57_1_1_A112_22-1_ASFV_spleen_R1.fastq.gz  -2 ilm57/57_1_1_A112_22-1_ASFV_spleen_R2.fastq.gz  -o quast_result")
+    print("#build bwa index")
+    print("bwa index -a bwtsw ref.fasta")
+    print("#align with bwa")
+    print("bwa mem -t 2 -M ref.fasta r1.fastq r2.fastq | samtools view -hF4 | samtools sort -o out.bam")
+    print("#build bowtie2 index")
+    print("bowtie2-build ref.fa asfv")
+    print("#align with bowtie2")
+    print("bowtie2 -x ref/asfv -1 r1.fastq -2 r2.fastq")
+
+if __name__ == "__main__":
+    main() # type: ignore[arg-type]
