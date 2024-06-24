@@ -1,12 +1,16 @@
-v1.0.1
-======
+generate_vm_illu_deploy_and_qc_pipeline v1.0.1
+==============================================
 a. removed check_fastqc_run
 b. tidied up help message
 c. tidied up directory creation and error handling
 
+generate_vm_novogene_illu_deploy_and_qc_pipeline v1.0.0
+==============================================
+a. adapted from generate_vm_illu_deploy_and_qc_pipeline v1.0.0 for fastq files from novogene
+b. trimmomatic used for trimming reads of adaptors
 
-v1.0.0
-======
+generate_vm_illu_deploy_and_qc_pipeline v1.0.0
+==============================================
 a. updated from beta version
 b. added assembly of contigs
 c. added alignment statistics

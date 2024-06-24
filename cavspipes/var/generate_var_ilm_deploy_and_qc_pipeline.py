@@ -107,7 +107,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     version = "1.0.0"
 
     # programs
-    fastqc = "/usr/local/FastQC-0.12.1/fastqc"
+    fastqc = f"/usr/local/FastQC-0.12.1/fastqc --adapters /usr/local/FastQC-0.12.1/Configuration/adapter_list.illumina.txt"
     kraken2 = "/usr/local/kraken2-2.1.2/kraken2"
     kraken2_std_db = "/usr/local/ref/kraken2/20210908_standard"
     kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
@@ -116,14 +116,18 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     bwa = "/usr/local/bwa-0.7.17/bwa"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
     plot_bamstats = "/usr/local/samtools-1.17/bin/plot-bamstats"
+    quast = "docker run -t -v  `pwd`:`pwd` -w `pwd` fischuu/quast quast.py "
+    #metaquast = "docker run -t -v  `pwd`:`pwd` -w `pwd` fischuu/quast metaquast.py "
+    #docker run -t -v  `pwd`:`pwd` -w `pwd` fischuu/quast quast.py  ilm57/contigs/57_1_1_A112_22-1_ASFV_spleen.contigs.fasta --bam ilm57/analysis/1_1_A112_22-1_ASFV_spleen/align_result/1_1_A112_22-1_ASFV_spleen.bam  -o quast_result_from_bam_docker
 
     # initialize
     pg = PipelineGenerator(make_file)
 
-    # analyze
+    # multiqc dependencies
     fastqc_multiqc_dep = ""
     kraken2_multiqc_dep = ""
     samtools_multiqc_dep = ""
+    quast_multiqc_dep = ""
 
     for sample in run.samples:
 
@@ -216,13 +220,107 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         cmd = f"{spades} -1 {input_fastq_file1} -2 {input_fastq_file2} -o {output_dir} --threads 10 --meta > {log} 2> {err}"
         pg.add_srun(tgt, dep, cmd, 10)
 
+        # # assemble
+        # output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/spades_result/assembly_isolate"
+        # input_fastq_file1 = f"{sample.fastq1}"
+        # input_fastq_file2 = f"{sample.fastq2}"
+        # log = f"{log_dir}/{sample.idx}_{sample.id}.spades_assembly_isolate.log"
+        # err = f"{log_dir}/{sample.idx}_{sample.id}.spades_assembly_isolate.err"
+        # dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
+        # tgt = f"{log_dir}/{sample.idx}_{sample.id}.spades_assembly_isolate.OK"
+        # cmd = f"{spades} -1 {input_fastq_file1} -2 {input_fastq_file2} -o {output_dir} --threads 10 --isolate > {log} 2> {err}"
+        # pg.add_srun(tgt, dep, cmd, 10)
+
         #copy contigs to main directory
-        src_fasta = f"{output_dir}/contigs.fasta"
+        assembly_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/spades_result/assembly"
+        src_fasta = f"{assembly_dir}/contigs.fasta"
         dst_fasta = f"{contigs_dir}/{run.idx}_{sample.idx}_{sample.id}.contigs.fasta"
         dep = f"{log_dir}/{sample.idx}_{sample.id}.spades_assembly.OK"
         tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.contigs.fasta.OK"
         cmd = f"cp {src_fasta} {dst_fasta}"
         pg.add(tgt, dep, cmd)
+
+        #link contigs to alignment directory
+        src_fasta = f"{contigs_dir}/{run.idx}_{sample.idx}_{sample.id}.contigs.fasta"
+        align_ref_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/align_result/ref"
+        dst_fasta = f"{align_ref_dir}/{sample.padded_idx}_{sample.id}.fasta"
+        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.contigs.fasta.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.ref.contigs.fasta.OK"
+        cmd = f"ln -sf {src_fasta} {dst_fasta}"
+        pg.add(tgt, dep, cmd)
+
+        ###########################
+        # align to de novo assembly
+        ###########################
+        align_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/align_result"
+        reference_fasta_file = f"{align_ref_dir}/{sample.padded_idx}_{sample.id}.fasta"
+
+        # construct reference
+        log = f"{log_dir}/{sample.idx}_{sample.id}.ref.contigs.bwa_index.log"
+        dep = f"{log_dir}/{sample.idx}_{sample.id}.ref.contigs.fasta.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.ref.contigs.bwa_index.OK"
+        cmd = f"{bwa} index -a bwtsw {reference_fasta_file} 2> {log}"
+        pg.add(tgt, dep, cmd)
+
+        # align
+        output_bam_file = f"{align_dir}/{sample.idx}_{sample.id}.bam"
+        log = f"{log_dir}/{sample.idx}_{sample.id}.align.log"
+        sort_log = f"{log_dir}/{sample.idx}_{sample.id}.align.sort.log"
+        dep = f"{log_dir}/{sample.idx}_{sample.id}.ref.contigs.bwa_index.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.bam.OK"
+        cmd = f"{bwa} mem -t 2 -M {reference_fasta_file} {sample.fastq1} {sample.fastq2} 2> {log} | {samtools} view -h | {samtools} sort -o {output_bam_file} 2> {sort_log}"
+        pg.add(tgt, dep, cmd)
+
+        #  index
+        input_bam_file = f"{align_dir}/{sample.idx}_{sample.id}.bam"
+        dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
+        cmd = f"{samtools} index {input_bam_file}"
+        pg.add(tgt, dep, cmd)
+
+        # stats
+        output_stats_file = f"{align_dir}/general_stats/{sample.padded_idx}_{sample.id}.txt"
+        dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.stats.OK"
+        cmd = f"{samtools} stats {input_bam_file} > {output_stats_file}"
+        samtools_multiqc_dep += f" {tgt}"
+        pg.add(tgt, dep, cmd)
+
+        # flag stats
+        output_stats_file = f"{align_dir}/flag_stats/{sample.padded_idx}_{sample.id}.txt"
+        dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.flag.stats.OK"
+        cmd = f"{samtools} flagstat {input_bam_file} > {output_stats_file}"
+        samtools_multiqc_dep += f" {tgt}"
+        pg.add(tgt, dep, cmd)
+
+        #  idx stats
+        output_stats_file = f"{align_dir}/idx_stats/{sample.padded_idx}_{sample.id}.txt"
+        dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.idx.stats.OK"
+        cmd = f"{samtools} idxstats {input_bam_file} > {output_stats_file}"
+        samtools_multiqc_dep += f" {tgt}"
+        pg.add(tgt, dep, cmd)
+
+        # plot samtools stats
+        input_stats_file = f"{align_dir}/general_stats/{sample.padded_idx}_{sample.id}.txt"
+        dep = f"{log_dir}/{sample.idx}_{sample.id}.stats.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.plot_bamstats.OK"
+        cmd = f"{plot_bamstats} -p  {align_dir}/plot_bamstats/plot {input_stats_file}"
+        pg.add(tgt, dep, cmd)
+
+        # plot quast
+        align_ref_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/align_result/ref"
+        input_contigs_fasta_file = f"{align_ref_dir}/{sample.padded_idx}_{sample.id}.fasta"
+        input_bam_file = f"{align_dir}/{sample.idx}_{sample.id}.bam"
+        output_quast_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/spades_result/assembly/quast_result"
+        log = f"{log_dir}/{sample.idx}_{sample.id}.plot_quast.log"
+        dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.plot_quast.OK"
+        cmd = f"{quast} {input_contigs_fasta_file} --bam {input_bam_file} -o {output_quast_dir} > {log}"
+        quast_multiqc_dep += f" {tgt}"
+        pg.add(tgt, dep, cmd)
+
 
     # plot fastqc multiqc results
     analysis = "fastqc"
@@ -242,6 +340,26 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     dep = kraken2_multiqc_dep
     tgt = f"{log_dir}/{analysis}.multiqc_report.OK"
     cmd = f"cd {analysis_dir}; {multiqc} . -m kraken -f -o {output_dir} -n {analysis} --no-ansi > {log} 2> {err}"
+    pg.add(tgt, dep, cmd)
+
+    # plot samtools
+    analysis = "samtools"
+    output_dir = f"{analysis_dir}/all/{analysis}"
+    log = f"{log_dir}/{analysis}.multiqc_report.log"
+    err = f"{log_dir}/{analysis}.multiqc_report.err"
+    dep = samtools_multiqc_dep
+    tgt = f"{log_dir}/{analysis}.multiqc_report.OK"
+    cmd = f"cd {analysis_dir}; {multiqc} . -m samtools -f -o {output_dir} -n {analysis} --no-ansi > {log} 2> {err}"
+    pg.add(tgt, dep, cmd)
+
+    # plot quast
+    analysis = "quast"
+    output_dir = f"{analysis_dir}/all/{analysis}"
+    log = f"{log_dir}/{analysis}.multiqc_report.log"
+    err = f"{log_dir}/{analysis}.multiqc_report.err"
+    dep = quast_multiqc_dep
+    tgt = f"{log_dir}/{analysis}.multiqc_report.OK"
+    cmd = f"cd {analysis_dir}; {multiqc} . -m quast -f -o {output_dir} -n {analysis} --no-ansi > {log} 2> {err}"
     pg.add(tgt, dep, cmd)
 
     pg.add_clean(f"rm -fr {log_dir} {dest_dir}")

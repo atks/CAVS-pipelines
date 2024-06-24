@@ -52,7 +52,7 @@ def main(illumina_raw_data_dir):
         #print(file_name)
         if file_name.endswith("fastq.gz"):
             #print(file_name)
-            m = re.match("^(.+_S(\d+)_L\d+)_R[12].+.fastq.gz", file_name) # type: ignore , this is a valid regex
+            m = re.match(r"^(.+_S(\d+)_L\d+)_R[12].+.fastq.gz", file_name)
             if m is not None:
                 sample_id = int(m.group(2))
                 name = m.group(1)

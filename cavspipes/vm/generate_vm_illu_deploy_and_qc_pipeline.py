@@ -264,7 +264,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         cmd = f"{samtools} index {input_bam_file}"
         pg.add(tgt, dep, cmd)
 
-        #  coverage
+        # coverage
         input_bam_file = f"{align_dir}/{sample.idx}_{sample.id}.bam"
         output_stats_file = f"{align_dir}/coverage_stats/{sample.padded_idx}_{sample.id}.txt"
         dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
@@ -273,7 +273,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         samtools_multiqc_dep += f" {tgt}"
         pg.add(tgt, dep, cmd)
 
-        #  stats
+        # stats
         output_stats_file = f"{align_dir}/general_stats/{sample.padded_idx}_{sample.id}.txt"
         dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
         tgt = f"{log_dir}/{sample.idx}_{sample.id}.stats.OK"
@@ -281,7 +281,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         samtools_multiqc_dep += f" {tgt}"
         pg.add(tgt, dep, cmd)
 
-        #  flag stats
+        # flag stats
         output_stats_file = f"{align_dir}/flag_stats/{sample.padded_idx}_{sample.id}.txt"
         dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
         tgt = f"{log_dir}/{sample.idx}_{sample.id}.flag.stats.OK"
