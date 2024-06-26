@@ -84,6 +84,8 @@ def main(
     illumina = len(input_ilm_read1_fastq_files) != 0
     nanopore = len(input_ont_fastq_files) != 0
 
+
+
     # programs
     minimap2 = "/usr/local/minimap2-2.24/minimap2"
     bwa = "/usr/local/bwa-0.7.17/bwa"
@@ -92,6 +94,7 @@ def main(
     seqkit = "/usr/local/seqkit-2.1.0/bin/seqkit"
 
     # make directories
+    output_dir = os.path.abspath(output_dir)
     fastq_dir = os.path.join(output_dir, "fastq")
     bam_dir = os.path.join(output_dir, "bam")
     fasta_dir = os.path.join(output_dir, "fasta")
@@ -105,7 +108,7 @@ def main(
         os.makedirs(stats_dir, exist_ok=True)
         os.makedirs(consensus_dir, exist_ok=True)
     except OSError as error:
-        print(f"Directory cannot be created")
+        print(f"{error.filename} cannot be created")
 
     # process illumina reads
     if illumina:
@@ -135,7 +138,8 @@ def main(
 
         #  align
         output_bam_file = os.path.join(bam_dir, "ilm.bam")
-        cmd = f"{bwa} mem -t 2 -M {reference_fasta_file} {output_read1_fastq_file} {output_read2_fastq_file} | {samtools} view -hF4 | {samtools} sort -o {output_bam_file}"
+        log = f"{bam_dir}/bwa.log"
+        cmd = f"{bwa} mem -t 2 -M {reference_fasta_file} {output_read1_fastq_file} {output_read2_fastq_file} 2> {log}| {samtools} view -hF4 | {samtools} sort -o {output_bam_file}"
         tgt = f"{output_bam_file}.OK"
         desc = f"Align to reference with bwa"
         run(cmd, tgt, desc)
@@ -149,7 +153,7 @@ def main(
 
         #  coverage
         input_bam_file = os.path.join(bam_dir, "ilm.bam")
-        output_stats_file = os.path.join(stats_dir, "ilm.stats.txt")
+        output_stats_file = os.path.join(stats_dir, f"{sample_id}.stats.txt")
         cmd = f"{samtools} coverage {input_bam_file} > {output_stats_file}"
         tgt = f"{output_stats_file}.OK"
         desc = f"Illumina coverage statistics"

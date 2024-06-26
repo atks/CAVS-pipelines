@@ -271,18 +271,26 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         cmd = f"{bwa} mem -t 2 -M {reference_fasta_file} {sample.fastq1} {sample.fastq2} 2> {log} | {samtools} view -h | {samtools} sort -o {output_bam_file} 2> {sort_log}"
         pg.add(tgt, dep, cmd)
 
-        #  index
+        # index
         input_bam_file = f"{align_dir}/{sample.idx}_{sample.id}.bam"
         dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.OK"
         tgt = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
         cmd = f"{samtools} index {input_bam_file}"
         pg.add(tgt, dep, cmd)
 
-        # stats
+        # general stats
         output_stats_file = f"{align_dir}/general_stats/{sample.padded_idx}_{sample.id}.txt"
         dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
         tgt = f"{log_dir}/{sample.idx}_{sample.id}.stats.OK"
         cmd = f"{samtools} stats {input_bam_file} > {output_stats_file}"
+        samtools_multiqc_dep += f" {tgt}"
+        pg.add(tgt, dep, cmd)
+
+        # coverage
+        output_stats_file = f"{align_dir}/coverage_stats/{sample.padded_idx}_{sample.id}.txt"
+        dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.stats.OK"
+        cmd = f"{samtools} coverage {input_bam_file} > {output_stats_file}"
         samtools_multiqc_dep += f" {tgt}"
         pg.add(tgt, dep, cmd)
 
@@ -294,7 +302,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         samtools_multiqc_dep += f" {tgt}"
         pg.add(tgt, dep, cmd)
 
-        #  idx stats
+        # idx stats
         output_stats_file = f"{align_dir}/idx_stats/{sample.padded_idx}_{sample.id}.txt"
         dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
         tgt = f"{log_dir}/{sample.idx}_{sample.id}.idx.stats.OK"

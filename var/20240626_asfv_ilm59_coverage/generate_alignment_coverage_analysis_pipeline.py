@@ -28,7 +28,7 @@ from shutil import copy2
     "-m",
     "--make_file",
     show_default=True,
-    default="run_consensus_analysis.mk",
+    default="run_alignment_coverage_analysis.mk",
     help="make file name",
 )
 @click.option(
@@ -42,9 +42,9 @@ from shutil import copy2
 @click.option("-r", "--reference_fasta_file", required=True, help="reference FASTA file")
 def main(make_file, working_dir, sample_file, reference_fasta_file):
     """
-    Consensus and coverage calculations
+    Generates alignments and coverage statistics.
 
-    e.g. generate_coverage_consensus_analysis_pipeline
+    e.g. generate_alignment_coverage_analysis_pipeline
     """
     print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
     print("\t{0:<20} :   {1:<10}".format("working_dir", working_dir))
@@ -52,18 +52,21 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
     print("\t{0:<20} :   {1:<10}".format("reference_fasta_file", reference_fasta_file))
 
     # create directories in destination folder directory
+    alignments_dir = f"{working_dir}/alignments"
     log_dir = f"{working_dir}/log"
     trace_dir = f"{working_dir}/trace"
-
+    stats_dir = f"{alignments_dir}/stats"
     try:
         os.makedirs(log_dir, exist_ok=True)
         os.makedirs(trace_dir, exist_ok=True)
+        os.makedirs(stats_dir, exist_ok=True)
     except OSError as error:
-        print(f"Directory cannot be created")
+        print(f"{error.filename} cannot be created")
 
     align_and_consensus = (
         "/home/atks/programs/CAVS-pipelines/var/20240626_asfv_ilm59_coverage/align_and_consensus.py"
     )
+    multiqc = "docker run -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` multiqc/multiqc multiqc"
 
     # initialize
     pg = PipelineGenerator(make_file)
@@ -75,14 +78,28 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
                 sample_id, fastq1, fastq2 = line.rstrip().split("\t")
                 samples.append(Sample(sample_id, fastq1, fastq2))
 
+    samtools_multiqc_dep = ""
+
     # align and consensus
     for s in samples:
         log_file = f"{log_dir}/{s.id}.log"
-        output_dir = f"{working_dir}/{s.id}"
+        output_dir = f"{alignments_dir}/{s.id}"
         dep = ""
         cmd = f"{align_and_consensus} -1 {s.fastq1} -2 {s.fastq2} -r {reference_fasta_file} -s {s.id} -w {output_dir} > {log_file}"
         tgt = f"{log_dir}/{s.id}.OK"
         pg.add(tgt, dep, cmd)
+        samtools_multiqc_dep += f"{tgt} "
+
+    # plot samtools
+    analysis = "samtools"
+    log = f"{log_dir}/{analysis}.multiqc_report.log"
+    err = f"{log_dir}/{analysis}.multiqc_report.err"
+    dep = samtools_multiqc_dep
+    tgt = f"{log_dir}/{analysis}.multiqc_report.OK"
+    cmd = f"cd {alignments_dir}; {multiqc} . -m samtools -f -o {stats_dir} -n {analysis} --no-ansi > {log} 2> {err}"
+    pg.add(tgt, dep, cmd)
+
+    pg.add_clean(f"rm -rf {alignments_dir} {log_dir}")
 
     # write make file
     print("Writing pipeline")
