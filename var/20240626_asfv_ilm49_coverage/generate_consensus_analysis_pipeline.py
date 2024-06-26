@@ -62,7 +62,7 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
         print(f"Directory cannot be created")
 
     align_and_consensus = (
-        "/home/atks/programs/CAVS-pipelines/minipipes/align_and_consensus.py"
+        "/home/atks/programs/CAVS-pipelines/var/20240626_asfv_ilm59_coverage/align_and_consensus.py"
     )
 
     # initialize
