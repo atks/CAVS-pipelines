@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+
+# The MIT License
+# Copyright (c) 2024 Adrian Tan <adrian_tan@nparks.gov.sg>
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the 'Software'), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+# THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
+import os
+from tokenize import Ignore
+import click
+import re
+import fnmatch
+
+
+@click.command()
+@click.argument("cavsnet_illumina_run_dir", required=True)
+def main(cavsnet_illumina_run_dir):
+    """
+    Takes in a CAVSnet Illumina run data directory and generate a sample file list
+
+    e.g. generate_illumina_sa_file /net/singapura/var/hts/ilm58
+    """
+    no_fastq_files = int(len(fnmatch.filter(os.listdir(cavsnet_illumina_run_dir), "*.fastq.gz")) / 2)
+    #print(f'#fastq : {no_fastq_files}')
+    cavsnet_illumina_run_dir = os.path.abspath(cavsnet_illumina_run_dir)
+
+    run_idx = 0
+    samples = []
+    observed_samples = set()
+    for file_name in os.listdir(cavsnet_illumina_run_dir):
+        if file_name.endswith("fastq.gz"):
+            #print(file_name)
+            m = re.match(r"(\d+)_(\d+)_(.+)_R[12].fastq.gz", file_name)
+            if m is not None:
+                run_idx = int(m.group(1))
+                sample_idx = int(m.group(2))
+                sample_id = f"{m.group(2)}_{m.group(3)}"
+                #print(f"\tidx: {sample_idx}")
+                #print(f"\tid: {sample_id}")
+                if sample_id not in observed_samples:
+                    observed_samples.add(sample_id)
+                    samples.append((sample_idx, sample_id))
+
+    sorted_samples = sorted(samples, key = lambda x: x[0])
+
+    print(f"#sample-id\tfastq1\tfastq2")
+    for id, t in enumerate(sorted_samples):
+        print(f"{t[1]}\t{cavsnet_illumina_run_dir}/{run_idx}_{t[1]}_R1.fastq.gz\t{cavsnet_illumina_run_dir}/{run_idx}_{t[1]}_R2.fastq.gz")
+
+
+if __name__ == "__main__":
+    main()  # type: ignore

@@ -1,0 +1,10 @@
+generate_var_illu_deploy_and_qc_pipeline v1.0.0
+==============================================
+a. updated from beta version
+b. added assembly of contigs
+c. added alignment statistics
+d. added slurm support
+e. fixed sample name order in multiqc reports
+f. fixed kraken2 multiqc report to per sample
+g. tidied up path creation code and error handling
+h. added aggregate assembly statistics
