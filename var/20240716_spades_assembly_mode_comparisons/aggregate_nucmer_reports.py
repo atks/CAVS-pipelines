@@ -51,7 +51,6 @@ def main(make_file, working_dir, sample_file):
 
     # create directories in destination folder directory
     pairwise_alignments_dir = f"{working_dir}/pairwise_alignments"
-    plot_dir = f"{working_dir}/plot"
     trace_dir = f"{working_dir}/trace"
     try:
         os.makedirs(pairwise_alignments_dir, exist_ok=True)
@@ -61,7 +60,6 @@ def main(make_file, working_dir, sample_file):
 
     nucmer = "/usr/local/mummer-4.0.0/bin/nucmer"
     dnadiff = "/usr/local/mummer-4.0.0/bin/dnadiff"
-    aggregate_nucmer_reports = "/home/atks/programs/CAVS-pipelines/var/20240716_spades_assembly_mode_comparisons/aggregate_nucmer_reports.py"
 
     # initialize
     pg = PipelineGenerator(make_file)
@@ -75,75 +73,36 @@ def main(make_file, working_dir, sample_file):
                 sample_id, contigs_file = line.rstrip().split("\t")
                 samples.append(Sample(idx, sample_id, contigs_file))
 
-    # pairwise alignment
-    isolate_assembly_dir = f"{working_dir}/isolate"
-    metaviral_assembly_dir = f"{working_dir}/metaviral"
-    meta_assembly_dir = f"{working_dir}/meta"
-    all_nucmer_report_files_ok = ""
-    input_nucmer_report_files = ""
+    samtools_multiqc_dep = ""
 
-    for s in samples:
+    #aggregate statistics from report
+    # NUCMER
+    #
+    #                             [REF]                [QRY]
+    # [Sequences]
+    # TotalSeqs                         51               264808
+    # AlignedSeqs             48(94.1176%)         490(0.1850%)
+    # UnalignedSeqs             3(5.8824%)     264318(99.8150%)
+    #
+    # [Bases]
+    # TotalBases                    148294             99993229
+    # AlignedBases        138783(93.5864%)      208972(0.2090%)
+    # UnalignedBases         9511(6.4136%)   99784257(99.7910%)
+    #
+    # [Alignments]
+    # 1-to-1                           138                  138
+    # TotalLength                   134376               134364
+    # AvgLength                   973.7391             973.6522
+    # AvgIdentity                  99.6538              99.6538
+    #
+    # M-to-M                           556                  556
+    # TotalLength                   227699               227687
+    # AvgLength                   409.5306             409.5090
+    # AvgIdentity                  95.9291              95.9291
 
-        #isolate vs meta pairwise alignment
-        ref_fasta_file = f"{isolate_assembly_dir}/{s.contigs_file}"
-        query_fasta_file = f"{meta_assembly_dir}/{s.contigs_file}"
-        file_prefix = f"{pairwise_alignments_dir}/isolate_meta_{s.idx}"
-        log_file = f"{pairwise_alignments_dir}/isolate_meta_{s.idx}.nucmer.log"
-        dep = ""
-        cmd = f"{nucmer} {ref_fasta_file} {query_fasta_file} -p {file_prefix} > {log_file}"
-        tgt = f"{file_prefix}.delta.OK"
-        pg.add(tgt, dep, cmd)
 
-        #isolate vs meta dnadiff analysis
-        input_delta_file = f"{pairwise_alignments_dir}/isolate_meta_{s.idx}.delta"
-        log_file = f"{pairwise_alignments_dir}/isolate_meta_{s.idx}.dnadiff.log"
-        dep = f"{file_prefix}.delta.OK"
-        cmd = f"{dnadiff} -d {input_delta_file} -p {file_prefix} 2> {log_file}"
-        tgt = f"{file_prefix}.report.OK"
-        pg.add(tgt, dep, cmd)
 
-        all_nucmer_report_files_ok += f" {tgt}"
-
-    # aggregrate reports
-    tag = "isolate_meta"
-    output_txt_file = f"{plot_dir}/{tag}.txt"
-    dep = all_nucmer_report_files_ok
-    cmd = f"{aggregate_nucmer_reports} {input_nucmer_report_files} -t {tag} -o {output_txt_file}"
-    tgt = f"{output_txt_file}.OK"
-    pg.add(tgt, dep, cmd)
-
-    for s in samples:
-
-        #metaviral vs meta pairwise alignment
-        ref_fasta_file = f"{metaviral_assembly_dir}/{s.contigs_file}"
-        query_fasta_file = f"{meta_assembly_dir}/{s.contigs_file}"
-        file_prefix = f"{pairwise_alignments_dir}/metaviral_meta_{s.idx}"
-        log_file = f"{pairwise_alignments_dir}/metaviral_meta_{s.idx}.log"
-        dep = ""
-        cmd = f"{nucmer} {ref_fasta_file} {query_fasta_file} -p {file_prefix} > {log_file}"
-        tgt = f"{file_prefix}.delta.OK"
-        pg.add(tgt, dep, cmd)
-
-        #metaviral vs meta dnadiff analysis
-        input_delta_file = f"{pairwise_alignments_dir}/metaviral_meta_{s.idx}.delta"
-        log_file = f"{pairwise_alignments_dir}/metaviral_meta_{s.idx}.dnadiff.log"
-        dep = f"{file_prefix}.delta.OK"
-        cmd = f"{dnadiff} -d {input_delta_file} -p {file_prefix} 2> {log_file}"
-        tgt = f"{file_prefix}.report.OK"
-        pg.add(tgt, dep, cmd)
-
-        all_nucmer_report_files_ok += f" {tgt}"
-
-    # aggregrate reports
-    tag = "metaviral_meta"
-    output_txt_file = f"{plot_dir}/{tag}.txt"
-    dep = all_nucmer_report_files_ok
-    cmd = f"{aggregate_nucmer_reports} {input_nucmer_report_files} -t {tag} -o {output_txt_file}"
-    tgt = f"{output_txt_file}.OK"
-    pg.add(tgt, dep, cmd)
-
-    #clean up
-    pg.add_clean(f"rm -rf {pairwise_alignments_dir} {plot_dir}")
+    pg.add_clean(f"rm -rf {pairwise_alignments_dir}")
 
     # write make file
     print("Writing pipeline")
