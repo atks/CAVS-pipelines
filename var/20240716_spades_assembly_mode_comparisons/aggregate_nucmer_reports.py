@@ -39,6 +39,7 @@ def main(report_files, tag, output_file):
     samples = []
     idx = 0
     #aggregate statistics from report
+    # 0:meta_viral/59_2_29_A66_23-11_ASFV_blood.contigs.fasta /meta/59_2_29_A66_23-11_ASFV_blood.contigs.fasta
     # 1: NUCMER
     # 2:
     # 3:                             [REF]                [QRY]
@@ -63,7 +64,15 @@ def main(report_files, tag, output_file):
     #22: AvgLength                   409.5306             409.5090
     #23: AvgIdentity                  95.9291              95.9291
 
-    #name, seq_type, total_seqs, aligned_seqs, unaligned_seqs, total_bases, aligned_bases, unaligned_bases, one_to_one, total_length, avg_length, avg_identity, m_to_m, total_length, avg_length, avg_identity
+    #name
+    #seq_type: isolate_meta, metaviral_isolate
+    #total_seqs
+    # aligned_seqs,
+    # unaligned_seqs,
+    # total_bases,
+    #  aligned_bases,
+    #  unaligned_bases,
+    # oto_total_length, oto_avg_length, avg_identity, m_to_m, total_length, avg_length, avg_identity
 
     for f in report_files:
         line_no = 0
