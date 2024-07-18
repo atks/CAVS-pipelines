@@ -28,7 +28,7 @@ from shutil import copy2
     "-m",
     "--make_file",
     show_default=True,
-    default="run_alignment_coverage_analysis.mk",
+    default="run_assembly_comparisons_analysis.mk",
     help="make file name",
 )
 @click.option(
@@ -39,67 +39,84 @@ from shutil import copy2
     help="working directory",
 )
 @click.option("-s", "--sample_file", required=True, help="sample file")
-@click.option("-r", "--reference_fasta_file", required=True, help="reference FASTA file")
-def main(make_file, working_dir, sample_file, reference_fasta_file):
+def main(make_file, working_dir, sample_file):
     """
-    Generates alignments and coverage statistics.
+    Generates assembly comparisons statistics.
 
-    e.g. generate_alignment_coverage_analysis_pipeline
+    e.g. generate_assembly_comparisons_pipeline.py
     """
     print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
     print("\t{0:<20} :   {1:<10}".format("working_dir", working_dir))
     print("\t{0:<20} :   {1:<10}".format("sample_file", sample_file))
-    print("\t{0:<20} :   {1:<10}".format("reference_fasta_file", reference_fasta_file))
 
     # create directories in destination folder directory
-    alignments_dir = f"{working_dir}/alignments"
-    log_dir = f"{working_dir}/log"
+    pairwise_alignments_dir = f"{working_dir}/pairwise_alignments"
     trace_dir = f"{working_dir}/trace"
-    stats_dir = f"{alignments_dir}/stats"
     try:
-        os.makedirs(log_dir, exist_ok=True)
+        os.makedirs(pairwise_alignments_dir, exist_ok=True)
         os.makedirs(trace_dir, exist_ok=True)
-        os.makedirs(stats_dir, exist_ok=True)
     except OSError as error:
         print(f"{error.filename} cannot be created")
 
-    align_and_consensus = (
-        "/home/atks/programs/CAVS-pipelines/var/20240626_asfv_ilm59_coverage/align_and_consensus.py"
-    )
-    multiqc = "docker run -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` multiqc/multiqc multiqc"
+    nucmer = "/usr/local/mummer-4.0.0/bin/nucmer"
+    dnadiff = "/usr/local/mummer-4.0.0/bin/dnadiff"
 
     # initialize
     pg = PipelineGenerator(make_file)
 
     samples = []
+    idx = 0
     with open(sample_file, "r") as file:
         for line in file:
             if not line.startswith("#"):
-                sample_id, fastq1, fastq2 = line.rstrip().split("\t")
-                samples.append(Sample(sample_id, fastq1, fastq2))
+                idx += 1
+                sample_id, contigs_file = line.rstrip().split("\t")
+                samples.append(Sample(idx, sample_id, contigs_file))
 
     samtools_multiqc_dep = ""
 
-    # align and consensus
+    # pairwise alignment
+    isolate_assembly_dir = f"{working_dir}/isolate"
+    metaviral_assembly_dir = f"{working_dir}/metaviral"
+    meta_assembly_dir = f"{working_dir}/meta"
     for s in samples:
-        log_file = f"{log_dir}/{s.id}.log"
-        output_dir = f"{alignments_dir}/{s.id}"
+        #isolate vs meta pairwise alignment
+        ref_fasta_file = f"{isolate_assembly_dir}/{s.contigs_file}"
+        query_fasta_file = f"{meta_assembly_dir}/{s.contigs_file}"
+        file_prefix = f"{pairwise_alignments_dir}/isolate_meta_{s.idx}"
+        log_file = f"{pairwise_alignments_dir}/isolate_meta_{s.idx}.nucmer.log"
         dep = ""
-        cmd = f"{align_and_consensus} -1 {s.fastq1} -2 {s.fastq2} -r {reference_fasta_file} -s {s.id} -w {output_dir} > {log_file}"
-        tgt = f"{log_dir}/{s.id}.OK"
+        cmd = f"{nucmer} {ref_fasta_file} {query_fasta_file} -p {file_prefix} > {log_file}"
+        tgt = f"{file_prefix}.delta.OK"
         pg.add(tgt, dep, cmd)
-        samtools_multiqc_dep += f"{tgt} "
 
-    # plot samtools
-    analysis = "samtools"
-    log = f"{log_dir}/{analysis}.multiqc_report.log"
-    err = f"{log_dir}/{analysis}.multiqc_report.err"
-    dep = samtools_multiqc_dep
-    tgt = f"{log_dir}/{analysis}.multiqc_report.OK"
-    cmd = f"cd {alignments_dir}; {multiqc} . -m samtools -f -o {stats_dir} -n {analysis} --no-ansi > {log} 2> {err}"
-    pg.add(tgt, dep, cmd)
+        #isolate vs meta dnadiff analysis
+        input_delta_file = f"{pairwise_alignments_dir}/isolate_meta_{s.idx}.delta"
+        log_file = f"{pairwise_alignments_dir}/isolate_meta_{s.idx}.dnadiff.log"
+        dep = f"{file_prefix}.delta.OK"
+        cmd = f"{dnadiff} -d {input_delta_file} -p {file_prefix} 2> {log_file}"
+        tgt = f"{file_prefix}.report.OK"
+        pg.add(tgt, dep, cmd)
 
-    pg.add_clean(f"rm -rf {alignments_dir} {log_dir}")
+        #metaviral vs meta
+        ref_fasta_file = f"{metaviral_assembly_dir}/{s.contigs_file}"
+        query_fasta_file = f"{meta_assembly_dir}/{s.contigs_file}"
+        file_prefix = f"{pairwise_alignments_dir}/metaviral_meta_{s.idx}"
+        log_file = f"{pairwise_alignments_dir}/metaviral_meta_{s.idx}.log"
+        dep = ""
+        cmd = f"{nucmer} {ref_fasta_file} {query_fasta_file} -p {file_prefix} > {log_file}"
+        tgt = f"{file_prefix}.delta.OK"
+        pg.add(tgt, dep, cmd)
+
+        #metacviral vs meta dnadiff analysis
+        input_delta_file = f"{pairwise_alignments_dir}/metaviral_meta_{s.idx}.delta"
+        log_file = f"{pairwise_alignments_dir}/metaviral_meta_{s.idx}.dnadiff.log"
+        dep = f"{file_prefix}.delta.OK"
+        cmd = f"{dnadiff} -d {input_delta_file} -p {file_prefix} 2> {log_file}"
+        tgt = f"{file_prefix}.report.OK"
+        pg.add(tgt, dep, cmd)
+
+    pg.add_clean(f"rm -rf {pairwise_alignments_dir}")
 
     # write make file
     print("Writing pipeline")
@@ -109,7 +126,6 @@ def main(make_file, working_dir, sample_file, reference_fasta_file):
     copy2(__file__, trace_dir)
     copy2(make_file, trace_dir)
     copy2(sample_file, trace_dir)
-
 
 class PipelineGenerator(object):
     def __init__(self, make_file):
@@ -153,15 +169,15 @@ class PipelineGenerator(object):
 
 
 class Sample(object):
-    def __init__(self, id, fastq1, fastq2):
+    def __init__(self, idx, id, contigs_file):
+        self.idx = idx
         self.id = id
-        self.fastq1 = fastq1
-        self.fastq2 = fastq2
+        self.contigs_file = contigs_file
 
     def print(self):
-        print(f"id        : {self.id}")
-        print(f"fastq1    : {self.fastq1}")
-        print(f"fastq2    : {self.fastq2}")
+        print(f"idx           : {self.idx}")
+        print(f"id            : {self.id}")
+        print(f"contigs_file  : {self.contigs_file}")
 
 if __name__ == "__main__":
     main()  # type: ignore
