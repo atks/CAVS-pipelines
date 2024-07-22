@@ -88,16 +88,19 @@ def main(report_files, tag, output_file):
             for line in file:
                 if line_no == 5:
                     m = re.search(r"TotalSeqs\s+(\d+)\s+(\d+)))", line)
-                    ref_total_seqs = m.group(1)
-                    qry_total_seqs = m.group(2)
+                    if m is not None:
+                        ref_total_seqs = m.group(1)
+                        qry_total_seqs = m.group(2)
                 elif line_no == 6:
                     m = re.search(r"AlignedSeqs\s+(\d+)\(.+\)\s+(\d+)\(.+\)", line)
-                    ref_aligned_seqs = m.group(1)
-                    qry_aligned_seqs = m.group(2)
+                    if m is not None:
+                        ref_aligned_seqs = m.group(1)
+                        qry_aligned_seqs = m.group(2)
                 elif line_no == 7:
                     m = re.search(r"UnalignedSeqs\s+(\d+)\(.+\)\s+(\d+)\(.+\)", line)
-                    ref_unaligned_seqs = m.group(1)
-                    qry_unaligned_seqs = m.group(2)
+                    if m is not None:
+                        ref_unaligned_seqs = m.group(1)
+                        qry_unaligned_seqs = m.group(2)
 
 
 
