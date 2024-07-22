@@ -20,7 +20,7 @@
 
 import os
 import click
-
+import re
 
 @click.command()
 @click.argument("report_files", nargs=-1)
@@ -43,31 +43,39 @@ def main(report_files, tag, output_file):
     # 1: NUCMER
     # 2:
     # 3:                             [REF]                [QRY]
-    # 4: [Sequences]
-    # 5: TotalSeqs                         51               264808
-    # 6: AlignedSeqs             48(94.1176%)         490(0.1850%)
-    # 7: UnalignedSeqs             3(5.8824%)     264318(99.8150%)
+    # 4: [Sequences]                                               - Sequence-centric stats.
+    # 5: TotalSeqs                         51               264808 - Total number of input sequences.
+    # 6: AlignedSeqs             48(94.1176%)         490(0.1850%) - Number of input sequences with at least one alignment.
+    # 7: UnalignedSeqs             3(5.8824%)     264318(99.8150%) - Number of input sequences with no alignment.
     # 8:
-    # 9: [Bases]
-    #10: TotalBases                    148294             99993229
-    #11: AlignedBases        138783(93.5864%)      208972(0.2090%)
-    #12: UnalignedBases         9511(6.4136%)   99784257(99.7910%)
+    # 9: [Bases]                                                   - Base-pair-centric stats.
+    #10: TotalBases                    148294             99993229 - Total number of bases in the input sequences.
+    #11: AlignedBases        138783(93.5864%)      208972(0.2090%) - Total number of bases contained within an alignment.
+    #12: UnalignedBases         9511(6.4136%)   99784257(99.7910%) - Total number of unaligned bases. This is a rough
+    #                                                                measure for the amount of "unique" sequence in the
+    #                                                                reference and query.
     #13:
-    #14: [Alignments]
-    #15: 1-to-1                           138                  138
-    #16: TotalLength                   134376               134364
-    #17: AvgLength                   973.7391             973.6522
-    #18: AvgIdentity                  99.6538              99.6538
+    #14: [Alignments]                                              - Alignment-centric stats.
+    #15: 1-to-1                           138                  138 - Number of alignment blocks comprising the 1-
+    #                                                                mapping of reference to query. This is a sub
+    #                                                                the M-to-M mapping, with repeats removed.
+    #16: TotalLength                   134376               134364 - Total length of 1-to-1 alignment blocks.
+    #17: AvgLength                   973.7391             973.6522 - Average length of 1-to-1 alignment blocks.
+    #18: AvgIdentity                  99.6538              99.6538 - Average identity of 1-to-1 alignment blocks.
     #19:
-    #20: M-to-M                           556                  556
-    #21: TotalLength                   227699               227687
-    #22: AvgLength                   409.5306             409.5090
-    #23: AvgIdentity                  95.9291              95.9291
+    #20: M-to-M                           556                  556 - Number of alignment blocks comprising the
+    #                                                                many-to-many mapping of reference to query. The
+    #                                                                M-to-M mapping represents the smallest set of
+    #                                                                alignments that maximize the coverage of both
+    #                                                                reference and query. This is a superset of the 1
+    #                                                                mapping.
+    #21: TotalLength                   227699               227687 - Total length of M-to-M alignment blocks.
+    #22: AvgLength                   409.5306             409.5090 - Average length of M-to-M alignment blocks.
+    #23: AvgIdentity                  95.9291              95.9291 - Average identity of M-to-M alignment blocks.
 
     #name
     #seq_type: isolate_meta, metaviral_isolate
-    #total_seqs
-    # aligned_seqs,
+    #total_seqs, aligned_seqs,
     # unaligned_seqs,
     # total_bases,
     #  aligned_bases,
@@ -78,13 +86,19 @@ def main(report_files, tag, output_file):
         line_no = 0
         with open(f, "r") as file:
             for line in file:
-                if line_no == 1:
-                elif line_no == 1:
+                if line_no == 5:
+                    m = re.search(r"TotalSeqs\s+(\d+)\s+(\d+)))", line)
+                    ref_total_seqs = m.group(1)
+                    qry_total_seqs = m.group(2)
+                elif line_no == 6:
+                    m = re.search(r"AlignedSeqs\s+(\d+)\(.+\)\s+(\d+)\(.+\)", line)
+                    ref_aligned_seqs = m.group(1)
+                    qry_aligned_seqs = m.group(2)
+                elif line_no == 7:
+                    m = re.search(r"UnalignedSeqs\s+(\d+)\(.+\)\s+(\d+)\(.+\)", line)
+                    ref_unaligned_seqs = m.group(1)
+                    qry_unaligned_seqs = m.group(2)
 
-                if not line.startswith("#"):
-                    idx += 1
-                    sample_id, contigs_file = line.rstrip().split("\t")
-                    samples.append(Sample(idx, sample_id, contigs_file))
 
 
 
