@@ -32,7 +32,7 @@ def main(report_files, tag, output_file):
 
     e.g. aggregate_nucmer_reports.py 1.report 2.report -t a_b -o a_b.txt
     """
-    print("\t{0:<20} :   {1:<10}".format("report_files", report_files))
+    #print("\t{0:<20} :   {1:<10}".format("report_files", report_files))
     print("\t{0:<20} :   {1:<10}".format("tag", tag))
     print("\t{0:<20} :   {1:<10}".format("output_file", output_file))
 
@@ -81,7 +81,7 @@ def main(report_files, tag, output_file):
     #  aligned_bases,
     #  unaligned_bases,
     # oto_total_length, oto_avg_length, avg_identity, m_to_m, total_length, avg_length, avg_identity
-
+    file_no = 0
     for f in report_files:
         line_no = 0
         with open(f, "r") as file:
@@ -102,8 +102,8 @@ def main(report_files, tag, output_file):
                         ref_unaligned_seqs = m.group(1)
                         qry_unaligned_seqs = m.group(2)
 
-
-
+        print(f"{file_no}")
+        file_no += 1
 
 if __name__ == "__main__":
     main()  # type: ignore
