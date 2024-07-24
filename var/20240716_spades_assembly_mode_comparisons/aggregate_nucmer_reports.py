@@ -82,126 +82,128 @@ def main(report_files, tag, output_file):
     #  unaligned_bases,
     # oto_total_length, oto_avg_length, avg_identity, m_to_m, total_length, avg_length, avg_identity
     file_no = 0
-    for f in report_files:
 
-        with open(f, "r") as file:
-            ref_total_seqs = ""
-            qry_total_seqs = ""
-            ref_aligned_seqs = ""
-            qry_aligned_seqs = ""
-            ref_unaligned_seqs = ""
-            qry_unaligned_seqs = ""
+    with open(output_file, "w") as ofile:
 
-            ref_total_bases = ""
-            qry_total_bases = ""
-            ref_aligned_bases = ""
-            qry_aligned_bases = ""
-            ref_unaligned_bases = ""
-            qry_unaligned_bases = ""
+        #print header
+        output_line = f"file_no\tref_total_seqs\tqry_total_seqs\tref_aligned_seqs\tqry_aligned_seqs\tref_unaligned_seqs\tqry_unaligned_seqs"
+        output_line += f"\tref_total_bases\tqry_total_bases\tref_aligned_bases\tqry_aligned_bases\tref_unaligned_bases\tqry_unaligned_bases"
+        output_line += f"\tref_1to1_total_length\tqry_1to1_total_length\tref_1to1_aligned_length\tqry_1to1_aligned_length\tref_1to1_aligned_identity\tqry_1to1_aligned_identity"
+        output_line += f"\tref_mtom_total_length\tqry_mtom_total_length\tref_mtom_aligned_length\tqry_mtom_aligned_length\tref_mtom_aligned_identity\tqry_mtom_aligned_identity\n"
+        ofile.write(output_line)
 
-            ref_total_seqs = ""
-            qry_total_seqs = ""
-            ref_aligned_seqs = ""
-            qry_aligned_seqs = ""
-            ref_unaligned_seqs = ""
-            qry_unaligned_seqs = ""
+        for f in report_files:
+            with open(f, "r") as file:
+                ref_total_seqs = ""
+                qry_total_seqs = ""
+                ref_aligned_seqs = ""
+                qry_aligned_seqs = ""
+                ref_unaligned_seqs = ""
+                qry_unaligned_seqs = ""
 
-            ref_1to1_total_length = ""
-            qry_1to1_total_length = ""
-            ref_1to1_aligned_length = ""
-            qry_1to1_aligned_length = ""
-            ref_1to1_aligned_identity = ""
-            qry_1to1_aligned_identity = ""
+                ref_total_bases = ""
+                qry_total_bases = ""
+                ref_aligned_bases = ""
+                qry_aligned_bases = ""
+                ref_unaligned_bases = ""
+                qry_unaligned_bases = ""
 
-            ref_mtom_total_length = ""
-            qry_mtom_total_length = ""
-            ref_mtom_aligned_length = ""
-            qry_mtom_aligned_length = ""
-            ref_mtom_aligned_identity = ""
-            qry_mtom_aligned_identity = ""
+                ref_total_seqs = ""
+                qry_total_seqs = ""
+                ref_aligned_seqs = ""
+                qry_aligned_seqs = ""
+                ref_unaligned_seqs = ""
+                qry_unaligned_seqs = ""
 
-            line_no = 0
+                ref_1to1_total_length = ""
+                qry_1to1_total_length = ""
+                ref_1to1_aligned_length = ""
+                qry_1to1_aligned_length = ""
+                ref_1to1_aligned_identity = ""
+                qry_1to1_aligned_identity = ""
 
-            #print header
-            output_line = f"file_no\t{ref_total_seqs}\t{qry_total_seqs}\t{ref_aligned_seqs}\t{qry_aligned_seqs}\t{ref_unaligned_seqs}\t{qry_unaligned_seqs}"
+                ref_mtom_total_length = ""
+                qry_mtom_total_length = ""
+                ref_mtom_aligned_length = ""
+                qry_mtom_aligned_length = ""
+                ref_mtom_aligned_identity = ""
+                qry_mtom_aligned_identity = ""
+
+                line_no = 0
+                for line in file:
+                    if line_no in [5, 6, 7, 10, 11, 12, 16, 17, 18, 21, 22, 23]:
+                        pass
+                        #print(f"{line_no} {line}")
+                    if line_no == 5:
+                        m = re.search(r"TotalSeqs\s+(\d+)\s+(\d+)", line)
+                        if m is not None:
+                            ref_total_seqs = m.group(1)
+                            qry_total_seqs = m.group(2)
+                    elif line_no == 6:
+                        m = re.search(r"AlignedSeqs\s+(\d+)\(.+\)\s+(\d+)\(.+\)", line)
+                        if m is not None:
+                            ref_aligned_seqs = m.group(1)
+                            qry_aligned_seqs = m.group(2)
+                    elif line_no == 7:
+                        m = re.search(r"UnalignedSeqs\s+(\d+)\(.+\)\s+(\d+)\(.+\)", line)
+                        if m is not None:
+                            ref_unaligned_seqs = m.group(1)
+                            qry_unaligned_seqs = m.group(2)
+                    elif line_no == 10:
+                        m = re.search(r"TotalBases\s+(\d+)\s+(\d+)", line)
+                        if m is not None:
+                            ref_total_bases = m.group(1)
+                            qry_total_bases = m.group(2)
+                    elif line_no == 11:
+                        m = re.search(r"AlignedBases\s+(\d+)\(.+\)\s+(\d+)\(.+\)", line)
+                        if m is not None:
+                            ref_aligned_bases = m.group(1)
+                            qry_aligned_bases = m.group(2)
+                    elif line_no == 12:
+                        m = re.search(r"UnalignedBases\s+(\d+)\(.+\)\s+(\d+)\(.+\)", line)
+                        if m is not None:
+                            ref_unaligned_bases = m.group(1)
+                            qry_unaligned_bases = m.group(2)
+                    elif line_no == 16:
+                        m = re.search(r"TotalLength\s+(\d+)\s+(\d+)", line)
+                        if m is not None:
+                            ref_1to1_total_length = m.group(1)
+                            qry_1to1_total_length = m.group(2)
+                    elif line_no == 17:
+                        m = re.search(r"AvgLength\s+(\d+\.\d+)\s+(\d+\.\d+)", line)
+                        if m is not None:
+                            ref_1to1_aligned_length = m.group(1)
+                            qry_1to1_aligned_length = m.group(2)
+                    elif line_no == 18:
+                        m = re.search(r"AvgIdentity\s+(\d+\.\d+)\s+(\d+\.\d+)", line)
+                        if m is not None:
+                            ref_1to1_aligned_identity = m.group(1)
+                            qry_1to1_aligned_identity = m.group(2)
+                    elif line_no == 21:
+                        m = re.search(r"TotalLength\s+(\d+)\s+(\d+)", line)
+                        if m is not None:
+                            ref_mtom_total_length = m.group(1)
+                            qry_mtom_total_length = m.group(2)
+                    elif line_no == 22:
+                        m = re.search(r"AvgLength\s+(\d+\.\d+)\s+(\d+\.\d+)", line)
+                        if m is not None:
+                            ref_mtom_aligned_length = m.group(1)
+                            qry_mtom_aligned_length = m.group(2)
+                    elif line_no == 23:
+                        m = re.search(r"AvgIdentity\s+(\d+\.\d+)\s+(\d+\.\d+)", line)
+                        if m is not None:
+                            ref_mtom_aligned_identity = m.group(1)
+                            qry_mtom_aligned_identity = m.group(2)
+                    line_no += 1
+
+            output_line = f"{file_no}\t{ref_total_seqs}\t{qry_total_seqs}\t{ref_aligned_seqs}\t{qry_aligned_seqs}\t{ref_unaligned_seqs}\t{qry_unaligned_seqs}"
             output_line += f"\t{ref_total_bases}\t{qry_total_bases}\t{ref_aligned_bases}\t{qry_aligned_bases}\t{ref_unaligned_bases}\t{qry_unaligned_bases}"
             output_line += f"\t{ref_1to1_total_length}\t{qry_1to1_total_length}\t{ref_1to1_aligned_length}\t{qry_1to1_aligned_length}\t{ref_1to1_aligned_identity}\t{qry_1to1_aligned_identity}"
-            output_line += f"\t{ref_mtom_total_length}\t{qry_mtom_total_length}\t{ref_mtom_aligned_length}\t{qry_mtom_aligned_length}\t{ref_mtom_aligned_identity}\t{qry_mtom_aligned_identity}"
-            print(output_line)
+            output_line += f"\t{ref_mtom_total_length}\t{qry_mtom_total_length}\t{ref_mtom_aligned_length}\t{qry_mtom_aligned_length}\t{ref_mtom_aligned_identity}\t{qry_mtom_aligned_identity}\n"
 
-            for line in file:
-                if line_no in [5, 6, 7, 10, 11, 12, 16, 17, 18, 21, 22, 23]:
-                    print(f"{line_no} {line}")
-                if line_no == 5:
-                    m = re.search(r"TotalSeqs\s+(\d+)\s+(\d+)", line)
-                    if m is not None:
-                        ref_total_seqs = m.group(1)
-                        qry_total_seqs = m.group(2)
-                elif line_no == 6:
-                    m = re.search(r"AlignedSeqs\s+(\d+)\(.+\)\s+(\d+)\(.+\)", line)
-                    if m is not None:
-                        ref_aligned_seqs = m.group(1)
-                        qry_aligned_seqs = m.group(2)
-                elif line_no == 7:
-                    m = re.search(r"UnalignedSeqs\s+(\d+)\(.+\)\s+(\d+)\(.+\)", line)
-                    if m is not None:
-                        ref_unaligned_seqs = m.group(1)
-                        qry_unaligned_seqs = m.group(2)
-                elif line_no == 10:
-                    m = re.search(r"TotalBases\s+(\d+)\s+(\d+)", line)
-                    if m is not None:
-                        ref_total_bases = m.group(1)
-                        qry_total_bases = m.group(2)
-                elif line_no == 11:
-                    m = re.search(r"AlignedBases\s+(\d+)\(.+\)\s+(\d+)\(.+\)", line)
-                    if m is not None:
-                        ref_aligned_bases = m.group(1)
-                        qry_aligned_bases = m.group(2)
-                elif line_no == 12:
-                    m = re.search(r"UnalignedBases\s+(\d+)\(.+\)\s+(\d+)\(.+\)", line)
-                    if m is not None:
-                        ref_unaligned_bases = m.group(1)
-                        qry_unaligned_bases = m.group(2)
-                elif line_no == 16:
-                    m = re.search(r"TotalLength\s+(\d+)\s+(\d+)", line)
-                    if m is not None:
-                        ref_1to1_total_length = m.group(1)
-                        qry_1to1_total_length = m.group(2)
-                elif line_no == 17:
-                    m = re.search(r"AvgLength\s+(\d+)\s+(\d+)", line)
-                    if m is not None:
-                        ref_1to1_aligned_length = m.group(1)
-                        qry_1to1_aligned_length = m.group(2)
-                elif line_no == 18:
-                    m = re.search(r"AvgIdentity\s+(\d+)\s+(\d+)", line)
-                    if m is not None:
-                        ref_1to1_aligned_identity = m.group(1)
-                        qry_1to1_aligned_identity = m.group(2)
-                elif line_no == 21:
-                    m = re.search(r"TotalLength\s+(\d+)\s+(\d+)", line)
-                    if m is not None:
-                        ref_mtom_total_length = m.group(1)
-                        qry_mtom_total_length = m.group(2)
-                elif line_no == 22:
-                    m = re.search(r"AvgLength\s+(\d+)\s+(\d+)", line)
-                    if m is not None:
-                        ref_mtom_aligned_length = m.group(1)
-                        qry_mtom_aligned_length = m.group(2)
-                elif line_no == 23:
-                    m = re.search(r"AvgIdentity\s+(\d+)\s+(\d+)", line)
-                    if m is not None:
-                        ref_mtom_aligned_identity = m.group(1)
-                        qry_mtom_aligned_identity = m.group(2)
-                line_no += 1
+            ofile.write(output_line)
 
-        output_line = f"{file_no}\t{ref_total_seqs}\t{qry_total_seqs}\t{ref_aligned_seqs}\t{qry_aligned_seqs}\t{ref_unaligned_seqs}\t{qry_unaligned_seqs}"
-        output_line += f"\t{ref_total_bases}\t{qry_total_bases}\t{ref_aligned_bases}\t{qry_aligned_bases}\t{ref_unaligned_bases}\t{qry_unaligned_bases}"
-        output_line += f"\t{ref_1to1_total_length}\t{qry_1to1_total_length}\t{ref_1to1_aligned_length}\t{qry_1to1_aligned_length}\t{ref_1to1_aligned_identity}\t{qry_1to1_aligned_identity}"
-        output_line += f"\t{ref_mtom_total_length}\t{qry_mtom_total_length}\t{ref_mtom_aligned_length}\t{qry_mtom_aligned_length}\t{ref_mtom_aligned_identity}\t{qry_mtom_aligned_identity}"
-
-        print(output_line)
-
-        file_no += 1
+            file_no += 1
 
 if __name__ == "__main__":
     main()  # type: ignore
