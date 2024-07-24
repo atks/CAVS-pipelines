@@ -55,6 +55,7 @@ def main(make_file, working_dir, sample_file):
     trace_dir = f"{working_dir}/trace"
     try:
         os.makedirs(pairwise_alignments_dir, exist_ok=True)
+        os.makedirs(plot_dir, exist_ok=True)
         os.makedirs(trace_dir, exist_ok=True)
     except OSError as error:
         print(f"{error.filename} cannot be created")
@@ -79,12 +80,16 @@ def main(make_file, working_dir, sample_file):
     isolate_assembly_dir = f"{working_dir}/isolate"
     metaviral_assembly_dir = f"{working_dir}/metaviral"
     meta_assembly_dir = f"{working_dir}/meta"
+
+    #####################################
+    #isolate vs meta pairwise alignment
+    #####################################
     all_nucmer_report_files_ok = ""
     input_nucmer_report_files = ""
 
     for s in samples:
 
-        #isolate vs meta pairwise alignment
+        #nucmer pairwise alignment
         ref_fasta_file = f"{isolate_assembly_dir}/{s.contigs_file}"
         query_fasta_file = f"{meta_assembly_dir}/{s.contigs_file}"
         file_prefix = f"{pairwise_alignments_dir}/isolate_meta_{s.idx}"
@@ -102,19 +107,26 @@ def main(make_file, working_dir, sample_file):
         tgt = f"{file_prefix}.report.OK"
         pg.add(tgt, dep, cmd)
 
+        input_nucmer_report_files += f" {file_prefix}.report"
         all_nucmer_report_files_ok += f" {tgt}"
 
     # aggregrate reports
     tag = "isolate_meta"
     output_txt_file = f"{plot_dir}/{tag}.txt"
     dep = all_nucmer_report_files_ok
-    cmd = f"{aggregate_nucmer_reports} {input_nucmer_report_files} -t {tag} -o {output_txt_file}"
+    cmd = f"{aggregate_nucmer_reports} {input_nucmer_report_files} -o {output_txt_file}"
     tgt = f"{output_txt_file}.OK"
     pg.add(tgt, dep, cmd)
 
+    #####################################
+    #metaviral vs meta pairwise alignment
+    #####################################
+    all_nucmer_report_files_ok = ""
+    input_nucmer_report_files = ""
+
     for s in samples:
 
-        #metaviral vs meta pairwise alignment
+        #nucmer pairwise alignment
         ref_fasta_file = f"{metaviral_assembly_dir}/{s.contigs_file}"
         query_fasta_file = f"{meta_assembly_dir}/{s.contigs_file}"
         file_prefix = f"{pairwise_alignments_dir}/metaviral_meta_{s.idx}"
@@ -132,13 +144,14 @@ def main(make_file, working_dir, sample_file):
         tgt = f"{file_prefix}.report.OK"
         pg.add(tgt, dep, cmd)
 
+        input_nucmer_report_files += f" {file_prefix}.report"
         all_nucmer_report_files_ok += f" {tgt}"
 
     # aggregrate reports
     tag = "metaviral_meta"
     output_txt_file = f"{plot_dir}/{tag}.txt"
     dep = all_nucmer_report_files_ok
-    cmd = f"{aggregate_nucmer_reports} {input_nucmer_report_files} -t {tag} -o {output_txt_file}"
+    cmd = f"{aggregate_nucmer_reports} {input_nucmer_report_files} -o {output_txt_file}"
     tgt = f"{output_txt_file}.OK"
     pg.add(tgt, dep, cmd)
 

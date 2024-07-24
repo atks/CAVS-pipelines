@@ -24,16 +24,14 @@ import re
 
 @click.command()
 @click.argument("report_files", nargs=-1)
-@click.option("-t", "--tag", required=True, help="tag")
 @click.option("-o", "--output_file", required=True, help="output data text file")
-def main(report_files, tag, output_file):
+def main(report_files, output_file):
     """
     aggregate_nucmer_reports.py
 
     e.g. aggregate_nucmer_reports.py 1.report 2.report -t a_b -o a_b.txt
     """
     #print("\t{0:<20} :   {1:<10}".format("report_files", report_files))
-    print("\t{0:<20} :   {1:<10}".format("tag", tag))
     print("\t{0:<20} :   {1:<10}".format("output_file", output_file))
 
     samples = []
@@ -86,10 +84,15 @@ def main(report_files, tag, output_file):
     with open(output_file, "w") as ofile:
 
         #print header
-        output_line = f"file_no\tref_total_seqs\tqry_total_seqs\tref_aligned_seqs\tqry_aligned_seqs\tref_unaligned_seqs\tqry_unaligned_seqs"
-        output_line += f"\tref_total_bases\tqry_total_bases\tref_aligned_bases\tqry_aligned_bases\tref_unaligned_bases\tqry_unaligned_bases"
-        output_line += f"\tref_1to1_total_length\tqry_1to1_total_length\tref_1to1_aligned_length\tqry_1to1_aligned_length\tref_1to1_aligned_identity\tqry_1to1_aligned_identity"
-        output_line += f"\tref_mtom_total_length\tqry_mtom_total_length\tref_mtom_aligned_length\tqry_mtom_aligned_length\tref_mtom_aligned_identity\tqry_mtom_aligned_identity\n"
+        output_line = f"file_no\ttype\ttotal_seqs\taligned_seqs\tunaligned_seqs"
+        output_line += f"\ttotal_bases\taligned_bases\tunaligned_bases"
+        output_line += f"\t1to1_total_length\t1to1_aligned_length\t1to1_aligned_identity"
+        output_line += f"\tmtom_total_length\tmtom_aligned_length\tmtom_aligned_identity\n"
+
+        # output_line = f"file_no\tref_total_seqs\tqry_total_seqs\tref_aligned_seqs\tqry_aligned_seqs\tref_unaligned_seqs\tqry_unaligned_seqs"
+        # output_line += f"\tref_total_bases\tqry_total_bases\tref_aligned_bases\tqry_aligned_bases\tref_unaligned_bases\tqry_unaligned_bases"
+        # output_line += f"\tref_1to1_total_length\tqry_1to1_total_length\tref_1to1_aligned_length\tqry_1to1_aligned_length\tref_1to1_aligned_identity\tqry_1to1_aligned_identity"
+        # output_line += f"\tref_mtom_total_length\tqry_mtom_total_length\tref_mtom_aligned_length\tqry_mtom_aligned_length\tref_mtom_aligned_identity\tqry_mtom_aligned_identity\n"
         ofile.write(output_line)
 
         for f in report_files:
@@ -196,11 +199,22 @@ def main(report_files, tag, output_file):
                             qry_mtom_aligned_identity = m.group(2)
                     line_no += 1
 
-            output_line = f"{file_no}\t{ref_total_seqs}\t{qry_total_seqs}\t{ref_aligned_seqs}\t{qry_aligned_seqs}\t{ref_unaligned_seqs}\t{qry_unaligned_seqs}"
-            output_line += f"\t{ref_total_bases}\t{qry_total_bases}\t{ref_aligned_bases}\t{qry_aligned_bases}\t{ref_unaligned_bases}\t{qry_unaligned_bases}"
-            output_line += f"\t{ref_1to1_total_length}\t{qry_1to1_total_length}\t{ref_1to1_aligned_length}\t{qry_1to1_aligned_length}\t{ref_1to1_aligned_identity}\t{qry_1to1_aligned_identity}"
-            output_line += f"\t{ref_mtom_total_length}\t{qry_mtom_total_length}\t{ref_mtom_aligned_length}\t{qry_mtom_aligned_length}\t{ref_mtom_aligned_identity}\t{qry_mtom_aligned_identity}\n"
+            output_line = f"{file_no}\tref\t{ref_total_seqs}\t{ref_aligned_seqs}\t{ref_unaligned_seqs}"
+            output_line += f"\t{ref_total_bases}\t{ref_aligned_bases}\t{ref_unaligned_bases}"
+            output_line += f"\t{ref_1to1_total_length}\t{ref_1to1_aligned_length}\t{ref_1to1_aligned_identity}"
+            output_line += f"\t{ref_mtom_total_length}\t{ref_mtom_aligned_length}\t{ref_mtom_aligned_identity}\n"
+            ofile.write(output_line)
 
+            output_line = f"{file_no}\tquery\t{qry_total_seqs}\t{qry_aligned_seqs}\t{qry_unaligned_seqs}"
+            output_line += f"\t{qry_total_bases}\t{qry_aligned_bases}\t{qry_unaligned_bases}"
+            output_line += f"\t{qry_1to1_total_length}\t{qry_1to1_aligned_length}\t{qry_1to1_aligned_identity}"
+            output_line += f"\t{qry_mtom_total_length}\t{qry_mtom_aligned_length}\t{qry_mtom_aligned_identity}\n"
+
+
+            # output_line = f"{file_no}\t{ref_total_seqs}\t{qry_total_seqs}\t{ref_aligned_seqs}\t{qry_aligned_seqs}\t{ref_unaligned_seqs}\t{qry_unaligned_seqs}"
+            # output_line += f"\t{ref_total_bases}\t{qry_total_bases}\t{ref_aligned_bases}\t{qry_aligned_bases}\t{ref_unaligned_bases}\t{qry_unaligned_bases}"
+            # output_line += f"\t{ref_1to1_total_length}\t{qry_1to1_total_length}\t{ref_1to1_aligned_length}\t{qry_1to1_aligned_length}\t{ref_1to1_aligned_identity}\t{qry_1to1_aligned_identity}"
+            # output_line += f"\t{ref_mtom_total_length}\t{qry_mtom_total_length}\t{ref_mtom_aligned_length}\t{qry_mtom_aligned_length}\t{ref_mtom_aligned_identity}\t{qry_mtom_aligned_identity}\n"
             ofile.write(output_line)
 
             file_no += 1
