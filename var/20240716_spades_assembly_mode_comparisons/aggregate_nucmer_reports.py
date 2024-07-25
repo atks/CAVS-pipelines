@@ -86,8 +86,8 @@ def main(report_files, output_file):
         #print header
         output_line = f"file_no\ttype\ttotal_seqs\taligned_seqs\tunaligned_seqs"
         output_line += f"\ttotal_bases\taligned_bases\tunaligned_bases"
-        output_line += f"\t1to1_total_length\t1to1_aligned_length\t1to1_aligned_identity"
-        output_line += f"\tmtom_total_length\tmtom_aligned_length\tmtom_aligned_identity\n"
+        output_line += f"\to2o_total_length\to2o_aligned_length\to2o_aligned_identity"
+        output_line += f"\tm2m_total_length\tm2m_aligned_length\tm2m_aligned_identity\n"
 
         # output_line = f"file_no\tref_total_seqs\tqry_total_seqs\tref_aligned_seqs\tqry_aligned_seqs\tref_unaligned_seqs\tqry_unaligned_seqs"
         # output_line += f"\tref_total_bases\tqry_total_bases\tref_aligned_bases\tqry_aligned_bases\tref_unaligned_bases\tqry_unaligned_bases"
