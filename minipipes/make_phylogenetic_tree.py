@@ -118,9 +118,12 @@ def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, sample_file, pre
     version = "1.0.0"
 
     # programs
-    mafft = "/usr/local/mafft-7.490/bin/mafft"
-    raxml = "/usr/local/raxml-ng-1.1.0/raxml-ng"
-    seqkit = "/usr/local/seqkit-2.1.0/bin/seqkit"
+    #mafft = "/usr/local/mafft-7.490/bin/mafft"
+    mafft = "/usr/local/mafft-7.525/bin/mafft"
+    #raxml = "/usr/local/raxml-ng-1.1.0/raxml-ng"
+    raxml = "/usr/local/raxml-ng-1.2.2/raxml-ng"
+    #seqkit = "/usr/local/seqkit-2.1.0/bin/seqkit"
+    seqkit = "/usr/local/seqkit-2.8.2/seqkit"
     rename_newick_tree = "/home/atks/programs/CAVS-pipelines/gen/rename_newick_trees"
     gotree = "/usr/local/gotree-0.4.5/gotree"
 
@@ -150,7 +153,7 @@ def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, sample_file, pre
         input_fasta_file = f"{output_dir}/combined.fasta"
         output_msa_file = f"{output_dir}/{prefix}.msa"
         log = f"{output_dir}/msa.log"
-        cmd = f"{mafft} {input_fasta_file} > {output_msa_file} 2>{log}"
+        cmd = f"{mafft} --thread -1 {input_fasta_file} > {output_msa_file} 2>{log}"
         tgt = f"{output_msa_file}.OK"
         desc = f"Multiple sequence alignment"
         mpm.run(cmd, tgt, desc)
@@ -189,6 +192,7 @@ def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, sample_file, pre
         with open(rename_file, "w") as out:
             with open(sample_file, "r") as f:
                 for line in f:
+                    print(line)
                     if line.startswith("#"):
                         header_names = line.lstrip('#').strip().split("\t")
                         fasta_hdr_idx = header_names.index("fasta_header")
