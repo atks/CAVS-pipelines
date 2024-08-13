@@ -1,0 +1,143 @@
+#!/usr/bin/perl
+
+use warnings;
+use strict;
+use Getopt::Long;
+use Pod::Usage;
+
+=head1 NAME
+
+partition
+
+=head1 SYNOPSIS
+
+ partition [options] <file-a> <file-b>	
+	
+  -h      display this help page
+  -w      write to file
+  -i      file A column (default 1)
+  -j      file B column (default 1)
+  file-a  file a
+  file-b  file b
+
+  example: partition pscalare.txt paltum.txt
+
+  Partitions 2 columns in 2 files (A, B) into a-b.txt, a&b.txt and b-a.txt
+       
+=head1 DESCRIPTION
+ 
+=cut
+
+#option variables
+my $help;
+my $i = 1;
+my $j = 1;
+my $write;
+
+#initialize options
+Getopt::Long::Configure ('bundling');
+
+if(!GetOptions ('i=i' => \$i, 'j=i' => \$j, 'w'=>\$write)
+   || $i<1 || $j<1 || scalar(@ARGV) != 2)
+{
+    if ($help)
+    {
+        pod2usage(-verbose => 2);
+    }
+    else
+    {
+        pod2usage(1);
+    }
+}
+
+$a = $ARGV[0];
+$b = $ARGV[1];
+
+$i--;
+$j--;
+
+open(A, $a) || die "Cannot open $a\n";
+open(B, $b) || die "Cannot open $b\n";
+
+my %ELEMENTS;
+
+while (<A>)
+{
+    s/\r?\n?$//;
+    my @fields = split('\t');
+	my $value = $fields[$i];
+	
+	die "Value not defined at col " . ($i+1) if (!defined($value));
+	
+	#ignores repeat elements
+	$ELEMENTS{$value} = 1
+}
+close(A);
+
+my $aNo = scalar(keys(%ELEMENTS));
+my $abNo = 0;
+my $bNo = 0;
+
+while (<B>)
+{
+	s/\r?\n?$//;
+	my @fields = split('\t');
+	my $value = $fields[$j];
+	
+	die "$.) Value not defined at col " . ($j+1) if (!defined($value));
+	
+	#ignores repeat elements
+	if(!exists($ELEMENTS{$value}))
+	{
+		$ELEMENTS{$value} = 2 ;
+		++$bNo;
+	}
+	else
+	{
+	    if ($ELEMENTS{$value}==1)
+	    {
+    		++$abNo;
+    		--$aNo;
+	    }
+	    
+	    $ELEMENTS{$value} |= 2;
+	}
+}
+close(B);
+
+print "A: $a , column " . ++$i . "\n";
+print "B: $b , column " . ++$j . "\n";
+
+print "A-B: $aNo\n";
+print "A&B: $abNo\n";
+print "B-A: $bNo\n";
+
+if ($write)
+{
+	open(A, ">a-b.txt") || die "Cannot open a-b.txt";
+	open(AB, ">a&b.txt") || die "Cannot open a&b.txt";
+	open(B, ">b-a.txt") || die "Cannot open b-a.txt";
+
+
+    foreach my $e (keys(%ELEMENTS))
+    {
+    	my $flag=$ELEMENTS{$e};
+    	
+        if ($flag==1)
+        {        	
+            print A "$e\n";
+        }
+        elsif ($flag==2)
+        {
+            print B "$e\n";
+        }
+        else
+        {
+            print AB "$e\n";
+        }
+    }
+
+    close(A);
+	close(AB);
+	close(B);
+}
