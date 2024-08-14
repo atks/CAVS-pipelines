@@ -118,14 +118,16 @@ def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, sample_file, pre
     version = "1.0.0"
 
     # programs
-    #mafft = "/usr/local/mafft-7.490/bin/mafft"
-    mafft = "/usr/local/mafft-7.525/bin/mafft"
-    #raxml = "/usr/local/raxml-ng-1.1.0/raxml-ng"
-    raxml = "/usr/local/raxml-ng-1.2.2/raxml-ng"
-    #seqkit = "/usr/local/seqkit-2.1.0/bin/seqkit"
-    seqkit = "/usr/local/seqkit-2.8.2/seqkit"
-    rename_newick_tree = "/home/atks/programs/CAVS-pipelines/gen/rename_newick_trees"
+    mafft = "/usr/local/mafft-7.490/bin/mafft"
+    raxml = "/usr/local/raxml-ng-1.1.0/raxml-ng"
+    seqkit = "/usr/local/seqkit-2.1.0/bin/seqkit"
     gotree = "/usr/local/gotree-0.4.5/gotree"
+
+    # on chengdu
+    # mafft = "/usr/local/mafft-7.525/bin/mafft"
+    # raxml = "/usr/local/raxml-ng-1.2.2/raxml-ng"
+    # seqkit = "/usr/local/seqkit-2.8.2/seqkit"
+    # gotree = "/usr/local/gotree-0.4.5/gotree"
 
     # initialize
     mpm = MiniPipeManager(f"{output_dir}/make_phylogenetic_tree.log")

@@ -75,26 +75,29 @@ def main(make_file, sequence_id_file, download_type, output_dir):
     with open(sequence_id_file, "r") as file:
         for line in file:
             line = line.rstrip()
+            if line.startswith("#"):
+                continue
             if "-" in line:
                 print(line, end="\t")
                 result = re.search("(\D+)(\d+)-(\D+)(\d+)", line)
-                prefix1 = result.group(1)
-                num1 = result.group(2)
-                prefix2 = result.group(3)
-                num2 = result.group(4)
-                if prefix1 != prefix2:
-                    print("prefix not the same")
-                    exit()
-                if len(num1) != len(num2):
-                    print("numeric length not the same")
-                    exit()
-                prefix = prefix1
-                nlen = len(num1)
-                num1 = int(num1)
-                num2 = int(num2)
-                if num1 >= num2:
-                    print("num1 > num2")
-                    exit()
+                if result is not None:
+                    prefix1 = result.group(1)
+                    num1 = result.group(2)
+                    prefix2 = result.group(3)
+                    num2 = result.group(4)
+                    if prefix1 != prefix2:
+                        print("prefix not the same")
+                        exit()
+                    if len(num1) != len(num2):
+                        print("numeric length not the same")
+                        exit()
+                    prefix = prefix1
+                    nlen = len(num1)
+                    num1 = int(num1)
+                    num2 = int(num2)
+                    if num1 >= num2:
+                        print("num1 > num2")
+                        exit()
                 # generate sequence
                 no_ids = 0
                 for i in range(num1, num2 + 1):
@@ -131,7 +134,6 @@ def main(make_file, sequence_id_file, download_type, output_dir):
     # write make file
     print("Writing pipeline")
     pg.write()
-
 
 class PipelineGenerator(object):
     def __init__(self, make_file):
@@ -175,4 +177,4 @@ class PipelineGenerator(object):
 
 
 if __name__ == "__main__":
-    main()
+    main() # type: ignore[arg-type]
