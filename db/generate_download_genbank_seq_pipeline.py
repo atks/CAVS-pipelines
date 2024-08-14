@@ -79,7 +79,7 @@ def main(make_file, sequence_id_file, download_type, output_dir):
                 continue
             if "-" in line:
                 print(line, end="\t")
-                result = re.search("(\D+)(\d+)-(\D+)(\d+)", line)
+                result = re.search(r"(\D+)(\d+)-(\D+)(\d+)", line)
                 if result is not None:
                     prefix1 = result.group(1)
                     num1 = result.group(2)
