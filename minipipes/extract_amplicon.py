@@ -63,6 +63,7 @@ def main(output_dir, primer_fasta_file, reference_fasta_file):
 
     # initialize
     mpm = MiniPipeManager(f"{output_dir}/extract_amplicon.log")
+    mpm.set_ignore_targets(True)
 
     # read reference sequences
     seq = ""
@@ -315,10 +316,11 @@ class MiniPipeManager(object):
     def __init__(self, log_file):
         self.log_file = log_file
         self.log_msg = []
+        self.ignore_targets = False
 
     def run(self, cmd, tgt, desc):
         try:
-            if os.path.exists(tgt):
+            if not self.ignore_targets and os.path.exists(tgt):
                 self.log(f"{desc} -  already executed")
                 self.log(cmd)
                 return
@@ -330,6 +332,9 @@ class MiniPipeManager(object):
         except subprocess.CalledProcessError as e:
             self.log(f" - failed")
             exit(1)
+
+    def set_ignore_targets(self, ignore_targets):
+        self.ignore_targets = ignore_targets
 
     def log(self, msg):
         print(msg)
