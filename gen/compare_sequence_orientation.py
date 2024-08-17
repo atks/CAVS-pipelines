@@ -34,8 +34,8 @@ import re
     help="working directory",
 )
 @click.option(
-    "-g",
-    "--gene_fasta_file",
+    "-s",
+    "--seq_fasta_file",
     required=True,
     show_default=True,
     help="gene fasta file",
@@ -59,7 +59,7 @@ def main(
     working_dir, gene_fasta_file, reference_fasta_file, extracted_gene_fasta_header
 ):
     """
-    Extracts gene from a reference sequence file based on a gene sequence
+    Peforms a global alignment of two similar sequences to ensure the orientation is the same
 
     e.g. extract_gene -g gene.fasta -r ref.fasta
     """
