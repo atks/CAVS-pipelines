@@ -23,15 +23,15 @@ import os
 import click
 import subprocess
 import re
-
+from shutil import copy2
 
 @click.command()
 @click.option(
-    "-w",
-    "--working_dir",
+    "-o",
+    "--output_dir",
     default=os.getcwd(),
     show_default=True,
-    help="working directory",
+    help="output directory",
 )
 @click.option(
     "-g",
@@ -56,7 +56,7 @@ import re
     help="extracted gene FASTA header",
 )
 def main(
-    working_dir, gene_fasta_file, reference_fasta_file, extracted_gene_fasta_header
+    output_dir, gene_fasta_file, reference_fasta_file, extracted_gene_fasta_header
 ):
     """
     Extracts gene from a reference sequence file based on a gene sequence
@@ -64,6 +64,26 @@ def main(
     e.g. extract_gene -g gene.fasta -r ref.fasta
     """
 
+    # create working directory
+    # write out to separate files
+    trace_dir = f"{output_dir}/trace"
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+        os.makedirs(trace_dir, exist_ok=True)
+    except OSError as error:
+        print(f"{error.filename} cannot be created")
+        exit(1)
+
+    # version
+    version = "1.0.0"
+
+    # programs
+    water = "/usr/local/emboss-6.6.0/bin/water"
+
+    # initialize
+    mpm = MiniPipeManager(f"{output_dir}/extract_amplicon.log")
+    mpm.set_ignore_targets(True)
+    
     # read reference sequences
     seq = ""
     with open(reference_fasta_file, "r") as file:
@@ -93,53 +113,50 @@ def main(
         .upper()
     )
 
-    # create working directory
-    output_dir = f"{working_dir}"
-    try:
-        os.makedirs(output_dir, exist_ok=True)
-    except OSError as error:
-        print(f"Directory cannot be created")
-
     # write out to separate files
     output_fasta_file = f"{output_dir}/gene_fwd.fasta"
     cmd = f"echo '>gene_fwd\n{gene_fwd}' > {output_fasta_file}"
     tgt = f"{output_fasta_file}.OK"
     desc = f"Create forward gene FASTA file"
-    run(cmd, tgt, desc)
+    mpm.run(cmd, tgt, desc)
 
     output_fasta_file = f"{output_dir}/gene_rev.fasta"
     cmd = f"echo '>gene_rev\n{gene_rev}' > {output_fasta_file}"
     tgt = f"{output_fasta_file}.OK"
     desc = f"Create reverse gene FASTA file"
-    run(cmd, tgt, desc)
+    mpm.run(cmd, tgt, desc)
 
     # invoke smith waterman alignment for each direction
-    water = "/usr/local/emboss-6.6.0/bin/water"
-
     input_fasta_file = f"{output_dir}/gene_fwd.fasta"
     alignment_file = f"{output_dir}/gene_fwd_ref.water"
     cmd = f"{water} {input_fasta_file} {reference_fasta_file} {alignment_file} -gapopen 10 -gapextend 0.5"
     tgt = f"{alignment_file}.OK"
     desc = f"Align forward gene to reference"
-    run(cmd, tgt, desc)
+    mpm.run(cmd, tgt, desc)
 
     input_fasta_file = f"{output_dir}/gene_rev.fasta"
     alignment_file = f"{output_dir}/gene_rev_ref.water"
     cmd = f"{water} {input_fasta_file} {reference_fasta_file} {alignment_file} -gapopen 10 -gapextend 0.5"
     tgt = f"{alignment_file}.OK"
     desc = f"Align reverse gene to reference"
-    run(cmd, tgt, desc)
+    mpm.run(cmd, tgt, desc)
 
     # examine alignments
     gene_fwd_alignment = parse_water_alignment(f"{output_dir}/gene_fwd_ref.water")
     gene_rev_alignment = parse_water_alignment(f"{output_dir}/gene_rev_ref.water")
 
+
+    print(f"fwd score: {gene_fwd_alignment.score}")
+    print(f"rev score: {gene_rev_alignment.score}")
     # find best alignment.
     best_alignment = (
         gene_fwd_alignment
-        if gene_fwd_alignment.score < gene_rev_alignment.score
+        if gene_fwd_alignment.score > gene_rev_alignment.score
         else gene_rev_alignment
     )
+
+    print("best alignment")
+    best_alignment.print()
 
     # write out extracted gene sequence
     output_fasta_file = f"{output_dir}/extracted_gene.fasta"
@@ -157,7 +174,7 @@ def main(
     cmd = f"echo '>{extracted_gene_fasta_header}\n{gene_seq}' > {output_fasta_file}"
     tgt = f"{output_fasta_file}.OK"
     desc = f"Extract gene and save in FASTA file"
-    run(cmd, tgt, desc)
+    mpm.run(cmd, tgt, desc)
 
     print(f"Extracted gene stats")
     print(f'gene  : {gene[0:20]}{"..." if len(gene)>20 else ""} ({len(gene)}bp)')
@@ -170,6 +187,12 @@ def main(
     print("==========")
     gene_rev_alignment.print()
     print("==========")
+
+    # copy files to trace
+    copy2(__file__, trace_dir)
+
+    # write log file
+    mpm.print_log()
 
 
 # Aligned_sequences: 2
@@ -256,19 +279,39 @@ class Alignment(object):
         print(f"end       : {self.end}")
 
 
-def run(cmd, tgt, desc):
-    try:
-        if os.path.exists(tgt):
-            print(f"{desc} -  already executed")
-            return
-        else:
-            print(f"{cmd}")
-            subprocess.run(cmd, shell=True, check=True)
-            subprocess.run(f"touch {tgt}", shell=True, check=True)
-            print(f"{desc} -  successfully executed")
-    except subprocess.CalledProcessError as e:
-        print(f" - failed")
-        exit(1)
+class MiniPipeManager(object):
+    def __init__(self, log_file):
+        self.log_file = log_file
+        self.log_msg = []
+        self.ignore_targets = False
+
+    def run(self, cmd, tgt, desc):
+        try:
+            if not self.ignore_targets and os.path.exists(tgt):
+                self.log(f"{desc} -  already executed")
+                self.log(cmd)
+                return
+            else:
+                self.log(f"{desc}")
+                subprocess.run(cmd, shell=True, check=True)
+                subprocess.run(f"touch {tgt}", shell=True, check=True)
+                self.log(cmd)
+        except subprocess.CalledProcessError as e:
+            self.log(f" - failed")
+            exit(1)
+
+    def set_ignore_targets(self, ignore_targets):
+        self.ignore_targets = ignore_targets
+
+    def log(self, msg):
+        print(msg)
+        self.log_msg.append(msg)
+
+    def print_log(self):
+        self.log(f"\nlogs written to {self.log_file}")
+        with open(self.log_file, "w") as f:
+            f.write("\n".join(self.log_msg))
+
 
 
 if __name__ == "__main__":

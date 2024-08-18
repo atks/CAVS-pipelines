@@ -34,11 +34,11 @@ import re
     help="working directory",
 )
 @click.option(
-    "-s",
-    "--seq_fasta_file",
+    "-q",
+    "--qry_fasta_file",
     required=True,
     show_default=True,
-    help="gene fasta file",
+    help="query fasta file",
 )
 @click.option(
     "-r",
@@ -56,12 +56,12 @@ import re
     help="extracted gene FASTA header",
 )
 def main(
-    working_dir, gene_fasta_file, reference_fasta_file, extracted_gene_fasta_header
+    working_dir, query_fasta_file, reference_fasta_file, extracted_gene_fasta_header
 ):
     """
     Peforms a global alignment of two similar sequences to ensure the orientation is the same
 
-    e.g. extract_gene -g gene.fasta -r ref.fasta
+    e.g. compare_sequence_orientation -q qry.fasta -r ref.fasta
     """
 
     # read reference sequences
@@ -73,19 +73,19 @@ def main(
             else:
                 seq += line.rstrip()
 
-    # read gene sequence
-    gene = ""
-    with open(gene_fasta_file, "r") as file:
+    # read query sequence
+    seq = ""
+    with open(query_fasta_file, "r") as file:
         for line in file:
             if line.startswith(">"):
                 pass
             else:
-                gene += line.rstrip()
+                seq += line.rstrip()
 
     # reverse_complement
-    gene_fwd = gene.upper()
-    gene_rev = (
-        gene[::-1]
+    seq_fwd = seq.upper()
+    seq_rev = (
+        seq[::-1]
         .replace("A", "t")
         .replace("T", "a")
         .replace("G", "c")
@@ -94,31 +94,31 @@ def main(
     )
 
     # create working directory
-    output_dir = f"{working_dir}/extract_gene_output"
+    output_dir = f"{working_dir}"
     try:
         os.makedirs(output_dir, exist_ok=True)
     except OSError as error:
         print(f"Directory cannot be created")
 
     # write out to separate files
-    output_fasta_file = f"{output_dir}/gene_fwd.fasta"
-    cmd = f"echo '>gene_fwd\n{gene_fwd}' > {output_fasta_file}"
+    output_fasta_file = f"{output_dir}/seq_fwd.fasta"
+    cmd = f"echo '>seq_fwd\n{seq_fwd}' > {output_fasta_file}"
     tgt = f"{output_fasta_file}.OK"
-    desc = f"Create forward gene FASTA file"
+    desc = f"Create forward sequence FASTA file"
     run(cmd, tgt, desc)
 
-    output_fasta_file = f"{output_dir}/gene_rev.fasta"
-    cmd = f"echo '>gene_rev\n{gene_rev}' > {output_fasta_file}"
+    output_fasta_file = f"{output_dir}/seq_rev.fasta"
+    cmd = f"echo '>seq_rev\n{seq_rev}' > {output_fasta_file}"
     tgt = f"{output_fasta_file}.OK"
-    desc = f"Create reverse gene FASTA file"
+    desc = f"Create reverse sequence FASTA file"
     run(cmd, tgt, desc)
 
-    # invoke smith waterman alignment for each direction
-    water = "/usr/local/emboss-6.6.0/bin/water"
+    # invoke needleman-wunchrman alignment for each direction
+    stretcher = "/usr/local/emboss-6.6.0/bin/stetcher"
 
-    input_fasta_file = f"{output_dir}/gene_fwd.fasta"
+    input_fasta_file = f"{output_dir}/seq_fwd.fasta"
     alignment_file = f"{output_dir}/gene_fwd_ref.water"
-    cmd = f"{water} {input_fasta_file} {reference_fasta_file} {alignment_file} -gapopen 10 -gapextend 0.5"
+    cmd = f"{stretcher} {input_fasta_file} {reference_fasta_file} {alignment_file} -gapopen 10 -gapextend 0.5"
     tgt = f"{alignment_file}.OK"
     desc = f"Align forward gene to reference"
     run(cmd, tgt, desc)
@@ -184,7 +184,7 @@ def main(
 # Similarity:    15/19 (78.9%)
 # Gaps:           2/19 (10.5%)
 # Score: 56.5
-def parse_water_alignment(file):
+def parse_stretcher_alignment(file):
     with open(file, "r") as file:
         qseq = ""
         rseq = ""

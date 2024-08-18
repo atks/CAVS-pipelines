@@ -32,7 +32,7 @@ from datetime import datetime
     "-m",
     "--make_file",
     show_default=True,
-    default="ilm_deploy_and_qc.mk",
+    default="generate_sequence_orientation_evaluation.mk",
     help="make file name",
 )
 @click.option("-r", "--run_id", required=True, help="Run ID")
@@ -128,6 +128,11 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     kraken2_multiqc_dep = ""
     samtools_multiqc_dep = ""
     quast_multiqc_dep = ""
+
+    #split sequences into seprate fasta files
+    #compare orientation of sequences
+    #combine results
+    #create new combined fasta file
 
     for sample in run.samples:
 
