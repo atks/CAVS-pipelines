@@ -94,7 +94,7 @@ def main(
     )
 
     # create working directory
-    output_dir = f"{working_dir}/extract_gene_output"
+    output_dir = f"{working_dir}"
     try:
         os.makedirs(output_dir, exist_ok=True)
     except OSError as error:
@@ -137,7 +137,7 @@ def main(
     # find best alignment.
     best_alignment = (
         gene_fwd_alignment
-        if gene_fwd_alignment.score > gene_rev_alignment.score
+        if gene_fwd_alignment.score < gene_rev_alignment.score
         else gene_rev_alignment
     )
 
