@@ -125,14 +125,14 @@ def main(
 
     input_fasta_file = f"{output_dir}/gene_rev.fasta"
     alignment_file = f"{output_dir}/gene_rev_ref.water"
-    cmd = f"{water} {input_fasta_file} {reference_fasta_file} {alignment_file} -gapopen 10 -gapextend 0.5"
+    cmd = f"{stretcher} {input_fasta_file} {reference_fasta_file} {alignment_file} -gapopen 10 -gapextend 0.5"
     tgt = f"{alignment_file}.OK"
     desc = f"Align reverse gene to reference"
     run(cmd, tgt, desc)
 
     # examine alignments
-    gene_fwd_alignment = parse_water_alignment(f"{output_dir}/gene_fwd_ref.water")
-    gene_rev_alignment = parse_water_alignment(f"{output_dir}/gene_rev_ref.water")
+    gene_fwd_alignment = parse_stretcher_alignment(f"{output_dir}/gene_fwd_ref.water")
+    gene_rev_alignment = parse_stretcher_alignment(f"{output_dir}/gene_rev_ref.water")
 
     # find best alignment.
     best_alignment = (
@@ -160,7 +160,7 @@ def main(
     run(cmd, tgt, desc)
 
     print(f"Extracted gene stats")
-    print(f'gene  : {gene[0:20]}{"..." if len(gene)>20 else ""} ({len(gene)}bp)')
+    print(f'gene  : {seq[0:20]}{"..." if len(seq)>20 else ""} ({len(seq)}bp)')
     print(f'reference : {seq[0:30]}{"..." if len(seq)>30 else ""} ({len(seq)}bp)')
     print(f"best alignment  : {best_alignment.qseq}")
     print(f"size: {best_alignment.length}")
