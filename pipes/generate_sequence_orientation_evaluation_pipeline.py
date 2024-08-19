@@ -40,7 +40,7 @@ from datetime import datetime
 @click.option(
     "-w",
     "--working_dir",
-    default=os.getcwd(),
+    default= f"{os.getcwd()}/sequence_orientation_evaluation",
     show_default=True,
     help="working directory",
 )
@@ -53,10 +53,9 @@ def main(make_file, fasta_file, ref_fasta_file, working_dir):
     """
 
     print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
-    print("\t{0:<20} :   {1:<10}".format("fasta_file", run_id))
+    print("\t{0:<20} :   {1:<10}".format("fasta_file", fasta_file))
     print("\t{0:<20} :   {1:<10}".format("ref_fasta_file", ref_fasta_file))
     print("\t{0:<20} :   {1:<10}".format("working_dir", working_dir))
-    print("\t{0:<20} :   {1:<10}".format("fastq_path", fastq_dir))
 
     #version
     version = "1.0.0"
@@ -65,21 +64,21 @@ def main(make_file, fasta_file, ref_fasta_file, working_dir):
     pg = PipelineGenerator(make_file)
 
     # programs
-    seqtk = f"/usr/local/FastQC-0.12.1/fastqc --adapters /usr/local/FastQC-0.12.1/Configuration/adapter_list.illumina.txt"
-    seqkit = "/usr/local/samtools-1.17/bin/samtools"
-    compare_sequence_orientation = "/usr/local/samtools-1.17/bin/plot-bamstats"
+    seqkit = "/usr/local/seqkit-2.20/seqkit"
+    compare_sequence_orientation = "/home/atks//local/samtools-1.17/bin/plot-bamstats"
 
     # create directories in destination folder directory
-    analysis_dir = f"{dest_dir}/analysis"
-    trace_dir = f"{dest_dir}/trace"
+    trace_dir = f"{working_dir}/trace"
     try:
         os.makedirs(trace_dir, exist_ok=True)
-        os.makedirs(f"{sample_dir}/align_result/idx_stats", exist_ok=True)
     except OSError as error:
         print(f"{error.filename} cannot be created")
 
 
     # split fasta file
+    #seqkit split --by-id ../36seq_asfv_ref_p72_genotype.fasta
+
+
 
     #perform pairwise orientation checking
 
@@ -87,7 +86,6 @@ def main(make_file, fasta_file, ref_fasta_file, working_dir):
 
     #fix orientation of sequences
 
-    pg.add_clean(f"rm -fr {log_dir} {dest_dir}")
 
     # write make file
     print("Writing pipeline")
@@ -96,7 +94,6 @@ def main(make_file, fasta_file, ref_fasta_file, working_dir):
     #copy files to trace
     copy2(__file__, trace_dir)
     copy2(make_file, trace_dir)
-    copy2(sample_file, trace_dir)
 
 class PipelineGenerator(object):
     def __init__(self, make_file):
