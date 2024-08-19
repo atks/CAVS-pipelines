@@ -30,7 +30,7 @@ from shutil import copy2
 @click.option(
     "-w",
     "--working_dir",
-    default="",
+    default=f"{os.getcwd()}/phylo_tree",
     show_default=True,
     help="working directory",
 )
