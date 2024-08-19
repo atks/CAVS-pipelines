@@ -346,6 +346,5 @@ class MiniPipeManager(object):
             f.write("\n".join(self.log_msg))
 
 
-
 if __name__ == "__main__":
     main() # type: ignore[arg-type]
