@@ -103,6 +103,7 @@ def main(output_dir, primer_fasta_file, reference_fasta_file):
         os.makedirs(trace_dir, exist_ok=True)
     except OSError as error:
         print(f"{error.filename} cannot be created")
+        exit(1)
 
     output_file = f"{output_dir}/p1_forward.fasta"
     with open(output_file, "w") as file:

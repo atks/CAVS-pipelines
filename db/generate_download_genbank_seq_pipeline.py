@@ -74,6 +74,8 @@ def main(make_file, sequence_id_file, download_type, output_dir):
     ids = []
     with open(sequence_id_file, "r") as file:
         for line in file:
+            if line.startswith("#"):
+                continue
             line = line.rstrip()
             if line.startswith("#"):
                 continue
@@ -116,7 +118,8 @@ def main(make_file, sequence_id_file, download_type, output_dir):
     print("Generating pipeline")
     pg = PipelineGenerator(make_file)
 
-    efetch = "/usr/local/edirect-17.0/efetch"
+    efetch = "/usr/local/edirect-22.4/efetch"
+#    efetch = "/usr/local/edirect-17.0/efetch"
 
     for id in ids:
         output_sequence_file = f"{output_dir}/{id}.{ext}"
