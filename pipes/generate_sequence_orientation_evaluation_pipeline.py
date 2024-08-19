@@ -32,7 +32,7 @@ from datetime import datetime
     "-m",
     "--make_file",
     show_default=True,
-    default="generate_sequence_orientation_evaluation.mk",
+    default="sequence_orientation_evaluation_pipeline.mk",
     help="make file name",
 )
 @click.option("-f", "--fasta_file", required=True, help="FASTA file containing the sequences to be checked")
@@ -46,11 +46,15 @@ from datetime import datetime
 )
 def main(make_file, fasta_file, ref_fasta_file, working_dir):
     """
-    Compares the orientation of a set of sequences against a FAST sequence
+    Compares the orientation of a set of sequences against a reference sequence.
     This is motivated by phylogenetic tree building where the multiple sequence alignment has to be in the same orientation
 
     e.g. generate_sequence_orientation_evaluation_pipeline -f panel.fasta -i ref.fasta -w verify_orientation
     """
+    working_dir = os.path.abspath(working_dir)
+    fasta_file = os.path.abspath(fasta_file)
+    prefix_fasta_file = os.path.basename(fasta_file).split(".")[0]
+    ref_fasta_file = os.path.abspath(ref_fasta_file)
 
     print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
     print("\t{0:<20} :   {1:<10}".format("fasta_file", fasta_file))
@@ -65,22 +69,52 @@ def main(make_file, fasta_file, ref_fasta_file, working_dir):
 
     # programs
     seqkit = "/usr/local/seqkit-2.20/seqkit"
-    compare_sequence_orientation = "/home/atks//local/samtools-1.17/bin/plot-bamstats"
+    compare_sequence_orientation = "/home/atks/programs/CAVS-pipelines/gen/compare_sequence_orientation.py"
+
+    ids = []
+
+    #read through the fasta file and record the IDs
+    with open(fasta_file, "r") as f:
+        for line in f:
+            if line.startswith(">"):
+                m = re.search(r"(?<=\>)(.*?)(?=\s)", line)
+                if m is not None:
+                    ids.append(m.group(0))
 
     # create directories in destination folder directory
     trace_dir = f"{working_dir}/trace"
+    split_dir = f"{working_dir}/fasta_split"
+    orientation_dir = f"{working_dir}/orientation"
     try:
         os.makedirs(trace_dir, exist_ok=True)
+        os.makedirs(split_dir, exist_ok=True)
+        os.makedirs(orientation_dir, exist_ok=True)
+        for id in ids:
+            os.makedirs(f"{orientation_dir}/{id}", exist_ok=True)
     except OSError as error:
         print(f"{error.filename} cannot be created")
 
 
+
+
     # split fasta file
-    #seqkit split --by-id ../36seq_asfv_ref_p72_genotype.fasta
-
-
+    # seqkit split --by-id ../36seq_asfv_ref_p72_genotype.fasta
+    output_dir = f"{working_dir}/fasta_split"
+    log = f"{output_dir}/fasta_split.log"
+    dep = f""
+    tgt = f"{working_dir}/fasta_split.OK"
+    cmd = f"{seqkit} split -f --by-id {fasta_file} -O {output_dir} > {log}"
+    pg.add(tgt, dep, cmd)
 
     #perform pairwise orientation checking
+    for id in ids:
+        query_fasta_file = f"{split_dir}/{prefix_fasta_file}.id_{id}.fasta"
+        output_dir = f"{orientation_dir}/{id}"
+        log = f"{output_dir}/compare_sequence_orientation.log"
+        dep = f""
+        tgt = f"{output_dir}/{id}.orientation_check.OK"
+        cmd = f"{compare_sequence_orientation} -q {query_fasta_file} -r {ref_fasta_file} -o {output_dir} > {log}"
+        pg.add(tgt, dep, cmd)
 
     #compile orientation detection results
 
