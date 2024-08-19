@@ -29,7 +29,7 @@ from shutil import copy2
 @click.option(
     "-o",
     "--output_dir",
-    default=os.getcwd(),
+    default=f"{os.getcwd()}/extract_gene",
     show_default=True,
     help="output directory",
 )
@@ -81,9 +81,9 @@ def main(
     water = "/usr/local/emboss-6.6.0/bin/water"
 
     # initialize
-    mpm = MiniPipeManager(f"{output_dir}/extract_amplicon.log")
+    mpm = MiniPipeManager(f"{output_dir}/extract_gene.log")
     mpm.set_ignore_targets(True)
-    
+
     # read reference sequences
     seq = ""
     with open(reference_fasta_file, "r") as file:
@@ -110,6 +110,17 @@ def main(
         .replace("T", "a")
         .replace("G", "c")
         .replace("C", "g")
+        .replace("M", "k")
+        .replace("R", "y")
+        .replace("W", "w")
+        .replace("S", "s")
+        .replace("Y", "r")
+        .replace("K", "m")
+        .replace("V", "b")
+        .replace("H", "d")
+        .replace("D", "h")
+        .replace("B", "v")
+        .replace("N", "n")
         .upper()
     )
 
@@ -161,7 +172,6 @@ def main(
     # write out extracted gene sequence
     output_fasta_file = f"{output_dir}/extracted_gene.fasta"
     gene_seq = seq[best_alignment.beg - 1 : best_alignment.end]
-    print(f"orig: {gene_seq}")
     if best_alignment.qseq == "gene_rev":
         gene_seq = (
             gene_seq[::-1]
@@ -220,44 +230,54 @@ def parse_water_alignment(file):
         for line in file:
             if line.startswith("# 1:"):
                 m = re.search(r"\# 1: (.+)", line)
-                qseq = m.group(1)
+                if m is not None:
+                    qseq = m.group(1)
+                else:
+                    exit("Cannot parse qseq")
             elif line.startswith("# 2:"):
                 m = re.search(r"\# 2: (.+)", line)
-                rseq = m.group(1)
+                if m is not None:
+                    rseq = m.group(1)
+                else:
+                    exit("Cannot parse rseq")
             elif line.startswith("# Length"):
                 m = re.search(r"(\d+)", line)
-                length = m.group(1)
+                if m is not None:
+                    length = int(m.group(1))
+                else:
+                    exit("Cannot parse length")
             elif line.startswith("# Identity"):
                 m = re.search(r"(\d+)\/", line)
-                identity = m.group(1)
+                if m is not None:
+                    identity = int(m.group(1))
+                else:
+                    exit("Cannot parse identity")
             elif line.startswith("# Gaps"):
                 m = re.search(r"(\d+)\/", line)
-                gaps = m.group(1)
+                if m is not None:
+                    gaps = int(m.group(1))
+                else:
+                    exit("Cannot parse gaps")
             elif line.startswith("# Score"):
                 m = re.search(r"([\d\.]+)", line)
-                score = m.group(1)
+                if m is not None:
+                    score = float(m.group(1))
+                else:
+                    exit("Cannot parse score")
             elif len(rseq) != 0 and line.startswith(rseq[:13]):
                 m = re.search(fr"{rseq[:13]}\s+([\d\.]+) [^\d]+ ([\d\.]+)", line)
-                beg = int(m.group(1)) if int(m.group(1)) < beg else beg
-                end = int(m.group(2)) if int(m.group(2)) > end else end
+                if m is not None:
+                    beg = int(m.group(1)) if int(m.group(1)) < beg else beg
+                    end = int(m.group(2)) if int(m.group(2)) > end else end
+                else:
+                    exit("Cannot parse beg or end")
             else:
                 pass
 
         alignment = Alignment(qseq, rseq, length, identity, gaps, score, beg, end)
         return alignment
 
-
 class Alignment(object):
-    def __init__(self):
-        self.qseq = ""
-        self.rseq = ""
-        self.length = 0
-        self.identity = 0
-        self.gaps = 0
-        self.score = 0
-        self.beg = 0
-        self.end = 0
-
     def __init__(self, qseq, rseq, length, identity, gaps, score, beg, end):
         self.qseq = qseq
         self.rseq = rseq
@@ -313,6 +333,5 @@ class MiniPipeManager(object):
             f.write("\n".join(self.log_msg))
 
 
-
 if __name__ == "__main__":
-    main()
+    main() # type: ignore
