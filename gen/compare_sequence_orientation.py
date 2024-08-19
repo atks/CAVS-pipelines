@@ -23,19 +23,19 @@ import os
 import click
 import subprocess
 import re
-
+from shutil import copy2
 
 @click.command()
 @click.option(
-    "-w",
-    "--working_dir",
-    default=os.getcwd(),
+    "-o",
+    "--output_dir",
+    default=f"{os.getcwd()}/compare_sequence_orientation",
     show_default=True,
-    help="working directory",
+    help="output directory",
 )
 @click.option(
     "-q",
-    "--qry_fasta_file",
+    "--query_fasta_file",
     required=True,
     show_default=True,
     help="query fasta file",
@@ -47,22 +47,34 @@ import re
     show_default=True,
     help="reference fasta file",
 )
-@click.option(
-    "-h",
-    "--extracted_gene_fasta_header",
-    required=False,
-    default="gene",
-    show_default=True,
-    help="extracted gene FASTA header",
-)
 def main(
-    working_dir, query_fasta_file, reference_fasta_file, extracted_gene_fasta_header
+    output_dir, query_fasta_file, reference_fasta_file
 ):
     """
-    Peforms a global alignment of two similar sequences to ensure the orientation is the same
+    Compare orientation of query sequence against reference sequence
 
-    e.g. compare_sequence_orientation -q qry.fasta -r ref.fasta
+    e.g. compare_sequence_orientation -q query.fasta -r ref.fasta
     """
+
+    # create working directory
+    # write out to separate files
+    trace_dir = f"{output_dir}/trace"
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+        os.makedirs(trace_dir, exist_ok=True)
+    except OSError as error:
+        print(f"{error.filename} cannot be created")
+        exit(1)
+
+    # version
+    version = "1.0.0"
+
+    # programs
+    stretcher = "/usr/local/emboss-6.6.0/bin/stretcher"
+
+    # initialize
+    mpm = MiniPipeManager(f"{output_dir}/compare_sequence_orientation.log")
+    mpm.set_ignore_targets(True)
 
     # read reference sequences
     seq = ""
@@ -74,116 +86,115 @@ def main(
                 seq += line.rstrip()
 
     # read query sequence
-    seq = ""
+    query = ""
+    header = ""
     with open(query_fasta_file, "r") as file:
         for line in file:
             if line.startswith(">"):
-                pass
+                header = line.rstrip()
             else:
-                seq += line.rstrip()
+                query += line.rstrip()
 
     # reverse_complement
-    seq_fwd = seq.upper()
-    seq_rev = (
-        seq[::-1]
+    query_fwd = query.upper()
+    query_rev = (
+        query[::-1]
         .replace("A", "t")
         .replace("T", "a")
         .replace("G", "c")
         .replace("C", "g")
+        .replace("M", "k")
+        .replace("R", "y")
+        .replace("W", "w")
+        .replace("S", "s")
+        .replace("Y", "r")
+        .replace("K", "m")
+        .replace("V", "b")
+        .replace("H", "d")
+        .replace("D", "h")
+        .replace("B", "v")
+        .replace("N", "n")
         .upper()
     )
 
-    # create working directory
-    output_dir = f"{working_dir}"
-    try:
-        os.makedirs(output_dir, exist_ok=True)
-    except OSError as error:
-        print(f"Directory cannot be created")
-
     # write out to separate files
-    output_fasta_file = f"{output_dir}/seq_fwd.fasta"
-    cmd = f"echo '>seq_fwd\n{seq_fwd}' > {output_fasta_file}"
+    output_fasta_file = f"{output_dir}/query_fwd.fasta"
+    cmd = f"echo '{header} forward\n{query_fwd}' > {output_fasta_file}"
     tgt = f"{output_fasta_file}.OK"
     desc = f"Create forward sequence FASTA file"
-    run(cmd, tgt, desc)
+    mpm.run(cmd, tgt, desc)
 
-    output_fasta_file = f"{output_dir}/seq_rev.fasta"
-    cmd = f"echo '>seq_rev\n{seq_rev}' > {output_fasta_file}"
+    output_fasta_file = f"{output_dir}/query_rev.fasta"
+    cmd = f"echo '{header} reverse complement\n{query_rev}' > {output_fasta_file}"
     tgt = f"{output_fasta_file}.OK"
-    desc = f"Create reverse sequence FASTA file"
-    run(cmd, tgt, desc)
+    desc = f"Create reverse completed sequence FASTA file"
+    mpm.run(cmd, tgt, desc)
 
-    # invoke needleman-wunchrman alignment for each direction
-    stretcher = "/usr/local/emboss-6.6.0/bin/stetcher"
-
-    input_fasta_file = f"{output_dir}/seq_fwd.fasta"
-    alignment_file = f"{output_dir}/gene_fwd_ref.water"
-    cmd = f"{stretcher} {input_fasta_file} {reference_fasta_file} {alignment_file} -gapopen 10 -gapextend 0.5"
+    # invoke smith waterman alignment for each direction
+    input_fasta_file = f"{output_dir}/query_fwd.fasta"
+    alignment_file = f"{output_dir}/query_fwd_ref.stretcher"
+    cmd = f"{stretcher} {input_fasta_file} {reference_fasta_file} {alignment_file}"
     tgt = f"{alignment_file}.OK"
-    desc = f"Align forward gene to reference"
-    run(cmd, tgt, desc)
+    desc = f"Align forward sequence to reference"
+    mpm.run(cmd, tgt, desc)
 
-    input_fasta_file = f"{output_dir}/gene_rev.fasta"
-    alignment_file = f"{output_dir}/gene_rev_ref.water"
-    cmd = f"{stretcher} {input_fasta_file} {reference_fasta_file} {alignment_file} -gapopen 10 -gapextend 0.5"
+    input_fasta_file = f"{output_dir}/query_rev.fasta"
+    alignment_file = f"{output_dir}/query_rev_ref.stretcher"
+    cmd = f"{stretcher} {input_fasta_file} {reference_fasta_file} {alignment_file}"
     tgt = f"{alignment_file}.OK"
-    desc = f"Align reverse gene to reference"
-    run(cmd, tgt, desc)
+    desc = f"Align reverse sequence to reference"
+    mpm.run(cmd, tgt, desc)
 
     # examine alignments
-    gene_fwd_alignment = parse_stretcher_alignment(f"{output_dir}/gene_fwd_ref.water")
-    gene_rev_alignment = parse_stretcher_alignment(f"{output_dir}/gene_rev_ref.water")
+    query_fwd_alignment = parse_stretcher_alignment(f"{output_dir}/query_fwd_ref.stretcher")
+    query_rev_alignment = parse_stretcher_alignment(f"{output_dir}/query_rev_ref.stretcher")
 
     # find best alignment.
-    best_alignment = (
-        gene_fwd_alignment
-        if gene_fwd_alignment.score > gene_rev_alignment.score
-        else gene_rev_alignment
+    in_same_orientation = (
+        True
+        if query_fwd_alignment.score > query_rev_alignment.score
+        else False
     )
 
-    # write out extracted gene sequence
-    output_fasta_file = f"{output_dir}/extracted_gene.fasta"
-    gene_seq = seq[best_alignment.beg - 1 : best_alignment.end]
-    print(f"orig: {gene_seq}")
-    if best_alignment.qseq == "gene_rev":
-        gene_seq = (
-            gene_seq[::-1]
-            .replace("A", "t")
-            .replace("T", "a")
-            .replace("G", "c")
-            .replace("C", "g")
-            .upper()
-        )
-    cmd = f"echo '>{extracted_gene_fasta_header}\n{gene_seq}' > {output_fasta_file}"
-    tgt = f"{output_fasta_file}.OK"
-    desc = f"Extract gene and save in FASTA file"
-    run(cmd, tgt, desc)
-
-    print(f"Extracted gene stats")
-    print(f'gene  : {seq[0:20]}{"..." if len(seq)>20 else ""} ({len(seq)}bp)')
-    print(f'reference : {seq[0:30]}{"..." if len(seq)>30 else ""} ({len(seq)}bp)')
-    print(f"best alignment  : {best_alignment.qseq}")
-    print(f"size: {best_alignment.length}")
-    print(f"locus: {best_alignment.qseq}:{best_alignment.beg}-{best_alignment.end}")
-    print("==========")
-    gene_fwd_alignment.print()
-    print("==========")
-    gene_rev_alignment.print()
-    print("==========")
+    result_file  = f"{output_dir}/result.txt"
+    with open(result_file, "w") as file:
+        file.write(f"#qseq\trseq\tfwd_score\trev_score\tfwd_similarity\trev_similarity\tsame_orientation\n")
+        fwd_identity_percent = float(query_fwd_alignment.identity)/float(query_fwd_alignment.length)*100
+        rev_identity_percent = float(query_rev_alignment.identity)/float(query_rev_alignment.length)*100
+        file.write(f"{query_fwd_alignment.qseq}\t{query_fwd_alignment.rseq}\t{query_fwd_alignment.score}\t{query_rev_alignment.score}\t{fwd_identity_percent:.2f}\t{rev_identity_percent:.2f}\t{in_same_orientation}\n")
 
 
-# Aligned_sequences: 2
-# 1: primer2_reverse
-# 2: AY261360.1
-# Matrix: EDNAFULL
-# Gap_penalty: 10.0
-# Extend_penalty: 0.5
+    print(f"Compare sequence orientation stats")
+    print(f'In same orientation: {in_same_orientation}')
+    print("==========")
+    query_fwd_alignment.print()
+    print("==========")
+    query_rev_alignment.print()
+    print("==========")
+
+    # copy files to trace
+    copy2(__file__, trace_dir)
+
+    # write log file
+    mpm.print_log()
+
+#=======================================
 #
-# Length: 19
-# Identity:      15/19 (78.9%)
-# Similarity:    15/19 (78.9%)
-# Gaps:           2/19 (10.5%)
-# Score: 56.5
+# Aligned_sequences: 2
+# 1: FR682468.2
+# 2: AF270707.1
+# Matrix: EDNAFULL
+# Gap_penalty: 16
+# Extend_penalty: 4
+#
+# Length: 417
+# Identity:     402/417 (96.4%)
+# Similarity:   402/417 (96.4%)
+# Gaps:           0/417 ( 0.0%)
+# Score: 1950
+#
+#
+#=======================================
 def parse_stretcher_alignment(file):
     with open(file, "r") as file:
         qseq = ""
@@ -197,53 +208,54 @@ def parse_stretcher_alignment(file):
         for line in file:
             if line.startswith("# 1:"):
                 m = re.search(r"\# 1: (.+)", line)
-                qseq = m.group(1)
+                if m is not None:
+                    qseq = m.group(1)
+                else:
+                    exit("Cannot parse qseq")
             elif line.startswith("# 2:"):
                 m = re.search(r"\# 2: (.+)", line)
-                rseq = m.group(1)
+                if m is not None:
+                    rseq = m.group(1)
+                else:
+                    exit("Cannot parse rseq")
             elif line.startswith("# Length"):
                 m = re.search(r"(\d+)", line)
-                length = m.group(1)
+                if m is not None:
+                    length = int(m.group(1))
+                else:
+                    exit("Cannot parse length")
             elif line.startswith("# Identity"):
                 m = re.search(r"(\d+)\/", line)
-                identity = m.group(1)
+                if m is not None:
+                    identity = int(m.group(1))
+                else:
+                    exit("Cannot parse identity")
             elif line.startswith("# Gaps"):
                 m = re.search(r"(\d+)\/", line)
-                gaps = m.group(1)
+                if m is not None:
+                    gaps = int(m.group(1))
+                else:
+                    exit("Cannot parse gaps")
             elif line.startswith("# Score"):
                 m = re.search(r"([\d\.]+)", line)
-                score = m.group(1)
-            elif len(rseq) != 0 and line.startswith(rseq[:13]):
-                m = re.search(fr"{rseq[:13]}\s+([\d\.]+) [^\d]+ ([\d\.]+)", line)
-                beg = int(m.group(1)) if int(m.group(1)) < beg else beg
-                end = int(m.group(2)) if int(m.group(2)) > end else end
+                if m is not None:
+                    score = float(m.group(1))
+                else:
+                    exit("Cannot parse score")
             else:
                 pass
 
-        alignment = Alignment(qseq, rseq, length, identity, gaps, score, beg, end)
+        alignment = Alignment(qseq, rseq, length, identity, gaps, score)
         return alignment
 
-
 class Alignment(object):
-    def __init__(self):
-        self.qseq = ""
-        self.rseq = ""
-        self.length = 0
-        self.identity = 0
-        self.gaps = 0
-        self.score = 0
-        self.beg = 0
-        self.end = 0
-
-    def __init__(self, qseq, rseq, length, identity, gaps, score, beg, end):
+    def __init__(self, qseq, rseq, length, identity, gaps, score):
         self.qseq = qseq
         self.rseq = rseq
         self.length = length
         self.identity = identity
         self.gaps = gaps
         self.score = score
-        self.beg = beg
-        self.end = end
 
     def print(self):
         print(f"qseq      : {self.qseq}")
@@ -252,24 +264,40 @@ class Alignment(object):
         print(f"identity  : {self.identity}")
         print(f"gaps      : {self.gaps}")
         print(f"score     : {self.score}")
-        print(f"beg       : {self.beg}")
-        print(f"end       : {self.end}")
 
+class MiniPipeManager(object):
+    def __init__(self, log_file):
+        self.log_file = log_file
+        self.log_msg = []
+        self.ignore_targets = False
 
-def run(cmd, tgt, desc):
-    try:
-        if os.path.exists(tgt):
-            print(f"{desc} -  already executed")
-            return
-        else:
-            print(f"{cmd}")
-            subprocess.run(cmd, shell=True, check=True)
-            subprocess.run(f"touch {tgt}", shell=True, check=True)
-            print(f"{desc} -  successfully executed")
-    except subprocess.CalledProcessError as e:
-        print(f" - failed")
-        exit(1)
+    def run(self, cmd, tgt, desc):
+        try:
+            if not self.ignore_targets and os.path.exists(tgt):
+                self.log(f"{desc} -  already executed")
+                self.log(cmd)
+                return
+            else:
+                self.log(f"{desc}")
+                subprocess.run(cmd, shell=True, check=True)
+                subprocess.run(f"touch {tgt}", shell=True, check=True)
+                self.log(cmd)
+        except subprocess.CalledProcessError as e:
+            self.log(f" - failed")
+            exit(1)
+
+    def set_ignore_targets(self, ignore_targets):
+        self.ignore_targets = ignore_targets
+
+    def log(self, msg):
+        print(msg)
+        self.log_msg.append(msg)
+
+    def print_log(self):
+        self.log(f"\nlogs written to {self.log_file}")
+        with open(self.log_file, "w") as f:
+            f.write("\n".join(self.log_msg))
 
 
 if __name__ == "__main__":
-    main()
+    main() # type: ignore
