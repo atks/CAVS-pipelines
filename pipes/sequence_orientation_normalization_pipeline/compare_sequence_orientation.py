@@ -71,62 +71,31 @@ def main(
 
     # programs
     stretcher = "/usr/local/emboss-6.6.0/bin/stretcher"
+    seqtk = "/usr/local/seqtk-1.4/seqtk"
 
     # initialize
     mpm = MiniPipeManager(f"{output_dir}/compare_sequence_orientation.log")
     mpm.set_ignore_targets(True)
 
-    # read reference sequences
+    # read reference sequence
     seq = ""
-    with open(reference_fasta_file, "r") as file:
+    query_len = 0
+    with open(query_fasta_file, "r") as file:
         for line in file:
             if line.startswith(">"):
                 pass
             else:
-                seq += line.rstrip()
-
-    # read query sequence
-    query = ""
-    header = ""
-    with open(query_fasta_file, "r") as file:
-        for line in file:
-            if line.startswith(">"):
-                header = line.rstrip()
-            else:
-                query += line.rstrip()
-
-    # reverse_complement
-    query_fwd = query.upper()
-    query_rev = (
-        query[::-1]
-        .replace("A", "t")
-        .replace("T", "a")
-        .replace("G", "c")
-        .replace("C", "g")
-        .replace("M", "k")
-        .replace("R", "y")
-        .replace("W", "w")
-        .replace("S", "s")
-        .replace("Y", "r")
-        .replace("K", "m")
-        .replace("V", "b")
-        .replace("H", "d")
-        .replace("D", "h")
-        .replace("B", "v")
-        .replace("N", "n")
-        .upper()
-    )
-    query_len = len(query_fwd)
+                query_len += len(line.rstrip())
 
     # write out to separate files
     output_fasta_file = f"{output_dir}/query_fwd.fasta"
-    cmd = f"echo '{header} forward\n{query_fwd}' > {output_fasta_file}"
+    cmd = f"{seqtk} seq -A {query_fasta_file} > {output_fasta_file}"
     tgt = f"{output_fasta_file}.OK"
     desc = f"Create forward sequence FASTA file"
     mpm.run(cmd, tgt, desc)
 
     output_fasta_file = f"{output_dir}/query_rev.fasta"
-    cmd = f"echo '{header} reverse complement\n{query_rev}' > {output_fasta_file}"
+    cmd = f"{seqtk} seq -Ar {query_fasta_file} > {output_fasta_file}"
     tgt = f"{output_fasta_file}.OK"
     desc = f"Create reverse completed sequence FASTA file"
     mpm.run(cmd, tgt, desc)
