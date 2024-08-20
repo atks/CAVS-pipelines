@@ -72,6 +72,7 @@ def main(make_file, fasta_file, ref_fasta_file, working_dir):
     # programs
     seqkit = "/usr/local/seqkit-2.20/seqkit"
     compare_sequence_orientation = f"{os.path.dirname(__file__)}/compare_sequence_orientation.py"
+    normalize_sequence_orientation = f"{os.path.dirname(__file__)}/normalize_sequence_orientation.py"
 
     ids = []
     #read through the fasta file and record the IDs
@@ -119,7 +120,6 @@ def main(make_file, fasta_file, ref_fasta_file, working_dir):
         pg.add(tgt, dep, cmd)
 
     #compile orientation detection results
-    # seqkit split --by-id ../36seq_asfv_ref_p72_genotype.fasta
     output_text_file = f"{working_dir}/orientation_report.txt"
     dep = f"{compare_sequence_orientation_dep}"
     tgt = f"{output_text_file}.OK"
@@ -127,6 +127,12 @@ def main(make_file, fasta_file, ref_fasta_file, working_dir):
     pg.add(tgt, dep, cmd)
 
     #fix orientation of sequences
+    output_fasta_file = f"{working_dir}/normalized.fasta"
+    input_text_file = f"{working_dir}/orientation_report.txt"
+    dep = f"{working_dir}/orientation_report.txt.OK"
+    tgt = f"{output_fasta_file}.OK"
+    cmd = f"{normalize_sequence_orientation} -o {output_fasta_file} -s {input_text_file}"
+    pg.add(tgt, dep, cmd)
 
 
     # write make file

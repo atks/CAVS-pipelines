@@ -116,6 +116,7 @@ def main(
         .replace("N", "n")
         .upper()
     )
+    query_len = len(query_fwd)
 
     # write out to separate files
     output_fasta_file = f"{output_dir}/query_fwd.fasta"
@@ -160,10 +161,10 @@ def main(
 
     result_file  = f"{output_dir}/result.txt"
     with open(result_file, "w") as file:
-        file.write(f"#qseq\trseq\tfwd_align_len\trev_align_len\tfwd_score\trev_score\tfwd_similarity\trev_similarity\tsame_orientation\n")
+        file.write(f"#file\tqseq\trseq\tqry_len\tfwd_align_len\trev_align_len\tfwd_score\trev_score\tfwd_similarity\trev_similarity\tsame_orientation\n")
         fwd_identity_percent = float(query_fwd_alignment.identity)/float(query_fwd_alignment.length)*100
         rev_identity_percent = float(query_rev_alignment.identity)/float(query_rev_alignment.length)*100
-        file.write(f"{query_fwd_alignment.qseq}\t{query_fwd_alignment.rseq}\t{query_fwd_alignment.length}\t{query_rev_alignment.length}\t{query_fwd_alignment.score}\t{query_rev_alignment.score}\t{fwd_identity_percent:.2f}\t{rev_identity_percent:.2f}\t{in_same_orientation}\n")
+        file.write(f"{query_fasta_file}\t{query_fwd_alignment.qseq}\t{query_fwd_alignment.rseq}\t{query_len}\t{query_fwd_alignment.length}\t{query_rev_alignment.length}\t{query_fwd_alignment.score}\t{query_rev_alignment.score}\t{fwd_identity_percent:.2f}\t{rev_identity_percent:.2f}\t{in_same_orientation}\n")
 
 
     print(f"Compare sequence orientation stats")
