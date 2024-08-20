@@ -32,7 +32,7 @@ from datetime import datetime
     "-m",
     "--make_file",
     show_default=True,
-    default="sequence_orientation_evaluation_pipeline.mk",
+    default="sequence_orientation_normalization_pipeline.mk",
     help="make file name",
 )
 @click.option("-f", "--fasta_file", required=True, help="FASTA file containing the sequences to be checked")
@@ -53,8 +53,10 @@ def main(make_file, fasta_file, ref_fasta_file, working_dir):
     """
     working_dir = os.path.abspath(working_dir)
     fasta_file = os.path.abspath(fasta_file)
-    prefix_fasta_file = os.path.basename(fasta_file).split(".")[0]
+    prefix_fasta_file = ".".join(os.path.basename(fasta_file).split(".")[:-1])
     ref_fasta_file = os.path.abspath(ref_fasta_file)
+
+    #print(f"prefix_fasta_file: {prefix_fasta_file}")
 
     print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
     print("\t{0:<20} :   {1:<10}".format("fasta_file", fasta_file))
@@ -69,10 +71,9 @@ def main(make_file, fasta_file, ref_fasta_file, working_dir):
 
     # programs
     seqkit = "/usr/local/seqkit-2.20/seqkit"
-    compare_sequence_orientation = "/home/atks/programs/CAVS-pipelines/gen/compare_sequence_orientation.py"
+    compare_sequence_orientation = f"{os.path.dirname(__file__)}/compare_sequence_orientation.py"
 
     ids = []
-
     #read through the fasta file and record the IDs
     with open(fasta_file, "r") as f:
         for line in f:
