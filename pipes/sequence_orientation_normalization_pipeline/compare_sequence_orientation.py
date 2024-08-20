@@ -130,17 +130,19 @@ def main(
     desc = f"Create reverse completed sequence FASTA file"
     mpm.run(cmd, tgt, desc)
 
-    # invoke smith waterman alignment for each direction
+    # invoke needleman-wunsch alignment for each direction
     input_fasta_file = f"{output_dir}/query_fwd.fasta"
     alignment_file = f"{output_dir}/query_fwd_ref.stretcher"
-    cmd = f"{stretcher} {input_fasta_file} {reference_fasta_file} {alignment_file}"
+    log_file = f"{output_dir}/query_fwd_ref.stretcher.log"
+    cmd = f"{stretcher} {input_fasta_file} {reference_fasta_file} {alignment_file} 2> {log_file}"
     tgt = f"{alignment_file}.OK"
     desc = f"Align forward sequence to reference"
     mpm.run(cmd, tgt, desc)
 
     input_fasta_file = f"{output_dir}/query_rev.fasta"
     alignment_file = f"{output_dir}/query_rev_ref.stretcher"
-    cmd = f"{stretcher} {input_fasta_file} {reference_fasta_file} {alignment_file}"
+    log_file = f"{output_dir}/query_rev_ref.stretcher.log"
+    cmd = f"{stretcher} {input_fasta_file} {reference_fasta_file} {alignment_file} 2> {log_file}"
     tgt = f"{alignment_file}.OK"
     desc = f"Align reverse sequence to reference"
     mpm.run(cmd, tgt, desc)

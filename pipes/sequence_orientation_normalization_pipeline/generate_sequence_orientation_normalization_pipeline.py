@@ -94,9 +94,6 @@ def main(make_file, fasta_file, ref_fasta_file, working_dir):
     except OSError as error:
         print(f"{error.filename} cannot be created")
 
-
-
-
     # split fasta file
     # seqkit split --by-id ../36seq_asfv_ref_p72_genotype.fasta
     output_dir = f"{working_dir}/fasta_split"
@@ -107,16 +104,26 @@ def main(make_file, fasta_file, ref_fasta_file, working_dir):
     pg.add(tgt, dep, cmd)
 
     #perform pairwise orientation checking
+    compare_sequence_orientation_dep = ""
+    compare_sequence_orientation_reports = ""
     for id in ids:
         query_fasta_file = f"{split_dir}/{prefix_fasta_file}.id_{id}.fasta"
         output_dir = f"{orientation_dir}/{id}"
         log = f"{output_dir}/compare_sequence_orientation.log"
-        dep = f""
+        dep = f"{working_dir}/fasta_split.OK"
         tgt = f"{output_dir}/{id}.orientation_check.OK"
+        compare_sequence_orientation_dep += f" {tgt}"
+        compare_sequence_orientation_reports += f" {output_dir}/result.txt"
         cmd = f"{compare_sequence_orientation} -q {query_fasta_file} -r {ref_fasta_file} -o {output_dir} > {log}"
         pg.add(tgt, dep, cmd)
 
     #compile orientation detection results
+    # seqkit split --by-id ../36seq_asfv_ref_p72_genotype.fasta
+    output_text_file = f"{working_dir}/orientation_report.txt"
+    dep = f"{compare_sequence_orientation_dep}"
+    tgt = f"{output_text_file}.OK"
+    cmd = f"cat {compare_sequence_orientation_reports} | sort | uniq > {output_text_file}"
+    pg.add(tgt, dep, cmd)
 
     #fix orientation of sequences
 
