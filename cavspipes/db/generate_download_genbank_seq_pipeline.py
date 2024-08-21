@@ -75,6 +75,8 @@ def main(make_file, sequence_id_file, download_type, output_dir):
     with open(sequence_id_file, "r") as file:
         for line in file:
             line = line.rstrip()
+            if line.startswith("#"):
+                continue
             if "-" in line:
                 print(line, end="\t")
                 result = re.search("(\D+)(\d+)-(\D+)(\d+)", line)
@@ -175,4 +177,4 @@ class PipelineGenerator(object):
 
 
 if __name__ == "__main__":
-    main()
+    main() # type: ignore

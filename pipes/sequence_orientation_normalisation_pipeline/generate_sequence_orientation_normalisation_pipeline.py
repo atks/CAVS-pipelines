@@ -32,7 +32,7 @@ from datetime import datetime
     "-m",
     "--make_file",
     show_default=True,
-    default="sequence_orientation_normalization_pipeline.mk",
+    default="sequence_orientation_normalisation_pipeline.mk",
     help="make file name",
 )
 @click.option("-f", "--fasta_file", required=True, help="FASTA file containing the sequences to be checked")
@@ -40,7 +40,7 @@ from datetime import datetime
 @click.option(
     "-w",
     "--working_dir",
-    default= f"{os.getcwd()}/sequence_orientation_evaluation",
+    default= f"{os.getcwd()}/sequence_orientation_normalisation",
     show_default=True,
     help="working directory",
 )
@@ -49,7 +49,7 @@ def main(make_file, fasta_file, ref_fasta_file, working_dir):
     Compares the orientation of a set of sequences against a reference sequence.
     This is motivated by phylogenetic tree building where the multiple sequence alignment has to be in the same orientation
 
-    e.g. generate_sequence_orientation_evaluation_pipeline -f panel.fasta -i ref.fasta -w verify_orientation
+    e.g. generate_sequence_orientation_normalisation_pipeline -f panel.fasta -i ref.fasta -w verify_orientation
     """
     working_dir = os.path.abspath(working_dir)
     fasta_file = os.path.abspath(fasta_file)
@@ -72,7 +72,7 @@ def main(make_file, fasta_file, ref_fasta_file, working_dir):
     # programs
     seqkit = "/usr/local/seqkit-2.20/seqkit"
     compare_sequence_orientation = f"{os.path.dirname(__file__)}/compare_sequence_orientation.py"
-    normalize_sequence_orientation = f"{os.path.dirname(__file__)}/normalize_sequence_orientation.py"
+    normalize_sequence_orientation = f"{os.path.dirname(__file__)}/normalise_sequence_orientation.py"
 
     ids = []
     #read through the fasta file and record the IDs
@@ -127,7 +127,7 @@ def main(make_file, fasta_file, ref_fasta_file, working_dir):
     pg.add(tgt, dep, cmd)
 
     #fix orientation of sequences
-    output_fasta_file = f"{working_dir}/normalized.fasta"
+    output_fasta_file = f"{working_dir}/normalised.fasta"
     input_text_file = f"{working_dir}/orientation_report.txt"
     dep = f"{working_dir}/orientation_report.txt.OK"
     tgt = f"{output_fasta_file}.OK"
