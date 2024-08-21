@@ -194,7 +194,6 @@ def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, sample_file, pre
         with open(rename_file, "w") as out:
             with open(sample_file, "r") as f:
                 for line in f:
-                    print(line)
                     if line.startswith("#"):
                         header_names = line.lstrip('#').strip().split("\t")
                         fasta_hdr_idx = header_names.index("fasta_header")
