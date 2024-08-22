@@ -79,7 +79,10 @@ def main(make_file, sequence_id_file, download_type, output_dir):
                 continue
             if "-" in line:
                 print(line, end="\t")
-                result = re.search("(\D+)(\d+)-(\D+)(\d+)", line)
+                result = re.search(r"(\D+)(\d+)-(\D+)(\d+)", line)
+                if result is None:
+                    print("invalid range")
+                    exit()
                 prefix1 = result.group(1)
                 num1 = result.group(2)
                 prefix2 = result.group(3)
@@ -116,6 +119,7 @@ def main(make_file, sequence_id_file, download_type, output_dir):
     pg = PipelineGenerator(make_file)
 
     efetch = "/usr/local/edirect-17.0/efetch"
+    is_file_empty =  "/usr/local/cavspipes-1.1.0/is_file_empty"
 
     for id in ids:
         output_sequence_file = f"{output_dir}/{id}.{ext}"
@@ -124,6 +128,7 @@ def main(make_file, sequence_id_file, download_type, output_dir):
         tgt = f"{output_sequence_file}.OK"
         dep = ""
         cmd = f"{efetch} -db nuccore -id {id} -format {download_type} > {output_sequence_file} 2> {err}"
+        cmd += f"; {is_file_empty} {output_sequence_file}"
         pg.add(tgt, dep, cmd)
 
     # clean files

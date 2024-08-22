@@ -65,23 +65,24 @@ from shutil import copy2
 @click.option(
     "-p",
     "--prefix",
-    required=True,
     default="genus_species",
-    show_default=True,
     help="for RAXML file naming",
 )
 def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, sample_file, prefix):
     """
     Generates a phylogenetic tree from a panel of sequences and reference sequences
 
-    e.g. #combines both fasta files, multiple align, build tere
+     #combines both fasta files, multiple align, build tree \n
          make_phylogenetic_tree.py -f lsdv.fasta -r lsdv_ref.fasta
-         #multiple aligh reference fasta file, build tree
+
+     #multiple align reference fasta file, build tree \n
          make_phylogenetic_tree.py -r lsdv_ref.fasta
-         #multiple align sequences in fasta file to existing multiple alignment, build tree
+
+     #multiple align sequences in fasta file to existing multiple alignment, build tree \n
          make_phylogenetic_tree.py -f lsdv.fasta -m lsdv_ref.msa
-         #build tree from the multiple sequence alignment
-         make_phylogenetic_tree.py -m lsdv_ref.fasta
+
+     #build tree from the multiple sequence alignment \n
+         make_phylogenetic_tree.py -m lsdv_ref.msa
     """
 
     #make sure at least one of the two files is provided
