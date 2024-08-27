@@ -105,6 +105,7 @@ def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, sample_file, pre
 
     print(f"msa status = {multiple_align}")
 
+    # make directories
     output_dir = f"{os.getcwd()}/{prefix}_phylo"
     if working_dir != "":
         output_dir = os.path.abspath(working_dir)
@@ -118,20 +119,20 @@ def main(working_dir, fasta_file, ref_fasta_file, ref_msa_file, sample_file, pre
     # version
     version = "1.0.0"
 
+    # initialize
+    mpm = MiniPipeManager(f"{output_dir}/make_phylogenetic_tree.log")
+
     # programs
     mafft = "/usr/local/mafft-7.490/bin/mafft"
     raxml = "/usr/local/raxml-ng-1.1.0/raxml-ng"
     seqkit = "/usr/local/seqkit-2.1.0/bin/seqkit"
     gotree = "/usr/local/gotree-0.4.5/gotree"
 
-    # on chengdu
+    # on uluaotu
     # mafft = "/usr/local/mafft-7.525/bin/mafft"
     # raxml = "/usr/local/raxml-ng-1.2.2/raxml-ng"
     # seqkit = "/usr/local/seqkit-2.8.2/seqkit"
     # gotree = "/usr/local/gotree-0.4.5/gotree"
-
-    # initialize
-    mpm = MiniPipeManager(f"{output_dir}/make_phylogenetic_tree.log")
 
     # log text
     log_text = ""
