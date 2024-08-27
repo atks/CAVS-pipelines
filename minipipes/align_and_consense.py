@@ -26,7 +26,7 @@ import subprocess
 
 @click.command()
 @click.option(
-    "-w",
+    "-o",
     "--output_dir",
     default=os.path.join(os.getcwd(), "align_consensus"),
     show_default=True,
@@ -43,9 +43,9 @@ import subprocess
     "-s",
     "--sample_id",
     required=True,
-    default="sample1",
+    default="consensus",
     show_default=True,
-    help="sample ID",
+    help="consensus sequence sample ID",
 )
 @click.option(
     "-n",
@@ -85,7 +85,7 @@ def main(
     nanopore = len(input_ont_fastq_files) != 0
 
     # version
-    version = "1.0.0"
+    version = "1.1.0"
 
     # initialize
     mpm = MiniPipeManager(f"{output_dir}/make_phylogenetic_tree.log")
@@ -94,10 +94,11 @@ def main(
     minimap2 = "/usr/local/minimap2-2.24/minimap2"
     bwa = "/usr/local/bwa-0.7.17/bwa"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
-    medaka = "/home/atks/.miniconda3/bin/medaka"
+    medaka = "docker run --rm  ontresearch/medaka:latest medaka"
     seqkit = "/usr/local/seqkit-2.1.0/bin/seqkit"
 
     # make directories
+    output_dir = os.path.abspath(output_dir)
     fastq_dir = os.path.join(output_dir, "fastq")
     bam_dir = os.path.join(output_dir, "bam")
     fasta_dir = os.path.join(output_dir, "fasta")
@@ -143,9 +144,10 @@ def main(
 
         #  align
         output_bam_file = os.path.join(bam_dir, "ilm.bam")
-        cmd = f"{bwa} mem -t 2 -M {reference_fasta_file} {output_read1_fastq_file} {output_read2_fastq_file} | {samtools} view -hF4 | {samtools} sort -o {output_bam_file}"
+        log = os.path.join(bam_dir, "bwa_mem.log")
+        cmd = f"{bwa} mem -t 2 -M {reference_fasta_file} {output_read1_fastq_file} {output_read2_fastq_file} 2> {log}| {samtools} view -hF4 | {samtools} sort -o {output_bam_file}"
         tgt = f"{output_bam_file}.OK"
-        desc = f"Align to reference with bwa"
+        desc = f"Align to reference with bwa mem"
         mpm.run(cmd, tgt, desc)
 
         #  index
