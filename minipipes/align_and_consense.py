@@ -94,7 +94,9 @@ def main(
     minimap2 = "/usr/local/minimap2-2.24/minimap2"
     bwa = "/usr/local/bwa-0.7.17/bwa"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
-    medaka = "docker run --rm  ontresearch/medaka:latest medaka"
+    #"docker run -t -v  `pwd`:`pwd` -w `pwd` fischuu/quast quast.py "
+    activate_medaka_virtualenv = "source /usr/local/medaka-1.12.1/bin/activate"
+    medaka = "/usr/local/medaka-1.12.1/bin/medaka"
     seqkit = "/usr/local/seqkit-2.1.0/bin/seqkit"
 
     # make directories
@@ -218,12 +220,12 @@ def main(
         #  consensus
         input_bam_file = os.path.join(bam_dir, "ont.bam")
         output_hdf_file = os.path.join(bam_dir, "ont.hdf")
-        cmd = f"{medaka} consensus {input_bam_file} {output_hdf_file} --model r941_min_hac_g507"
+        cmd = f"{activate_medaka_virtualenv}; {medaka} consensus {input_bam_file} {output_hdf_file} --model r941_min_hac_g507; deactivate"
         tgt = f"{output_hdf_file}.OK"
         desc = f"Oxford Nanopore consensus contigs"
         mpm.run(cmd, tgt, desc)
 
-        #  consensus
+        #  stitch
         input_hdf_file = os.path.join(bam_dir, "ont.hdf")
         output_fasta_file = os.path.join(fasta_dir, "ont.consensus.fasta")
         cmd = f"{medaka} stitch --fill_char N {input_hdf_file} {reference_fasta_file} {output_fasta_file} "
