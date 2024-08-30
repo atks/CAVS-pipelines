@@ -220,7 +220,7 @@ def main(
         #  consensus
         input_bam_file = os.path.join(bam_dir, "ont.bam")
         output_hdf_file = os.path.join(bam_dir, "ont.hdf")
-        cmd = f"{activate_medaka_virtualenv}; {medaka} consensus {input_bam_file} {output_hdf_file} --model r941_min_hac_g507; deactivate"
+        cmd = f"{medaka} consensus {input_bam_file} {output_hdf_file} --model r941_min_hac_g507"
         tgt = f"{output_hdf_file}.OK"
         desc = f"Oxford Nanopore consensus contigs"
         mpm.run(cmd, tgt, desc)
