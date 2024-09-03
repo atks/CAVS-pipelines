@@ -88,7 +88,7 @@ def main(
     version = "1.1.0"
 
     # initialize
-    mpm = MiniPipeManager(f"{output_dir}/make_phylogenetic_tree.log")
+    mpm = MiniPipeManager(f"{output_dir}/align_and_consense.log")
 
     # programs
     minimap2 = "/usr/local/minimap2-2.24/minimap2"
