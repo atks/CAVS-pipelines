@@ -217,7 +217,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         err = f"{log_dir}/{sample.idx}_{sample.id}.spades_assembly.err"
         dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
         tgt = f"{log_dir}/{sample.idx}_{sample.id}.spades_assembly.OK"
-        cmd = f"{spades} -1 {input_fastq_file1} -2 {input_fastq_file2} -o {output_dir} --threads 10 --isolate  > {log} 2> {err}"
+        cmd = f"{spades} -1 {input_fastq_file1} -2 {input_fastq_file2} -o {output_dir} --threads 10 --meta  > {log} 2> {err}"
         pg.add_srun(tgt, dep, cmd, 10)
 
         # # assemble

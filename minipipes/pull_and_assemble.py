@@ -84,13 +84,11 @@ def main(
     # programs
     bwa = "/usr/local/bwa-0.7.17/bwa"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
-    spades = "/usr/local/Spades-4.0.0/bin/spades.py"
-    seqkit = "/usr/local/seqkit-2.1.0/bin/seqkit"
+    spades = "/usr/local/SPAdes-4.0.0/bin/spades.py"
+    seqtk = "/usr/local/seqtk-1.4/seqtk"
     iteration = 0
 
     reference_fasta_file = os.path.abspath(reference_fasta_file)
-
-
 
     # make directories
     output_dir = os.path.abspath(output_dir)
@@ -133,9 +131,11 @@ def main(
         # make directories
         iteration_dir = os.path.join(output_dir, f"iter_{iteration}")
         ref_dir = os.path.join(iteration_dir, "ref")
+        assembly_dir = f"{iteration_dir}/assembly"
         try:
             os.makedirs(iteration_dir, exist_ok=True)
             os.makedirs(ref_dir, exist_ok=True)
+            os.makedirs(assembly_dir, exist_ok=True)
         except OSError as error:
             print(f"{error.filename} cannot be created")
 
@@ -146,13 +146,10 @@ def main(
         desc = f"Step {iteration}: Copy reference sequence to ref directory"
         mpm.run(cmd, tgt, desc)
 
-        # update last reference file used
-        last_ref_fasta_file = output_fasta_file
-
         #  construct reference
         reference_fasta_file = os.path.join(ref_dir, ref_fasta_file_basename)
         log = os.path.join(ref_dir, "bwa_index.log")
-        cmd = f"{bwa} index -a bwtsw {reference_fasta_file} > {log}"
+        cmd = f"{bwa} index -a bwtsw {reference_fasta_file} 2> {log}"
         tgt = f"{reference_fasta_file}.bwa_index.OK"
         desc = f"Step {iteration}: Construct bwa reference"
         mpm.run(cmd, tgt, desc)
@@ -188,14 +185,37 @@ def main(
         desc = f"Step {iteration}: Illumina consensus"
         mpm.run(cmd, tgt, desc)
 
+        # extract reads IDs that were aligned
+        input_bam_file = os.path.join(iteration_dir, "ilm.bam")
+        id_text_file = f"{iteration_dir}/aligned_read_IDs.txt"
+        cmd = f"{samtools} view {input_bam_file} | cut -f1 | sort | uniq > {id_text_file}"
+        tgt = f"{id_text_file}.OK"
+        desc = f"Step {iteration}: Extract Aligned Illumina reads IDs"
+        mpm.run(cmd, tgt, desc)
+
+        # extract fastq paired reads
+        aligned_fastq_file1 = os.path.join(iteration_dir, "aligned.r1.fastq.gz")
+        cmd = f"{seqtk} subseq {input_fastq_file1} {id_text_file} | gzip > {aligned_fastq_file1 } "
+        tgt = f"{aligned_fastq_file1}.OK"
+        desc = f"Step {iteration}: Extract Read 1"
+        mpm.run(cmd, tgt, desc)
+
+        aligned_fastq_file2 = os.path.join(iteration_dir, "aligned.r2.fastq.gz")
+        tgt = f"{ aligned_fastq_file2}.OK"
+        cmd = f"{seqtk} subseq {input_fastq_file2} {id_text_file} | gzip > {aligned_fastq_file2 } "
+        desc = f"Step {iteration}: Extract Read 2"
+        mpm.run(cmd, tgt, desc)
+
         # assemble
-        output_dir = f"{iteration_dir}/assembly"
-        log = f"{iteration_dir}/assembly.log"
-        err = f"{iteration_dir}/assembly.err"
-        tgt = f"{iteration_dir}/assembly.OK"
-        cmd = f"{spades} -1 {input_fastq_file1} -2 {input_fastq_file2} -o {output_dir} --threads 10 --isolate  > {log} 2> {err}"
+        log = f"{assembly_dir}/assembly.log"
+        err = f"{assembly_dir}/assembly.err"
+        tgt = f"{assembly_dir}/assembly.OK"
+        cmd = f"{spades} -1 {aligned_fastq_file1} -2 {aligned_fastq_file2} -o {assembly_dir} --threads 10 --isolate  > {log} 2> {err}"
         desc = f"Step {iteration}: Illumina assembly"
-        mpm.run(tgt, cmd, desc)
+        mpm.run(cmd, tgt, desc)
+
+        # update last reference file used
+        last_ref_fasta_file = f"{assembly_dir}/contigs.fasta"
 
         iteration += 1
 
