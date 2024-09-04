@@ -79,32 +79,34 @@ def main(
     version = "1.0.0"
 
     # initialize
-    mpm = MiniPipeManager(f"{output_dir}/align_and_consense.log")
+    mpm = MiniPipeManager(f"{output_dir}/pull_and_assemble.log")
 
     # programs
     bwa = "/usr/local/bwa-0.7.17/bwa"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
     spades = "/usr/local/Spades-4.0.0/bin/spades.py"
     seqkit = "/usr/local/seqkit-2.1.0/bin/seqkit"
+    iteration = 0
+
+    reference_fasta_file = os.path.abspath(reference_fasta_file)
+
+
 
     # make directories
     output_dir = os.path.abspath(output_dir)
+    ref_dir = os.path.join(output_dir, "ref")
     fastq_dir = os.path.join(output_dir, "fastq")
-    bam_dir = os.path.join(output_dir, "bam")
-    fasta_dir = os.path.join(output_dir, "fasta")
-    stats_dir = os.path.join(output_dir, "stats")
-    consensus_dir = os.path.join(output_dir, "consensus")
     trace_dir = f"{output_dir}/trace"
     try:
         os.makedirs(output_dir, exist_ok=True)
+        os.makedirs(ref_dir, exist_ok=True)
         os.makedirs(fastq_dir, exist_ok=True)
-        os.makedirs(bam_dir, exist_ok=True)
-        os.makedirs(fasta_dir, exist_ok=True)
-        os.makedirs(stats_dir, exist_ok=True)
-        os.makedirs(consensus_dir, exist_ok=True)
         os.makedirs(trace_dir, exist_ok=True)
     except OSError as error:
         print(f"{error.filename} cannot be created")
+
+    ref_fasta_file_basename = os.path.basename(reference_fasta_file)
+    last_ref_fasta_file = reference_fasta_file
 
     #  combine fastq files
     read1_files = input_ilm_read1_fastq_files.split(",")
@@ -122,45 +124,83 @@ def main(
     desc = f"Combining read 2 fastq files"
     mpm.run(cmd, tgt, desc)
 
-    #  construct reference
-    cmd = f"{bwa} index -a bwtsw {reference_fasta_file}"
-    tgt = f"{reference_fasta_file}.bwa_index.OK"
-    desc = f"Construct bwa reference"
-    mpm.run(cmd, tgt, desc)
+    input_fastq_file1 = os.path.join(fastq_dir, "ilm.r1.fastq.gz")
+    input_fastq_file2 = os.path.join(fastq_dir, "ilm.r2.fastq.gz")
 
-    #  align
-    output_bam_file = os.path.join(bam_dir, "ilm.bam")
-    log = os.path.join(bam_dir, "bwa_mem.log")
-    cmd = f"{bwa} mem -t 2 -M {reference_fasta_file} {output_read1_fastq_file} {output_read2_fastq_file} 2> {log}| {samtools} view -hF4 | {samtools} sort -o {output_bam_file}"
-    tgt = f"{output_bam_file}.OK"
-    desc = f"Align to reference with bwa mem"
-    mpm.run(cmd, tgt, desc)
+    improved_assembly = True
+    while improved_assembly:
 
-    #  index
-    input_bam_file = os.path.join(bam_dir, "ilm.bam")
-    cmd = f"{samtools} index {input_bam_file}"
-    tgt = f"{input_bam_file}.bai.OK"
-    desc = f"Index bam file"
-    mpm.run(cmd, tgt, desc)
+        # make directories
+        iteration_dir = os.path.join(output_dir, f"iter_{iteration}")
+        ref_dir = os.path.join(iteration_dir, "ref")
+        try:
+            os.makedirs(iteration_dir, exist_ok=True)
+            os.makedirs(ref_dir, exist_ok=True)
+        except OSError as error:
+            print(f"{error.filename} cannot be created")
 
-    #  coverage
-    input_bam_file = os.path.join(bam_dir, "ilm.bam")
-    output_stats_file = os.path.join(stats_dir, "ilm.stats.txt")
-    cmd = f"{samtools} coverage {input_bam_file} > {output_stats_file}"
-    tgt = f"{output_stats_file}.OK"
-    desc = f"Illumina coverage statistics"
-    mpm.run(cmd, tgt, desc)
+        #  copy reference file to ref_dir
+        output_fasta_file = os.path.join(ref_dir, ref_fasta_file_basename)
+        cmd = f"cp {last_ref_fasta_file} {output_fasta_file}"
+        tgt = f"{output_fasta_file}.OK"
+        desc = f"Step {iteration}: Copy reference sequence to ref directory"
+        mpm.run(cmd, tgt, desc)
 
-    #  consensus
-    input_bam_file = os.path.join(bam_dir, "ilm.bam")
-    output_fasta_file = os.path.join(fasta_dir, "ilm.consensus.fasta")
-    cmd = f"{samtools} consensus {input_bam_file} > {output_fasta_file}"
-    tgt = f"{output_fasta_file}.OK"
-    desc = f"Illumina consensus"
-    mpm.run(cmd, tgt, desc)
+        # update last reference file used
+        last_ref_fasta_file = output_fasta_file
 
+        #  construct reference
+        reference_fasta_file = os.path.join(ref_dir, ref_fasta_file_basename)
+        log = os.path.join(ref_dir, "bwa_index.log")
+        cmd = f"{bwa} index -a bwtsw {reference_fasta_file} > {log}"
+        tgt = f"{reference_fasta_file}.bwa_index.OK"
+        desc = f"Step {iteration}: Construct bwa reference"
+        mpm.run(cmd, tgt, desc)
 
+        #  align
+        output_bam_file = os.path.join(iteration_dir, "ilm.bam")
+        log = os.path.join(iteration_dir, "bwa_mem.log")
+        cmd = f"{bwa} mem -t 2 -M {reference_fasta_file} {input_fastq_file1} {input_fastq_file2} 2> {log}| {samtools} view -hF4 | {samtools} sort -o {output_bam_file}"
+        tgt = f"{output_bam_file}.OK"
+        desc = f"Step {iteration}: Align to reference with bwa mem"
+        mpm.run(cmd, tgt, desc)
 
+        #  index
+        input_bam_file = os.path.join(iteration_dir, "ilm.bam")
+        cmd = f"{samtools} index {input_bam_file}"
+        tgt = f"{input_bam_file}.bai.OK"
+        desc = f"Step {iteration}: Index bam file"
+        mpm.run(cmd, tgt, desc)
+
+        #  coverage
+        input_bam_file = os.path.join(iteration_dir, "ilm.bam")
+        output_stats_file = os.path.join(iteration_dir, "ilm.stats.txt")
+        cmd = f"{samtools} coverage {input_bam_file} > {output_stats_file}"
+        tgt = f"{output_stats_file}.OK"
+        desc = f"Step {iteration}: Illumina coverage statistics"
+        mpm.run(cmd, tgt, desc)
+
+        #  consensus
+        input_bam_file = os.path.join(iteration_dir, "ilm.bam")
+        output_fasta_file = os.path.join(iteration_dir, "ilm.consensus.fasta")
+        cmd = f"{samtools} consensus {input_bam_file} > {output_fasta_file}"
+        tgt = f"{output_fasta_file}.OK"
+        desc = f"Step {iteration}: Illumina consensus"
+        mpm.run(cmd, tgt, desc)
+
+        # assemble
+        output_dir = f"{iteration_dir}/assembly"
+        log = f"{iteration_dir}/assembly.log"
+        err = f"{iteration_dir}/assembly.err"
+        tgt = f"{iteration_dir}/assembly.OK"
+        cmd = f"{spades} -1 {input_fastq_file1} -2 {input_fastq_file2} -o {output_dir} --threads 10 --isolate  > {log} 2> {err}"
+        desc = f"Step {iteration}: Illumina assembly"
+        mpm.run(tgt, cmd, desc)
+
+        iteration += 1
+
+        if iteration == 3:
+            improved_assembly = False
 
 class MiniPipeManager(object):
     def __init__(self, log_file):
