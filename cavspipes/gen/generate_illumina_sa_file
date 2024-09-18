@@ -56,9 +56,9 @@ def main(cavsnet_illumina_run_dir):
 
     sorted_samples = sorted(samples, key = lambda x: x[0])
 
-    print(f"#sample-id\tfastq1\tfastq2")
+    print(f"#sample-id\tfastq1\tfastq2\tcontigs")
     for id, t in enumerate(sorted_samples):
-        print(f"{t[1]}\t{cavsnet_illumina_run_dir}/{run_idx}_{t[1]}_R1.fastq.gz\t{cavsnet_illumina_run_dir}/{run_idx}_{t[1]}_R2.fastq.gz")
+        print(f"{t[1]}\t{cavsnet_illumina_run_dir}/{run_idx}_{t[1]}_R1.fastq.gz\t{cavsnet_illumina_run_dir}/{run_idx}_{t[1]}_R2.fastq.gz\t{cavsnet_illumina_run_dir}/contigs/{run_idx}_{t[1]}.contigs.fasta")
 
 
 if __name__ == "__main__":
