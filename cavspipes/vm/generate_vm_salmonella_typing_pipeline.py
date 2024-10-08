@@ -124,7 +124,7 @@ def main(make_file, output_dir, sample_file):
         log = f"{out_dir}/mlst.log"
         tgt = f"{out_dir}/mlst.OK"
         dep = f""
-        cmd = f'{mlst} {input_contig_fasta_file} --json typing.json --scheme senterica_achtman_2  --nopath > {results_txt_file} 2> {log}'
+        cmd = f'{mlst} {input_contig_fasta_file} --json {out_dir}/typing.json --scheme senterica_achtman_2  --nopath > {results_txt_file} 2> {log}'
         pg.add(tgt, dep, cmd)
 
         # SISTR

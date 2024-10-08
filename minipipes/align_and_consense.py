@@ -22,7 +22,7 @@ import sys
 import os
 import click
 import subprocess
-
+from shutil import copy2
 
 @click.command()
 @click.option(
@@ -46,6 +46,15 @@ import subprocess
     default="consensus",
     show_default=True,
     help="consensus sequence sample ID",
+)
+@click.option(
+    "-m",
+    "--ont_model",
+    required=False,
+    #r941_min_hac_g507
+    #r1041_e82_400bps_sup_v5.0.0
+    default="r1041_e82_400bps_sup_v4.3.0",
+    help="ONT Machine Model",
 )
 @click.option(
     "-n",
@@ -72,6 +81,7 @@ def main(
     input_ont_fastq_files,
     input_ilm_read1_fastq_files,
     input_ilm_read2_fastq_files,
+    ont_model,
     sample_id,
     output_dir,
     reference_fasta_file,
@@ -83,6 +93,17 @@ def main(
     """
     illumina = len(input_ilm_read1_fastq_files) != 0
     nanopore = len(input_ont_fastq_files) != 0
+
+    print("\t{0:<20} :   {1:<10}".format("sample ID", sample_id))
+    print("\t{0:<20} :   {1:<10}".format("output directory", output_dir))
+    print("\t{0:<20} :   {1:<10}".format("reference fasta file", reference_fasta_file))
+    if illumina:
+        print("\tIllumina reads")
+        print("\t{0:<20} :   {1:<10}".format("fastq1", input_ilm_read1_fastq_files))
+        print("\t{0:<20} :   {1:<10}".format("fastq2", input_ilm_read1_fastq_files))
+    if nanopore:
+        print("\tNanopore reads")
+        print("\t{0:<20} :   {1:<10}".format("ont fastq", input_ont_fastq_files))
 
     # version
     version = "1.1.0"
@@ -220,7 +241,7 @@ def main(
         #  consensus
         input_bam_file = os.path.join(bam_dir, "ont.bam")
         output_hdf_file = os.path.join(bam_dir, "ont.hdf")
-        cmd = f"{medaka} consensus {input_bam_file} {output_hdf_file} --model r941_min_hac_g507"
+        cmd = f"{medaka} consensus {input_bam_file} {output_hdf_file} --model {ont_model}"
         tgt = f"{output_hdf_file}.OK"
         desc = f"Oxford Nanopore consensus contigs"
         mpm.run(cmd, tgt, desc)
@@ -285,6 +306,12 @@ def main(
     tgt = f"{output_fasta_file}.OK"
     desc = f"Final consensus"
     mpm.run(cmd, tgt, desc)
+
+    # copy files to trace
+    copy2(__file__, trace_dir)
+
+    # write log file
+    mpm.print_log()
 
 class MiniPipeManager(object):
     def __init__(self, log_file):
