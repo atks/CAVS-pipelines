@@ -21,7 +21,7 @@
 import sys
 import os
 import click
-import subprocess
+import re
 from shutil import copy2
 
 @click.command()
@@ -52,6 +52,7 @@ def main(
     """
     print("\t{0:<20} :   {1:<10}".format("input tbl file", input_tbl_file))
     print("\t{0:<20} :   {1:<10}".format("output tbl file", output_tbl_file))
+    print("\t{0:<20} :   {1:<10}".format("reference fasta file", ref_fasta_file))
 
     # version
     version = "0.0.1"
@@ -67,14 +68,77 @@ def main(
                 ref_seq += line.rstrip()
 
     ref_len = len(ref_seq)
+    print("")
+    print(f"reference sequence")
     print(f"header: {ref_id}")
     print(f"length: {ref_len}")
 
-    with open(input_tbl_file, "r") as f:
-        lines = f.readlines()
-        for line in f:
-            if line.startswith("LOCUS"):
-                break
+    # parse input tbl file
+    feature_table = FeatureTable()
+    feature_table.parse(input_tbl_file)
+
+    print("")
+    print(f"feature table parsed")
+    print(f"no records: {len(feature_table.features)}")
+
+
+class FeatureTable(object):
+    def __init__(self):
+        self.features = []
+
+    def parse(self, file):
+        feature_text = ""
+        with open(file, "r") as f:
+            for line in f:
+                if line.startswith(">"):
+                    continue
+
+                if re.search(r"^\d", line):
+                    if len(feature_text)!=0:
+                        feature = Feature()
+                        feature.parse(feature_text)
+                        self.features.append(feature)
+                        feature_text = ""
+                    feature_text = line
+                else:
+                    feature_text += line
+
+            if len(feature_text)!=0:
+                feature = Feature()
+                feature.parse(feature_text)
+                self.features.append(feature)
+                feature_text = ""
+
+class Feature(object):
+    def __init__(self):
+        self.beg = 0
+        self.end = 0
+        self.feature = ""
+        self.annotations = []
+
+    def parse(self, text):
+        print(text)
+        lines = text.split("\n")
+        self.beg, self.end, self.feature = lines[0].split("\t")
+        for line in lines[1:]:
+            if len(line)==0:
+                continue
+            tag, description = line.split("\t")
+            annotation = Annotation(tag, description)
+            self.annotations.append(annotation)
+
+    def print(self):
+        print(f"{self.beg}\t{self.beg}\t{self.feature}\n")
+        for annotation in self.annotations:
+            annotation.print()
+
+class Annotation(object):
+    def __init__(self, tag, description):
+        self.tag = tag
+        self.description = description
+
+    def print(self):
+        print(f"\t\t\t{self.tag}\t{self.description}\n")
 
 if __name__ == "__main__":
     main() # type: ignore
