@@ -57,6 +57,11 @@ from shutil import copy2
     help="ONT Machine Model",
 )
 @click.option(
+    "--in_situ_ref",
+    is_flag=True,
+    help="Build reference databases in the location of the supplied reference FASTA file",
+)
+@click.option(
     "-n",
     "--input_ont_fastq_files",
     required=False,
@@ -81,6 +86,7 @@ def main(
     input_ont_fastq_files,
     input_ilm_read1_fastq_files,
     input_ilm_read2_fastq_files,
+    in_situ_ref,
     ont_model,
     sample_id,
     output_dir,
@@ -89,24 +95,29 @@ def main(
     """
     Aligns all fastq files to a reference sequence file and generates a consensus sequence.
 
-    e.g. align_and_consensus -1 r1.fastq.gz -2 r2.fastq.gz -n ont.fastq.qz  -r ref.fasta
+    e.g. align_and_consense.py -1 r1.fastq.gz -2 r2.fastq.gz -n ont.fastq.qz  -r ref.fasta
     """
+    ex_situ_ref = not in_situ_ref
+
     illumina = len(input_ilm_read1_fastq_files) != 0
     nanopore = len(input_ont_fastq_files) != 0
+
+    reference_fasta_file = os.path.abspath(reference_fasta_file)
 
     print("\t{0:<20} :   {1:<10}".format("sample ID", sample_id))
     print("\t{0:<20} :   {1:<10}".format("output directory", output_dir))
     print("\t{0:<20} :   {1:<10}".format("reference fasta file", reference_fasta_file))
+    print("\t{0:<20} :   {1}".format("in situ ref db", in_situ_ref))
     if illumina:
         print("\tIllumina reads")
         print("\t{0:<20} :   {1:<10}".format("fastq1", input_ilm_read1_fastq_files))
-        print("\t{0:<20} :   {1:<10}".format("fastq2", input_ilm_read1_fastq_files))
+        print("\t{0:<20} :   {1:<10}".format("fastq2", input_ilm_read2_fastq_files))
     if nanopore:
         print("\tNanopore reads")
         print("\t{0:<20} :   {1:<10}".format("ont fastq", input_ont_fastq_files))
 
     # version
-    version = "1.1.0"
+    version = "1.1.1"
 
     # initialize
     mpm = MiniPipeManager(f"{output_dir}/align_and_consense.log")
@@ -128,6 +139,9 @@ def main(
     stats_dir = os.path.join(output_dir, "stats")
     consensus_dir = os.path.join(output_dir, "consensus")
     trace_dir = f"{output_dir}/trace"
+    ref_dir = os.path.abspath(os.path.dirname(reference_fasta_file))
+    if ex_situ_ref:
+        ref_dir = f"{output_dir}/ref"
     try:
         os.makedirs(output_dir, exist_ok=True)
         os.makedirs(fastq_dir, exist_ok=True)
@@ -136,31 +150,50 @@ def main(
         os.makedirs(stats_dir, exist_ok=True)
         os.makedirs(consensus_dir, exist_ok=True)
         os.makedirs(trace_dir, exist_ok=True)
+        if ex_situ_ref:
+            os.makedirs(ref_dir, exist_ok=True)
     except OSError as error:
         print(f"{error.filename} cannot be created")
+
+    if ex_situ_ref:
+        copy2(reference_fasta_file, ref_dir)
+        reference_fasta_file = os.path.join(ref_dir, os.path.basename(reference_fasta_file))
 
     # process illumina reads
     if illumina:
         print("Processing illumina reads")
 
-        #  combine fastq files
         read1_files = input_ilm_read1_fastq_files.split(",")
         output_read1_fastq_file = os.path.join(fastq_dir, "ilm.r1.fastq.gz")
-        cmd = f"zcat {' '.join(read1_files)} | gzip > {output_read1_fastq_file}"
-        tgt = f"{output_read1_fastq_file}.OK"
-        desc = f"Combining read 1 fastq files"
-        mpm.run(cmd, tgt, desc)
-
         #  combine fastq files
-        read2_files = " ".join(input_ilm_read2_fastq_files.split(","))
+        if len(read1_files)>1:
+            cmd = f"zcat {' '.join(read1_files)} | gzip > {output_read1_fastq_file}"
+            tgt = f"{output_read1_fastq_file}.OK"
+            desc = f"Combining read 1 fastq files"
+            mpm.run(cmd, tgt, desc)
+        else:
+            cmd = f"cp {read1_files[0]} {fastq_dir}/ilm.r1.fastq.gz"
+            tgt = f"{output_read1_fastq_file}.OK"
+            desc = f"Copying read 1 fastq file"
+            mpm.run(cmd, tgt, desc)
+
+        read2_files = input_ilm_read2_fastq_files.split(",")
         output_read2_fastq_file = os.path.join(fastq_dir, "ilm.r2.fastq.gz")
-        cmd = f"zcat {read2_files} | gzip > {output_read2_fastq_file}"
-        tgt = f"{output_read2_fastq_file}.OK"
-        desc = f"Combining read 2 fastq files"
-        mpm.run(cmd, tgt, desc)
+        #  combine fastq files
+        if len(read2_files)>1:
+            cmd = f"zcat {' '.join(read2_files)} | gzip > {output_read2_fastq_file}"
+            tgt = f"{output_read2_fastq_file}.OK"
+            desc = f"Combining read 2 fastq files"
+            mpm.run(cmd, tgt, desc)
+        else:
+            cmd = f"cp {read2_files[0]} {fastq_dir}/ilm.r2.fastq.gz"
+            tgt = f"{output_read2_fastq_file}.OK"
+            desc = f"Copying read 2 fastq file"
+            mpm.run(cmd, tgt, desc)
 
         #  construct reference
-        cmd = f"{bwa} index -a bwtsw {reference_fasta_file}"
+        log = os.path.join(ref_dir, f"{reference_fasta_file}.bwa_index.log")
+        cmd = f"{bwa} index -a bwtsw {reference_fasta_file} 2> {log}"
         tgt = f"{reference_fasta_file}.bwa_index.OK"
         desc = f"Construct bwa reference"
         mpm.run(cmd, tgt, desc)
@@ -201,24 +234,32 @@ def main(
         print("Processing nanopore reads")
 
         #  combine fastq files
-        fastq_files = " ".join(input_ont_fastq_files.split(","))
+        fastq_files = input_ont_fastq_files.split(",")
         output_fastq_file = os.path.join(fastq_dir, "ont.fastq.gz")
-        cmd = f"zcat {fastq_files} | gzip > {output_fastq_file}"
-        tgt = f"{output_fastq_file}.OK"
-        desc = f"Combining nanopore fastq files"
-        mpm.run(cmd, tgt, desc)
+        if len(fastq_files)>1:
+            cmd = f"zcat {' '.join(fastq_files)} | gzip > {output_fastq_file}"
+            tgt = f"{output_fastq_file}.OK"
+            desc = f"Combining nanopore fastq files"
+            mpm.run(cmd, tgt, desc)
+        else:
+            cmd = f"cp {fastq_files[0]} {fastq_dir}/ont.fastq.gz"
+            tgt = f"{output_fastq_file}.OK"
+            desc = f"Copying nanopore fastq file"
+            mpm.run(cmd, tgt, desc)
 
         #  construct reference
-        cmd = f"{minimap2} -d {reference_fasta_file}.mmi {reference_fasta_file}"
+        log = os.path.join(ref_dir, f"{reference_fasta_file}.minimap2_index.log")
+        cmd = f"{minimap2} -d {reference_fasta_file}.mmi {reference_fasta_file} 2> {log}"
         tgt = f"{reference_fasta_file}.minimap2_index.OK"
         desc = f"Construct minimap2 reference"
         mpm.run(cmd, tgt, desc)
 
         #  align
         minimap2_ref_mmi_file = f"{reference_fasta_file}.mmi"
+        minimap2_log_file = os.path.join(bam_dir, "minimap2.log")
         input_fastq_file = os.path.join(fastq_dir, "ont.fastq.gz")
         output_bam_file = os.path.join(bam_dir, "ont.bam")
-        cmd = f"{minimap2} -ax map-ont {minimap2_ref_mmi_file} {input_fastq_file}  | {samtools} view -hF4 | {samtools} sort -o {output_bam_file}"
+        cmd = f"{minimap2} -ax map-ont {minimap2_ref_mmi_file} {input_fastq_file} 2> {minimap2_log_file}  | {samtools} view -hF4 | {samtools} sort -o {output_bam_file}"
         tgt = f"{output_bam_file}.OK"
         desc = f"Align to reference with minimap2"
         mpm.run(cmd, tgt, desc)
@@ -241,7 +282,8 @@ def main(
         #  consensus
         input_bam_file = os.path.join(bam_dir, "ont.bam")
         output_hdf_file = os.path.join(bam_dir, "ont.hdf")
-        cmd = f"{medaka} consensus {input_bam_file} {output_hdf_file} --model {ont_model}"
+        log = os.path.join(bam_dir, "medaka_consensus.log")
+        cmd = f"{medaka} consensus {input_bam_file} {output_hdf_file} --model {ont_model} 2> {log}"
         tgt = f"{output_hdf_file}.OK"
         desc = f"Oxford Nanopore consensus contigs"
         mpm.run(cmd, tgt, desc)
@@ -249,7 +291,8 @@ def main(
         #  stitch
         input_hdf_file = os.path.join(bam_dir, "ont.hdf")
         output_fasta_file = os.path.join(fasta_dir, "ont.consensus.fasta")
-        cmd = f"{medaka} stitch --fill_char N {input_hdf_file} {reference_fasta_file} {output_fasta_file} "
+        log = os.path.join(bam_dir, "medaka_stitch.log")
+        cmd = f"{medaka} stitch --fill_char N {input_hdf_file} {reference_fasta_file} {output_fasta_file} 2> {log}"
         tgt = f"{output_fasta_file}.OK"
         desc = f"Oxford Nanopore consensus assembly/scaffold"
         mpm.run(cmd, tgt, desc)
@@ -307,11 +350,12 @@ def main(
     desc = f"Final consensus"
     mpm.run(cmd, tgt, desc)
 
+    # write log file
+    mpm.print_log()
+
     # copy files to trace
     copy2(__file__, trace_dir)
 
-    # write log file
-    mpm.print_log()
 
 class MiniPipeManager(object):
     def __init__(self, log_file):
