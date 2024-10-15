@@ -54,7 +54,7 @@ from shutil import copy2
     #r941_min_hac_g507
     #r1041_e82_400bps_sup_v5.0.0
     default="r1041_e82_400bps_sup_v4.3.0",
-    help="ONT Machine Model",
+    help="ONT Machine Model e.g. r941_min_hac_g507, r1041_e82_400bps_sup_v5.0.0",
 )
 @click.option(
     "--in_situ_ref",
@@ -115,6 +115,7 @@ def main(
     if nanopore:
         print("\tNanopore reads")
         print("\t{0:<20} :   {1:<10}".format("ont fastq", input_ont_fastq_files))
+        print("\t{0:<20} :   {1:<10}".format("ONT model", ont_model))
 
     # version
     version = "1.1.1"
@@ -352,10 +353,11 @@ def main(
 
     # write log file
     mpm.print_log()
+    #print(" ".join(sys.argv))
 
     # copy files to trace
     copy2(__file__, trace_dir)
-
+    subprocess.run(f'echo {" ".join(sys.argv)} > {trace_dir}/cmd.txt', shell=True, check=True)
 
 class MiniPipeManager(object):
     def __init__(self, log_file):
