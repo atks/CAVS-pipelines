@@ -1,3 +1,18 @@
+
+generate_vm_salmonella_typing_pipeline.py v1.0.0
+==============================================
+a. integrated pipeline for SISTR v1.3.1, seroseq2 1.1.2 and mlst 2.23.0 
+
+generate_vm_illu_deploy_and_qc_pipeline v1.1.0
+==============================================
+a. added quast reports
+b. added aggregate quast reports
+
+generate_vm_novogene_illu_deploy_and_qc_pipeline v1.1.0
+==============================================
+a. added quast reports
+b. added aggregate quast reports
+
 generate_vm_illu_deploy_and_qc_pipeline v1.0.1
 ==============================================
 a. removed check_fastqc_run
