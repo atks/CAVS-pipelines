@@ -86,7 +86,9 @@ def main(
 
     # programs
     dorado = "/usr/local/dorado-0.8.1/bin/dorado"
-    dorado_basecall_model = " /usr/local/dorado-0.5.0/models/dna_r10.4.1_e8.2_400bps_sup@v4.3.0"
+    #dna_r10.4.1_e8.2_400bps_hac@v4.4.0
+    #dna_r10.4.1_e8.2_400bps_sup@v4.3.0
+    dorado_basecall_model = " /usr/local/dorado-0.8.1/models/dna_r10.4.1_e8.2_400bps_hac@v5.0.0"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
     fastqc = f"/usr/local/FastQC-0.12.1/fastqc --adapters /usr/local/FastQC-0.12.1/Configuration/adapter_list.nanopore.txt --memory {memory}"
     multiqc = "/usr/local/bin/multiqc"
