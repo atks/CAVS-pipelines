@@ -30,7 +30,7 @@ from datetime import datetime
     "-m",
     "--make_file",
     show_default=True,
-    default="ont_deploy_and_qc.mk",
+    default="pore_deploy_and_qc.mk",
     help="make file name",
 )
 @click.option("-r", "--run_id", required=True, help="Run ID")
@@ -49,6 +49,7 @@ from datetime import datetime
     "-l", "--len", help="Minimum passing read length", required=False, default=20
 )
 @click.option("-x", "--memory", help="Memory for fastqc", required=False, default=2048)
+@click.option("-y", "--model", help="Model for Dorado calling", required=False, default="dna_r10.4.1_e8.2_400bps_sup@v5.0.0")
 @click.option("-k", "--kit", default="SQK-LSK114", show_default=True, help="Kit ID")
 @click.option("-s", "--sample_file", required=True, help="sample file")
 def main(
@@ -59,13 +60,14 @@ def main(
     qscore,
     len,
     memory,
+    model,
     kit,
     sample_file,
 ):
     """
     Moves Oxford Nanopore Technology fastq files to a destination and performs QC
 
-    e.g. generate_vfp_ont_deploy_and_qc_pipeline -r pore6 -i raw -s pore6.sa
+    e.g. generate_vfp_pore_deploy_and_qc_pipeline -r pore6 -i raw -s pore6.sa
     """
     dest_dir = working_dir + "/" + run_id
     nanopore_dir = os.path.abspath(nanopore_dir)
@@ -77,6 +79,7 @@ def main(
     print("\t{0:<20} :   {1:<10}".format("minumum qscore", qscore))
     print("\t{0:<20} :   {1:<10}".format("minumum length", len))
     print("\t{0:<20} :   {1:<10}".format("memory", memory))
+    print("\t{0:<20} :   {1:<10}".format("model", model))
     print("\t{0:<20} :   {1:<10}".format("kit", kit))
     print("\t{0:<20} :   {1:<10}".format("sample_file", sample_file))
     print("\t{0:<20} :   {1:<10}".format("dest_dir", dest_dir))
@@ -88,15 +91,12 @@ def main(
     dorado = "/usr/local/dorado-0.8.1/bin/dorado"
     #dna_r10.4.1_e8.2_400bps_hac@v4.4.0
     #dna_r10.4.1_e8.2_400bps_sup@v4.3.0
-    #dorado_basecall_model = " /usr/local/dorado-0.8.1/models/dna_r10.4.1_e8.2_400bps_hac@v5.0.0"
-    dorado_basecall_model = " /usr/local/dorado-0.8.1/models/dna_r10.4.1_e8.2_400bps_sup@v5.0.0"
+    #dna_r10.4.1_e8.2_400bps_hac@v5.0.0"
+    dorado_basecall_model = f"/usr/local/dorado-0.8.1/models/{model}"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
     fastqc = f"/usr/local/FastQC-0.12.1/fastqc --adapters /usr/local/FastQC-0.12.1/Configuration/adapter_list.nanopore.txt --memory {memory}"
     multiqc = "/usr/local/bin/multiqc"
     nanoplot = "/usr/local/NanoPlot-1.43/bin/NanoPlot"
-    kraken2 = "/usr/local/kraken2-2.1.2/kraken2"
-    kraken2_std_db = "/usr/local/ref/kraken2/20220816_standard"
-    kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
     ft = "/usr/local/cavstools-0.0.1/ft"
 
     run = Run(run_id)
@@ -126,7 +126,6 @@ def main(
             sample_dir = f"{analysis_dir}/{sample.idx}_{sample.id}"
             os.makedirs(sample_dir, exist_ok=True)
             os.makedirs(f"{sample_dir}/fastqc_result", exist_ok=True)
-            os.makedirs(f"{sample_dir}/kraken2_result", exist_ok=True)
             os.makedirs(f"{sample_dir}/nanoplot_result", exist_ok=True)
     except OSError as error:
         print(f"{error.filename} cannot be created")
@@ -145,14 +144,12 @@ def main(
     cmd = f"{dorado} duplex -r {dorado_basecall_model} {pod5_files_dir} > {output_bam_file} 2> {log}"
     pg.add(tgt, dep, cmd)
 
-    #trim and filter
-    #dorado trim  basecalls.bam  | samtools bam2fq   |  ft filter -q 7 -l 20 -o trimmed.filtered.fastq.gz
-    # samtools bam2fq SQK-NBD114-24_barcode01.bam  -T "*"
+    #trim and filter and extract only simple single reads and duplex reads
     input_bam_file = f"{bam_dir}/basecalls.bam"
     output_fastq_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
     tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz.OK"
     dep = f"{log_dir}/dorado_base_caller.OK"
-    cmd = f"{dorado} trim {input_bam_file} | {samtools} bam2fq -T \"*\" | {ft} filter -q 7 -l 20 -o {output_fastq_file} "
+    cmd = f"{dorado} trim {input_bam_file} | {samtools} bam2fq -T \"*\" | grep -iP \"dx:i:0|dx:i:1\" -A 3 | grep -vP \"^--$$\"  | {ft} filter -q 7 -l 20 -o {output_fastq_file} "
     pg.add(tgt, dep, cmd)
 
     # symbolic link for fastqc
@@ -165,7 +162,7 @@ def main(
     cmd = f"ln -sf {src_fastq} {dst_fastq}"
     pg.add(tgt, dep, cmd)
 
-    #fastqc
+    # fastqc
     input_fastq_file = f"{fastqc_dir}/{sample.padded_idx}_{sample.id}.fastq.gz"
     log = f"{log_dir}/{sample.idx}_{sample.id}_fastqc.log"
     err = f"{log_dir}/{sample.idx}_{sample.id}_fastqc.err"
@@ -182,28 +179,6 @@ def main(
     tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}_nanoplot.OK"
     dep = f"{log_dir}/{sample.padded_idx}_{sample.id}.fastq.gz.OK"
     cmd = f"{nanoplot} --fastq {input_fastq_file} -o {nanoplot_dir} > {log} 2> {err}"
-    pg.add(tgt, dep, cmd)
-
-    # kraken2
-    input_fastq_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
-    output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
-    report_file = f"{output_dir}/{sample.padded_idx}_{sample.id}.txt"
-    log = f"{output_dir}/report.log"
-    err = f"{output_dir}/run.log"
-    dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz.OK"
-    tgt = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.OK"
-    cmd = f"{kraken2} --db {kraken2_std_db} {input_fastq_file} --use-names --report {report_file} > {log} 2> {err}"
-    pg.add_srun(tgt, dep, cmd, 15)
-
-    # plot kronatools radial tree
-    output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
-    input_txt_file = f"{output_dir}/{sample.padded_idx}_{sample.id}.txt"
-    output_html_file = f"{output_dir}/krona_radial_tree.html"
-    log = f"{log_dir}/{sample.idx}_{sample.id}.krona_radial_tree.log"
-    err = f"{log_dir}/{sample.idx}_{sample.id}.krona_radial_tree.err"
-    dep = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.OK"
-    tgt = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.krona_radial_tree.OK"
-    cmd = f"{kt_import_taxonomy} -m 3 -t 5 {input_txt_file} -o {output_html_file} > {log} 2> {err}"
     pg.add(tgt, dep, cmd)
 
     # write make file
@@ -288,8 +263,6 @@ class Run(object):
         for sample in self.samples:
             sample.print()
         print(f"++++++++++++++++++++")
-
-
 
 if __name__ == "__main__":
     main()  # type: ignore
