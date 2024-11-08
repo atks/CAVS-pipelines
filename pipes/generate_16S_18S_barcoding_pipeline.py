@@ -32,25 +32,24 @@ from datetime import datetime
     "-m",
     "--make_file",
     show_default=True,
-    default="16S_18S_blast_hits_pipeline.mk",
+    default="16S_18S_barcoding_pipeline.mk",
     help="make file name",
 )
-@click.option("-f", "--fasta_file", required=True, help="FASTA file containing the sequences to be checked")
-@click.option("-r", "--ref_fasta_file", required=True, help="reference sequence file to compare against")
+@click.option("-n", "--fastq_file", required=True, help="Nanopore fastq reads to be classified")
 @click.option(
     "-w",
     "--working_dir",
-    default= f"{os.getcwd()}/sequence_orientation_normalisation",
+    default= f"{os.getcwd()}/16S_18S_barcoding",
     show_default=True,
     help="working directory",
 )
 def main(make_file, fasta_file, ref_fasta_file, working_dir):
     """
-    Compares the orientation of a set of sequences against a reference sequence.
-    This is motivated by phylogenetic tree building where the multiple sequence alignment has to be in the same orientation
+    Classifies reads by 16S and 18S barcoding
 
-    e.g. generate_sequence_orientation_normalisation_pipeline -f panel.fasta -i ref.fasta -w verify_orientation
+    e.g. generate_16S_18S_barcoding_pipeline.py -n nanopore.fastq.gz
     """
+    reference_fasta_file = "/net/singapura/vfp/ref/16s_18s/SILVA_138.2_SSURef_NR99_tax_silva.fasta"
     working_dir = os.path.abspath(working_dir)
     fasta_file = os.path.abspath(fasta_file)
     prefix_fasta_file = ".".join(os.path.basename(fasta_file).split(".")[:-1])
