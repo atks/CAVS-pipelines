@@ -43,22 +43,18 @@ from datetime import datetime
     show_default=True,
     help="working directory",
 )
-def main(make_file, fasta_file, ref_fasta_file, working_dir):
+def main(make_file, fastq_file, working_dir):
     """
     Classifies reads by 16S and 18S barcoding
 
     e.g. generate_16S_18S_barcoding_pipeline.py -n nanopore.fastq.gz
     """
-    reference_fasta_file = "/net/singapura/vfp/ref/16s_18s/SILVA_138.2_SSURef_NR99_tax_silva.fasta"
     working_dir = os.path.abspath(working_dir)
-    fasta_file = os.path.abspath(fasta_file)
-    prefix_fasta_file = ".".join(os.path.basename(fasta_file).split(".")[:-1])
-    ref_fasta_file = os.path.abspath(ref_fasta_file)
-
-    #print(f"prefix_fasta_file: {prefix_fasta_file}")
+    ref_fasta_file = "/net/singapura/vfp/ref/16s_18s/SILVA_138.2_SSURef_NR99_tax_silva.fasta"
+    fastq_file = os.path.abspath(fastq_file)
 
     print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
-    print("\t{0:<20} :   {1:<10}".format("fasta_file", fasta_file))
+    print("\t{0:<20} :   {1:<10}".format("fastq_file", fastq_file))
     print("\t{0:<20} :   {1:<10}".format("ref_fasta_file", ref_fasta_file))
     print("\t{0:<20} :   {1:<10}".format("working_dir", working_dir))
 
@@ -70,68 +66,46 @@ def main(make_file, fasta_file, ref_fasta_file, working_dir):
 
     # programs
     seqkit = "/usr/local/seqkit-2.20/seqkit"
-    compare_sequence_orientation = f"{os.path.dirname(__file__)}/compare_sequence_orientation.py"
-    normalize_sequence_orientation = f"{os.path.dirname(__file__)}/normalise_sequence_orientation.py"
-
-    ids = []
-    #read through the fasta file and record the IDs
-    with open(fasta_file, "r") as f:
-        for line in f:
-            if line.startswith(">"):
-                m = re.search(r"(?<=\>)(.*?)(?=\s)", line)
-                if m is not None:
-                    ids.append(m.group(0))
 
     # create directories in destination folder directory
     trace_dir = f"{working_dir}/trace"
-    split_dir = f"{working_dir}/fasta_split"
-    orientation_dir = f"{working_dir}/orientation"
     try:
         os.makedirs(trace_dir, exist_ok=True)
-        os.makedirs(split_dir, exist_ok=True)
-        os.makedirs(orientation_dir, exist_ok=True)
-        for id in ids:
-            os.makedirs(f"{orientation_dir}/{id}", exist_ok=True)
     except OSError as error:
         print(f"{error.filename} cannot be created")
 
-    # split fasta file
-    # seqkit split --by-id ../36seq_asfv_ref_p72_genotype.fasta
+    ##########
+    # minimap2
+    ##########
+
+    # build index
     output_dir = f"{working_dir}/fasta_split"
     log = f"{output_dir}/fasta_split.log"
     dep = f""
     tgt = f"{working_dir}/fasta_split.OK"
-    cmd = f"{seqkit} split -f --by-id {fasta_file} -O {output_dir} > {log}"
+    cmd = f"{seqkit} split -f --by-id {fastq_file} -O {output_dir} > {log}"
     pg.add(tgt, dep, cmd)
 
-    #perform pairwise orientation checking
-    compare_sequence_orientation_dep = ""
-    compare_sequence_orientation_reports = ""
-    for id in ids:
-        query_fasta_file = f"{split_dir}/{prefix_fasta_file}.id_{id}.fasta"
-        output_dir = f"{orientation_dir}/{id}"
-        log = f"{output_dir}/compare_sequence_orientation.log"
-        dep = f"{working_dir}/fasta_split.OK"
-        tgt = f"{output_dir}/{id}.orientation_check.OK"
-        compare_sequence_orientation_dep += f" {tgt}"
-        compare_sequence_orientation_reports += f" {output_dir}/result.txt"
-        cmd = f"{compare_sequence_orientation} -q {query_fasta_file} -r {ref_fasta_file} -o {output_dir} > {log}"
-        pg.add(tgt, dep, cmd)
+    # align
 
-    #compile orientation detection results
-    output_text_file = f"{working_dir}/orientation_report.txt"
-    dep = f"{compare_sequence_orientation_dep}"
-    tgt = f"{output_text_file}.OK"
-    cmd = f"cat {compare_sequence_orientation_reports} | sort | uniq > {output_text_file}"
-    pg.add(tgt, dep, cmd)
+    # process alignment
 
-    #fix orientation of sequences
-    output_fasta_file = f"{working_dir}/normalised.fasta"
-    input_text_file = f"{working_dir}/orientation_report.txt"
-    dep = f"{working_dir}/orientation_report.txt.OK"
-    tgt = f"{output_fasta_file}.OK"
-    cmd = f"{normalize_sequence_orientation} -o {output_fasta_file} -s {input_text_file}"
-    pg.add(tgt, dep, cmd)
+    # prepare text file for krona tools
+
+    # generate krona plot
+
+    ##########
+    # blast
+    ##########
+
+    ##########
+    # qiime 2
+    ##########
+
+    ##########
+    # kraken 2
+    ##########
+
 
 
     # write make file
