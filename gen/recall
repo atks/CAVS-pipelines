@@ -50,6 +50,14 @@ def main():
     print("bowtie2-build ref.fa asfv")
     print("#align with bowtie2")
     print("bowtie2 -x ref/asfv -1 r1.fastq -2 r2.fastq")
+    print("#blastdb extract fasta from blastdb")
+    print("blastdbcmd -entry all -db Apicomplexandb -out apicomplexan.fasta")
+    print("#blastdb print species of sequences in blastdb")
+    print("blastdbcmd -entry all -db SSU_eukaryote_rRNA -outfmt \"%a %T %K %S\"")
+    print("#blastdb print species of sequences in balatdb")
+    print("makeblastdb -in apicomplexan.fasta -parse_seqids -blastdb_version 5 -title apicomplexan -dbtype nucl -out apicomplexan")
+
+
 
 if __name__ == "__main__":
     main() # type: ignore[arg-type]
