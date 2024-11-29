@@ -20,7 +20,6 @@
 
 import os
 import click
-import sys
 import re
 import sys
 from shutil import copy2
