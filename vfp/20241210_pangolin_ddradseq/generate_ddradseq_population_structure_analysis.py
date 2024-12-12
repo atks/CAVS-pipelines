@@ -27,7 +27,7 @@ import click
     "-m",
     "--make_file",
     show_default=True,
-    default="run_manis_javanica_ddradsnp_analysis.mk",
+    default="run_ddradseq_population_structure_analysis.mk",
     help="make file name",
 )
 @click.option(
@@ -38,23 +38,31 @@ import click
     help="working directory",
 )
 @click.option("-s", "--sample_file", required=True, help="sample file")
-def main(make_file, working_dir, sample_file):
+@click.option("-g", "--genome_fasta_file", default="", required=False, help="genome FASTA file")
+def main(make_file, working_dir, sample_file, genome_fasta_file):
     """
     Population structure of Pangolins
 
-    e.g. generate_manis_javanica_ddradsnp_analysis.py
+    e.g. generate_ddradseq_population_structure_analysis.py
     """
-    print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
-    print("\t{0:<20} :   {1:<10}".format("working_dir", working_dir))
+    print("\t{0:<20} :   {1:<10}".format("make file", make_file))
+    print("\t{0:<20} :   {1:<10}".format("working dir", working_dir))
+    print("\t{0:<20} :   {1:<10}".format("sample file", sample_file))
+    print("\t{0:<20} :   {1:<10}".format("genome fasta file", genome_fasta_file))
 
     # read sample file
-    samples = []
+    samples = {}
     with open(sample_file, "r") as file:
-        index = 0
         for line in file:
             if not line.startswith("#"):
-                sample_id, gene, fastq1, fastq2 = line.rstrip().split("\t")
-                samples.append(Sample(sample_id, gene, fastq1, fastq2))
+                id, fastq1, fastq2 = line.rstrip().split("\t")
+                if id not in samples:
+                    samples[id] = Sample(id, fastq1, fastq2)
+                else:
+                    samples[id].add_fastq(fastq1, fastq2)
+
+    # for id in samples.keys():
+    #     samples[id].print()
 
     # initialize
     pg = PipelineGenerator(make_file)
@@ -62,13 +70,13 @@ def main(make_file, working_dir, sample_file):
     # create directories in destination folder directory
     ref_dir = f"{working_dir}/ref"
     bam_dir = f"{working_dir}/bam"
-    stats_dir = f"{working_dir}/stats"
+    fastq_dir = f"{working_dir}/fastq"
     try:
         os.makedirs(ref_dir, exist_ok=True)
         os.makedirs(bam_dir, exist_ok=True)
-        os.makedirs(stats_dir, exist_ok=True)
+        os.makedirs(fastq_dir, exist_ok=True)
     except OSError as error:
-        print(f"Directory cannot be created")
+        print(f"{error.filename} cannot be created")
 
     #################
     # reference files
@@ -109,34 +117,36 @@ def main(make_file, working_dir, sample_file):
     seqtk = "/usr/local/seqtk-1.3/seqtk"
     seqkit = "/usr/local/seqkit-2.1.0/bin/seqkit"
 
-    # create bwa indices
-    input_fasta_file = f"{ref_dir}/AJ810453.1.fasta"
-    output_bwt_file = f"{input_fasta_file}.bwt"
-    log = f"{output_bwt_file}.log"
-    dep = f"{input_fasta_file}.OK"
-    tgt = f"{output_bwt_file}.OK"
-    cmd = f"{bwa} index -a bwtsw {input_fasta_file} 2> {log}"
-    pg.add(tgt, dep, cmd)
+    for id, sample in samples.items():
+        #combine files
+        if len(sample.fastq1s) == 1:
+            input_fastq1_file = sample.fastq1s[0]
+            output_fastq1_file = f"{fastq_dir}/{sample.id}.R1.fastq.gz"
+            tgt = f"{output_fastq1_file}.OK"
+            cmd = f"ln -s {input_fastq1_file} {output_fastq1_file}"
+            pg.add(tgt, dep, cmd)
 
-    for sample in samples:
-        input_fastq_file1 = sample.fastq1
-        input_fastq_file2 = sample.fastq2
-        ref_fasta_file = f"{ref_dir}/AJ810453.1.fasta"
-        output_bam_file = f"{bam_dir}/{sample.id}.bam"
-        log = f"{output_bam_file}.log"
-        dep = f"{output_bwt_file}.OK"
-        tgt = f"{output_bam_file}.OK"
-        cmd = f"set -o pipefail; {bwa} mem -t 2 -M {ref_fasta_file} {input_fastq_file1} {input_fastq_file2} 2> {log} | {samtools} sort - 2>> {log} | {samtools} view -o {output_bam_file}"
-        pg.add(tgt, dep, cmd)
+            input_fastq2_file = sample.fastq2s[0]
+            output_fastq2_file = f"{fastq_dir}/{sample.id}.R2.fastq.gz"
+            tgt = f"{output_fastq2_file}.OK"
+            cmd = f"ln -s {input_fastq2_file} {output_fastq2_file}"
+            pg.add(tgt, dep, cmd)
 
-        input_bam_file = output_bam_file
-        dep = f"{input_bam_file}.OK"
-        tgt = f"{input_bam_file}.bai.OK"
-        cmd = f"{samtools} index {input_bam_file}"
-        pg.add(tgt, dep, cmd)
+        elif len(sample.fastq1s) > 1:
+            input_fastq1_files = " ".join(sample.fastq1s)
+            output_fastq1_file = f"{fastq_dir}/{sample.id}.R1.fastq.gz"
+            tgt = f"{output_fastq1_file}.OK"
+            cmd = f"zcat {input_fastq1_files} | gzip > {output_fastq1_file}"
+            pg.add(tgt, dep, cmd)
+
+            input_fastq2_files = " ".join(sample.fastq2s)
+            output_fastq2_file = f"{fastq_dir}/{sample.id}.R2.fastq.gz"
+            tgt = f"{output_fastq2_file}.OK"
+            cmd = f"zcat {input_fastq2_files} | gzip > {output_fastq2_file}"
+            pg.add(tgt, dep, cmd)
 
     # clean
-    pg.add_clean(f"rm -fr {ref_dir} {bam_dir} {stats_dir}")
+    pg.add_clean(f"rm -fr {ref_dir} {bam_dir} {fastq_dir}")
 
     # write make file
     print("Writing pipeline")
@@ -185,17 +195,22 @@ class PipelineGenerator(object):
 
 class Sample(object):
 
-    def __init__(self, id, gene, fastq1, fastq2):
+    def __init__(self, id, fastq1, fastq2):
         self.id = id
-        self.gene = gene
-        self.fastq1 = fastq1
-        self.fastq2 = fastq2
+        self.fastq1s = []
+        self.fastq1s.append(fastq1)
+        self.fastq2s = []
+        self.fastq2s.append(fastq2)
+
+    def add_fastq(self, fastq1, fastq2):
+        self.fastq1s.append(fastq1)
+        self.fastq2s.append(fastq2)
 
     def print(self):
-        print(f"id      : {self.id}")
-        print(f"gene    : {self.gene}")
-        print(f"fastq1  : {self.fastq1}")
-        print(f"fastq2  : {self.fastq2}")
+        print(f"id       : {self.id}")
+        print(f"no files : {len(self.fastq1s)}")
+        print(f"fastq1s  : {','.join(self.fastq1s)}")
+        print(f"fastq2s  : {','.join(self.fastq2s)}")
 
 
 if __name__ == "__main__":
