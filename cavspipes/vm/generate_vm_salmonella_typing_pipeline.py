@@ -80,7 +80,7 @@ def main(make_file, output_dir, sample_file):
         print(f"{error.filename} cannot be created")
 
     #version
-    version = "1.0.0"
+    version = "1.1.0"
 
     # programs
     seqsero2 = "/usr/local/SeqSero2-v1.3.1/bin/SeqSero2_package.py"
@@ -90,8 +90,8 @@ def main(make_file, output_dir, sample_file):
     print("")
     print(f"  Checking for required programs")
     print(f"  ==============================")
-    commands = ['blastn', 'any2fasta', 'samtools', 'spades.py', 'SalmID.py', 'seqkit', 'bedtools']
-    tools = ['mlst', 'mlst', 'seqsero2', 'seqsero2', 'seqsero2', 'seqsero2', 'seqsero2']
+    commands = ['blastn', 'any2fasta', 'samtools', 'spades.py', 'SalmID.py', 'seqkit', 'bedtools', 'aggregate_salmonella_typing_results.py']
+    tools = ['mlst', 'mlst', 'seqsero2', 'seqsero2', 'seqsero2', 'seqsero2', 'seqsero2', 'vmst']
 
     for i,cmd in enumerate(commands):
         command_path = which(cmd)
@@ -104,6 +104,8 @@ def main(make_file, output_dir, sample_file):
     # initialize
     pg = PipelineGenerator(make_file)
 
+    analyse_ok_files = ""
+
     # analyze
     for idx, sample in enumerate(samples):
 
@@ -115,6 +117,7 @@ def main(make_file, output_dir, sample_file):
         tgt = f"{out_dir}/seqsero2.OK"
         dep = ""
         cmd = f'{seqsero2} -d {out_dir} -n {sample.id} -t 2 -i {sample.fastq1} {sample.fastq2} > {log} 2> {err}'
+        analyse_ok_files += f"{tgt} "
         pg.add(tgt, dep, cmd)
 
         # sequence typing
@@ -125,10 +128,10 @@ def main(make_file, output_dir, sample_file):
         tgt = f"{out_dir}/mlst.OK"
         dep = f""
         cmd = f'{mlst} {input_contig_fasta_file} --json {out_dir}/typing.json --scheme senterica_achtman_2  --nopath > {results_txt_file} 2> {log}'
+        analyse_ok_files += f"{tgt} "
         pg.add(tgt, dep, cmd)
 
         # SISTR
-        # "-f tab" is recognised too
         out_dir = f"{output_dir}/{sample.id}/sistr"
         output_file = f"{out_dir}/sistr"
         input_contig_fasta_file = f"{sample.contigs_fasta}"
@@ -136,8 +139,17 @@ def main(make_file, output_dir, sample_file):
         err = f"{out_dir}/run.err"
         tgt = f"{out_dir}/sistr.OK"
         dep = f""
-        cmd = f'{sistr} {input_contig_fasta_file} -f csv -o {output_file} -K -T {out_dir} > {log} 2> {err}'
+        cmd = f'{sistr} {input_contig_fasta_file} -f tab -o {output_file} -K -T {out_dir} > {log} 2> {err}'
+        analyse_ok_files += f"{tgt} "
         pg.add(tgt, dep, cmd)
+
+    #aggregate files
+    output_xlsx = f"{output_dir}/summary.xlsx"
+    tgt = f"{output_dir}/summary.xlsx.OK"
+    dep = analyse_ok_files
+    cmd = f'aggregate_salmonella_typing_results.py -i {output_dir} -s {sample_file} -o {output_xlsx}'
+    analyse_ok_files += f"{tgt} "
+    pg.add(tgt, dep, cmd)
 
     # write make file
     print("Writing pipeline")
