@@ -38,8 +38,9 @@ import click
     help="working directory",
 )
 @click.option("-s", "--sample_file", required=True, help="sample file")
+@click.option("-p", "--population_map_file", required=True, help="population map file")
 @click.option("-g", "--genome_fasta_file", default="", required=False, help="genome FASTA file")
-def main(make_file, working_dir, sample_file, genome_fasta_file):
+def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_file):
     """
     Population structure of Pangolins
 
@@ -48,6 +49,7 @@ def main(make_file, working_dir, sample_file, genome_fasta_file):
     print("\t{0:<20} :   {1:<10}".format("make file", make_file))
     print("\t{0:<20} :   {1:<10}".format("working dir", working_dir))
     print("\t{0:<20} :   {1:<10}".format("sample file", sample_file))
+    print("\t{0:<20} :   {1:<10}".format("population map file", population_map_file))
     print("\t{0:<20} :   {1:<10}".format("genome fasta file", genome_fasta_file))
 
     # read sample file
@@ -61,22 +63,39 @@ def main(make_file, working_dir, sample_file, genome_fasta_file):
                 else:
                     samples[id].add_fastq(fastq1, fastq2)
 
-    # for id in samples.keys():
-    #     samples[id].print()
-
     # initialize
     pg = PipelineGenerator(make_file)
 
     # create directories in destination folder directory
     ref_dir = f"{working_dir}/ref"
-    bam_dir = f"{working_dir}/bam"
+    log_dir = f"{working_dir}/log"
+    stats_dir = f"{working_dir}/stats"
     fastq_dir = f"{working_dir}/fastq"
+    bam_dir = f"{working_dir}/bam"
+    denovo_stacks_dir = f"{working_dir}/denovo"
+    ref_stacks_dir = f"{working_dir}/ref"
     try:
         os.makedirs(ref_dir, exist_ok=True)
-        os.makedirs(bam_dir, exist_ok=True)
+        os.makedirs(log_dir, exist_ok=True)
+        os.makedirs(stats_dir, exist_ok=True)
         os.makedirs(fastq_dir, exist_ok=True)
+        os.makedirs(bam_dir, exist_ok=True)
+        os.makedirs(denovo_stacks_dir, exist_ok=True)
+        os.makedirs(ref_stacks_dir, exist_ok=True)
     except OSError as error:
         print(f"{error.filename} cannot be created")
+
+    ##########
+    # programs
+    ##########
+    multiqc = "docker run  -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` multiqc/multiqc multiqc "
+    bwa = "/usr/local/bwa-0.7.17/bwa"
+    samtools = "/usr/local/samtools-1.17/bin/samtools"
+    plot_bamstats = "/usr/local/samtools-1.17/bin/plot-bamstats"
+    compute_effective_coverage = "/home/atks/programs/cavspipes/vfp/compute_effective_coverage.py"
+    extract_general_stats = "/home/atks/programs/cavspipes/vfp/extract_general_stats.py"
+    denovo_stacks = "/usr/local/stacks-2.68/bin/denovo_map.pl"
+    ref_stacks = "/usr/local/stacks-2.68/bin/ref_map.pl"
 
     #################
     # reference files
@@ -84,69 +103,148 @@ def main(make_file, working_dir, sample_file, genome_fasta_file):
     # reference genome assembly for sunda pangolin
     # https://www.ncbi.nlm.nih.gov/assembly/GCF_014570535.1
 
-    id = "AJ810453.1"
-    output_genbank_file = f"{ref_dir}/{id}.genbank"
+    #copy reference fasta file to reference directory
+    ref_fasta_file = f"{ref_dir}/{os.path.basename(genome_fasta_file)}"
+    tgt = f"{ref_fasta_file}.OK"
     dep = ""
-    tgt = f"{output_genbank_file }.OK"
-    cmd = f"efetch -db nuccore -id {id} -format genbank > {output_genbank_file}"
+    cmd = f"cp {genome_fasta_file} {ref_fasta_file}"
     pg.add(tgt, dep, cmd)
 
-    output_fasta_file = f"{ref_dir}/{id}.fasta"
-    dep = ""
-    tgt = f"{output_fasta_file}.OK"
-    cmd = f"efetch -db nuccore -id {id} -format fasta > {output_fasta_file}"
+    #index reference sequence
+    log = f"{ref_dir}/bwa_index.log"
+    tgt = f"{ref_dir}/bwa_index.OK"
+    dep = f"{ref_fasta_file}.OK"
+    cmd = f"{bwa} index -a bwtsw {ref_fasta_file} 2> {log}"
     pg.add(tgt, dep, cmd)
 
-    #################
-    # variant calling
-    #################
-
-    #################
-    # variant QC
-    # * HWE stats
-    # * PCA
-    # * * combine with other data sets
-    # * *
-    #################
-
-    #########
-    # mapping
-    #########
-    bwa = "/usr/local/bwa-0.7.17/bwa"
-    samtools = "/usr/local/samtools-1.16/bin/samtools"
-    seqtk = "/usr/local/seqtk-1.3/seqtk"
-    seqkit = "/usr/local/seqkit-2.1.0/bin/seqkit"
+    fastq_files_OK = ""
 
     for id, sample in samples.items():
+
         #combine files
         if len(sample.fastq1s) == 1:
             input_fastq1_file = sample.fastq1s[0]
-            output_fastq1_file = f"{fastq_dir}/{sample.id}.R1.fastq.gz"
+            output_fastq1_file = f"{fastq_dir}/{sample.id}.1.fq.gz"
             tgt = f"{output_fastq1_file}.OK"
+            fastq_files_OK += f"{tgt} "
             cmd = f"ln -s {input_fastq1_file} {output_fastq1_file}"
             pg.add(tgt, dep, cmd)
 
             input_fastq2_file = sample.fastq2s[0]
-            output_fastq2_file = f"{fastq_dir}/{sample.id}.R2.fastq.gz"
+            output_fastq2_file = f"{fastq_dir}/{sample.id}.2.fq.gz"
             tgt = f"{output_fastq2_file}.OK"
+            fastq_files_OK += f"{tgt} "
             cmd = f"ln -s {input_fastq2_file} {output_fastq2_file}"
             pg.add(tgt, dep, cmd)
 
         elif len(sample.fastq1s) > 1:
             input_fastq1_files = " ".join(sample.fastq1s)
-            output_fastq1_file = f"{fastq_dir}/{sample.id}.R1.fastq.gz"
+            output_fastq1_file = f"{fastq_dir}/{sample.id}.1.fq.gz"
             tgt = f"{output_fastq1_file}.OK"
+            fastq_files_OK += f"{tgt} "
             cmd = f"zcat {input_fastq1_files} | gzip > {output_fastq1_file}"
             pg.add(tgt, dep, cmd)
 
             input_fastq2_files = " ".join(sample.fastq2s)
-            output_fastq2_file = f"{fastq_dir}/{sample.id}.R2.fastq.gz"
+            output_fastq2_file = f"{fastq_dir}/{sample.id}.2.fq.gz"
             tgt = f"{output_fastq2_file}.OK"
+            fastq_files_OK += f"{tgt} "
             cmd = f"zcat {input_fastq2_files} | gzip > {output_fastq2_file}"
             pg.add(tgt, dep, cmd)
 
+        # align
+        src_fastq1 = f"{fastq_dir}/{sample.id}.1.fq.gz"
+        src_fastq2 = f"{fastq_dir}/{sample.id}.2.fq.gz"
+        output_bam_file = f"{bam_dir}/{sample.id}.bam"
+        log = f"{log_dir}/{sample.id}.align.log"
+        sort_log = f"{log_dir}/{sample.id}.align.sort.log"
+        dep = f"{src_fastq1}.OK {src_fastq2}.OK {ref_dir}/bwa_index.OK"
+        tgt = f"{output_bam_file}.OK"
+        cmd = f"{bwa} mem -t 2 -M {genome_fasta_file} {src_fastq1} {src_fastq2} 2> {log} | {samtools} view -h | {samtools} sort -o {output_bam_file} 2> {sort_log}"
+        pg.add(tgt, dep, cmd)
+
+        # index
+        input_bam_file = f"{bam_dir}/{sample.id}.bam"
+        dep = f"{bam_dir}/{sample.id}.bam.OK"
+        tgt = f"{bam_dir}/{sample.id}.bam.bai.OK"
+        cmd = f"{samtools} index {input_bam_file}"
+        pg.add(tgt, dep, cmd)
+
+        # #  coverage
+        # input_bam_file = f"{stats_dir}/{sample.idx}_{sample.id}.bam"
+        # output_stats_file = f"{align_dir}/coverage_stats/{sample.padded_idx}_{sample.id}.txt"
+        # dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
+        # tgt = f"{log_dir}/{sample.idx}_{sample.id}.coverage.stats.OK"
+        # cmd = f"{samtools} coverage {input_bam_file} > {output_stats_file}"
+        # samtools_multiqc_dep += f" {tgt}"
+        # pg.add(tgt, dep, cmd)
+
+        # # compute effective coverage
+        # input_stats_file = f"{align_dir}/coverage_stats/{sample.padded_idx}_{sample.id}.txt"
+        # output_stats_file = f"{align_dir}/coverage_stats/{sample.padded_idx}_{sample.id}.effective.coverage.stats.txt"
+        # dep = f"{log_dir}/{sample.idx}_{sample.id}.coverage.stats.OK"
+        # tgt = f"{log_dir}/{sample.idx}_{sample.id}.effective.coverage.stats.OK"
+        # cmd = f"{compute_effective_coverage} {input_stats_file} -o {output_stats_file} -s {sample.idx}_{sample.id}"
+        # pg.add(tgt, dep, cmd)
+
+        # #  stats
+        # output_stats_file = f"{align_dir}/general_stats/{sample.padded_idx}_{sample.id}.txt"
+        # dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
+        # tgt = f"{log_dir}/{sample.idx}_{sample.id}.stats.OK"
+        # cmd = f"{samtools} stats {input_bam_file} > {output_stats_file}"
+        # samtools_multiqc_dep += f" {tgt}"
+        # pg.add(tgt, dep, cmd)
+
+        # # extract general stats
+        # input_stats_file = f"{align_dir}/general_stats/{sample.padded_idx}_{sample.id}.txt"
+        # output_stats_file = f"{align_dir}/general_stats/{sample.padded_idx}_{sample.id}.extracted.stats.txt"
+        # dep = f"{log_dir}/{sample.idx}_{sample.id}.stats.OK"
+        # tgt = f"{log_dir}/{sample.idx}_{sample.id}.extracted.stats.OK"
+        # cmd = f"{extract_general_stats} {input_stats_file} -o {output_stats_file} -s {sample.idx}_{sample.id}"
+        # pg.add(tgt, dep, cmd)
+
+        # #  flag stats
+        # output_stats_file = f"{align_dir}/flag_stats/{sample.padded_idx}_{sample.id}.txt"
+        # dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
+        # tgt = f"{log_dir}/{sample.idx}_{sample.id}.flag.stats.OK"
+        # cmd = f"{samtools} flagstat {input_bam_file} > {output_stats_file}"
+        # samtools_multiqc_dep += f" {tgt}"
+        # pg.add(tgt, dep, cmd)
+
+        # #  idx stats
+        # output_stats_file = f"{align_dir}/idx_stats/{sample.padded_idx}_{sample.id}.txt"
+        # dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
+        # tgt = f"{log_dir}/{sample.idx}_{sample.id}.idx.stats.OK"
+        # cmd = f"{samtools} idxstats {input_bam_file} > {output_stats_file}"
+        # samtools_multiqc_dep += f" {tgt}"
+        # pg.add(tgt, dep, cmd)
+
+        # # plot samtools stats
+        # input_stats_file = f"{align_dir}/general_stats/{sample.padded_idx}_{sample.id}.txt"
+        # dep = f"{log_dir}/{sample.idx}_{sample.id}.stats.OK"
+        # tgt = f"{log_dir}/{sample.idx}_{sample.id}.plot_bamstats.OK"
+        # cmd = f"{plot_bamstats} -p  {align_dir}/plot_bamstats/plot {input_stats_file}"
+        # pg.add(tgt, dep, cmd)
+
+    #denovo stacks
+    log = f"{working_dir}/denovo_stacks.log"
+    tgt = f"{working_dir}/denovo_stacks.OK"
+    dep = fastq_files_OK
+    cmd = f"{denovo_stacks} -T 45 -M 7 -o {denovo_stacks_dir} --popmap {population_map_file} --samples {fastq_dir} --paired -X \"ustacks: --force-diff-len\" 2> {log}"
+    pg.add(tgt, dep, cmd)
+
+    # #ref stacks
+    # log = f"{working_dir}/ref_stacks.log"
+    # tgt = f"{working_dir}/ref_stacks.OK"
+    # dep = fastq_files_OK
+    # cmd = f"{denovo_stacks} -T 45 -M 7 -o {denovo_stacks_dir} --popmap {population_map_file} --samples {fastq_dir} --paired -X \"ustacks: --force-diff-len\" 2> {log}"
+    # pg.add(tgt, dep, cmd)
+
+    #denovo_map.pl -T 45 -M 7 -o ./stacks --popmap ./population.map --samples ./fastq --paired -X "ustacks: --force-diff-len"
+
+
     # clean
-    pg.add_clean(f"rm -fr {ref_dir} {bam_dir} {fastq_dir}")
+    pg.add_clean(f"rm -fr {ref_dir} {denovo_stacks_dir} {fastq_dir}")
 
     # write make file
     print("Writing pipeline")
