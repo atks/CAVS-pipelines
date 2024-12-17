@@ -72,8 +72,8 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
     stats_dir = f"{working_dir}/stats"
     fastq_dir = f"{working_dir}/fastq"
     bam_dir = f"{working_dir}/bam"
-    denovo_stacks_dir = f"{working_dir}/denovo"
-    ref_stacks_dir = f"{working_dir}/ref"
+    denovo_stacks_dir = f"{working_dir}/denovo_stacks"
+    ref_stacks_dir = f"{working_dir}/ref_stacks"
     try:
         os.makedirs(ref_dir, exist_ok=True)
         os.makedirs(log_dir, exist_ok=True)
@@ -127,6 +127,7 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
             output_fastq1_file = f"{fastq_dir}/{sample.id}.1.fq.gz"
             tgt = f"{output_fastq1_file}.OK"
             fastq_files_OK += f"{tgt} "
+            dep = ""
             cmd = f"ln -s {input_fastq1_file} {output_fastq1_file}"
             pg.add(tgt, dep, cmd)
 
@@ -134,6 +135,7 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
             output_fastq2_file = f"{fastq_dir}/{sample.id}.2.fq.gz"
             tgt = f"{output_fastq2_file}.OK"
             fastq_files_OK += f"{tgt} "
+            dep = ""
             cmd = f"ln -s {input_fastq2_file} {output_fastq2_file}"
             pg.add(tgt, dep, cmd)
 
@@ -142,6 +144,7 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
             output_fastq1_file = f"{fastq_dir}/{sample.id}.1.fq.gz"
             tgt = f"{output_fastq1_file}.OK"
             fastq_files_OK += f"{tgt} "
+            dep = ""
             cmd = f"zcat {input_fastq1_files} | gzip > {output_fastq1_file}"
             pg.add(tgt, dep, cmd)
 
@@ -149,6 +152,7 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
             output_fastq2_file = f"{fastq_dir}/{sample.id}.2.fq.gz"
             tgt = f"{output_fastq2_file}.OK"
             fastq_files_OK += f"{tgt} "
+            dep = ""
             cmd = f"zcat {input_fastq2_files} | gzip > {output_fastq2_file}"
             pg.add(tgt, dep, cmd)
 
@@ -160,7 +164,7 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
         sort_log = f"{log_dir}/{sample.id}.align.sort.log"
         dep = f"{src_fastq1}.OK {src_fastq2}.OK {ref_dir}/bwa_index.OK"
         tgt = f"{output_bam_file}.OK"
-        cmd = f"{bwa} mem -t 2 -M {genome_fasta_file} {src_fastq1} {src_fastq2} 2> {log} | {samtools} view -h | {samtools} sort -o {output_bam_file} 2> {sort_log}"
+        cmd = f"{bwa} mem -t 2 -M {ref_fasta_file} {src_fastq1} {src_fastq2} 2> {log} | {samtools} view -h | {samtools} sort -o {output_bam_file} 2> {sort_log}"
         pg.add(tgt, dep, cmd)
 
         # index
