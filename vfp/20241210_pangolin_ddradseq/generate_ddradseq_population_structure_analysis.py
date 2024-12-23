@@ -70,7 +70,9 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
     ref_dir = f"{working_dir}/ref"
     log_dir = f"{working_dir}/log"
     stats_dir = f"{working_dir}/stats"
+    plot_dir = f"{working_dir}/plot"
     fastq_dir = f"{working_dir}/fastq"
+    fastq_ulen_dir = f"{working_dir}/fastq_ulen"
     bam_dir = f"{working_dir}/bam"
     denovo_stacks_dir = f"{working_dir}/denovo_stacks"
     ref_stacks_dir = f"{working_dir}/ref_stacks"
@@ -78,7 +80,13 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
         os.makedirs(ref_dir, exist_ok=True)
         os.makedirs(log_dir, exist_ok=True)
         os.makedirs(stats_dir, exist_ok=True)
+        os.makedirs(f"{stats_dir}/coverage", exist_ok=True)
+        os.makedirs(f"{stats_dir}/general", exist_ok=True)
+        os.makedirs(f"{stats_dir}/flag", exist_ok=True)
+        os.makedirs(f"{stats_dir}/idx", exist_ok=True)
+        os.makedirs(plot_dir, exist_ok=True)
         os.makedirs(fastq_dir, exist_ok=True)
+        os.makedirs(fastq_ulen_dir, exist_ok=True)
         os.makedirs(bam_dir, exist_ok=True)
         os.makedirs(denovo_stacks_dir, exist_ok=True)
         os.makedirs(ref_stacks_dir, exist_ok=True)
@@ -94,6 +102,7 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
     plot_bamstats = "/usr/local/samtools-1.17/bin/plot-bamstats"
     compute_effective_coverage = "/home/atks/programs/cavspipes/vfp/compute_effective_coverage.py"
     extract_general_stats = "/home/atks/programs/cavspipes/vfp/extract_general_stats.py"
+    process_shortreads = "/usr/local/stacks-2.68/bin/process_shortreads"
     denovo_stacks = "/usr/local/stacks-2.68/bin/denovo_map.pl"
     ref_stacks = "/usr/local/stacks-2.68/bin/ref_map.pl"
 
@@ -118,6 +127,8 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
     pg.add(tgt, dep, cmd)
 
     fastq_files_OK = ""
+    bam_files_OK = ""
+    samtools_multiqc_dep = ""
 
     for id, sample in samples.items():
 
@@ -156,6 +167,16 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
             cmd = f"zcat {input_fastq2_files} | gzip > {output_fastq2_file}"
             pg.add(tgt, dep, cmd)
 
+        # #filter short reads
+        # input_fastq1_file = f"{fastq_dir}/{sample.id}.1.fq.gz"
+        # input_fastq2_file = f"{fastq_dir}/{sample.id}.2.fq.gz"
+        # output_fastq2_file = f"{fastq_dir}/{sample.id}.2.fq.gz"
+        # tgt = f"{output_fastq2_file}.OK"
+        # fastq_files_OK += f"{tgt} "
+        # dep = f"{fastq_dir}/{sample.id}.1.fq.gz.OK {fastq_dir}/{sample.id}.2.fq.gz.OK"
+        # cmd = f"{process_shortreads} -1 fastq/BIOS0006.1.fq.gz -2 fastq/BIOS0006.2.fq.gz -o {fastq_ulen_dir} --len-limit 145 "
+        # pg.add(tgt, dep, cmd)
+
         # align
         src_fastq1 = f"{fastq_dir}/{sample.id}.1.fq.gz"
         src_fastq2 = f"{fastq_dir}/{sample.id}.2.fq.gz"
@@ -165,6 +186,7 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
         dep = f"{src_fastq1}.OK {src_fastq2}.OK {ref_dir}/bwa_index.OK"
         tgt = f"{output_bam_file}.OK"
         cmd = f"{bwa} mem -t 2 -M {ref_fasta_file} {src_fastq1} {src_fastq2} 2> {log} | {samtools} view -h | {samtools} sort -o {output_bam_file} 2> {sort_log}"
+        samtools_multiqc_dep += f" {tgt}"
         pg.add(tgt, dep, cmd)
 
         # index
@@ -174,78 +196,87 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
         cmd = f"{samtools} index {input_bam_file}"
         pg.add(tgt, dep, cmd)
 
-        # #  coverage
-        # input_bam_file = f"{stats_dir}/{sample.idx}_{sample.id}.bam"
-        # output_stats_file = f"{align_dir}/coverage_stats/{sample.padded_idx}_{sample.id}.txt"
-        # dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
-        # tgt = f"{log_dir}/{sample.idx}_{sample.id}.coverage.stats.OK"
-        # cmd = f"{samtools} coverage {input_bam_file} > {output_stats_file}"
-        # samtools_multiqc_dep += f" {tgt}"
-        # pg.add(tgt, dep, cmd)
+        #  coverage
+        output_stats_file = f"{stats_dir}/coverage/{sample.id}.txt"
+        dep = f"{bam_dir}/{sample.id}.bam.bai.OK"
+        tgt = f"{output_stats_file}.OK"
+        cmd = f"{samtools} coverage {input_bam_file} > {output_stats_file}"
+        samtools_multiqc_dep += f" {tgt}"
+        pg.add(tgt, dep, cmd)
 
-        # # compute effective coverage
-        # input_stats_file = f"{align_dir}/coverage_stats/{sample.padded_idx}_{sample.id}.txt"
-        # output_stats_file = f"{align_dir}/coverage_stats/{sample.padded_idx}_{sample.id}.effective.coverage.stats.txt"
-        # dep = f"{log_dir}/{sample.idx}_{sample.id}.coverage.stats.OK"
-        # tgt = f"{log_dir}/{sample.idx}_{sample.id}.effective.coverage.stats.OK"
-        # cmd = f"{compute_effective_coverage} {input_stats_file} -o {output_stats_file} -s {sample.idx}_{sample.id}"
-        # pg.add(tgt, dep, cmd)
+        # compute effective coverage
+        input_stats_file = f"{stats_dir}/coverage/{sample.id}.txt"
+        output_stats_file = f"{stats_dir}/coverage/{sample.id}.ecov.txt"
+        dep = f"{input_stats_file}.OK"
+        tgt = f"{output_stats_file}.OK"
+        cmd = f"{compute_effective_coverage} {input_stats_file} -o {output_stats_file} -s {sample.id}"
+        pg.add(tgt, dep, cmd)
 
-        # #  stats
-        # output_stats_file = f"{align_dir}/general_stats/{sample.padded_idx}_{sample.id}.txt"
-        # dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
-        # tgt = f"{log_dir}/{sample.idx}_{sample.id}.stats.OK"
-        # cmd = f"{samtools} stats {input_bam_file} > {output_stats_file}"
-        # samtools_multiqc_dep += f" {tgt}"
-        # pg.add(tgt, dep, cmd)
+        # stats
+        output_stats_file = f"{stats_dir}/general/{sample.id}.txt"
+        dep = f"{bam_dir}/{sample.id}.bam.bai.OK"
+        tgt = f"{output_stats_file}.OK"
+        cmd = f"{samtools} stats {input_bam_file} > {output_stats_file}"
+        samtools_multiqc_dep += f" {tgt}"
+        pg.add(tgt, dep, cmd)
 
-        # # extract general stats
-        # input_stats_file = f"{align_dir}/general_stats/{sample.padded_idx}_{sample.id}.txt"
-        # output_stats_file = f"{align_dir}/general_stats/{sample.padded_idx}_{sample.id}.extracted.stats.txt"
-        # dep = f"{log_dir}/{sample.idx}_{sample.id}.stats.OK"
-        # tgt = f"{log_dir}/{sample.idx}_{sample.id}.extracted.stats.OK"
-        # cmd = f"{extract_general_stats} {input_stats_file} -o {output_stats_file} -s {sample.idx}_{sample.id}"
-        # pg.add(tgt, dep, cmd)
+        # extract general stats
+        input_stats_file = f"{stats_dir}/general/{sample.id}.txt"
+        output_stats_file = f"{stats_dir}/general/{sample.id}.extracted.txt"
+        dep = f"{input_stats_file}.OK"
+        tgt = f"{output_stats_file}.OK"
+        cmd = f"{extract_general_stats} {input_stats_file} -o {output_stats_file} -s {sample.id}"
+        pg.add(tgt, dep, cmd)
 
-        # #  flag stats
-        # output_stats_file = f"{align_dir}/flag_stats/{sample.padded_idx}_{sample.id}.txt"
-        # dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
-        # tgt = f"{log_dir}/{sample.idx}_{sample.id}.flag.stats.OK"
-        # cmd = f"{samtools} flagstat {input_bam_file} > {output_stats_file}"
-        # samtools_multiqc_dep += f" {tgt}"
-        # pg.add(tgt, dep, cmd)
+        # flag stats
+        output_stats_file = f"{stats_dir}/flag/{sample.id}.txt"
+        dep = f"{bam_dir}/{sample.id}.bam.bai.OK"
+        tgt = f"{output_stats_file}.OK"
+        cmd = f"{samtools} flagstat {input_bam_file} > {output_stats_file}"
+        samtools_multiqc_dep += f" {tgt}"
+        pg.add(tgt, dep, cmd)
 
-        # #  idx stats
-        # output_stats_file = f"{align_dir}/idx_stats/{sample.padded_idx}_{sample.id}.txt"
-        # dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
-        # tgt = f"{log_dir}/{sample.idx}_{sample.id}.idx.stats.OK"
-        # cmd = f"{samtools} idxstats {input_bam_file} > {output_stats_file}"
-        # samtools_multiqc_dep += f" {tgt}"
-        # pg.add(tgt, dep, cmd)
+        # idx stats
+        output_stats_file = f"{stats_dir}/idx/{sample.id}.txt"
+        dep = f"{bam_dir}/{sample.id}.bam.bai.OK"
+        tgt = f"{output_stats_file}.OK"
+        cmd = f"{samtools} idxstats {input_bam_file} > {output_stats_file}"
+        samtools_multiqc_dep += f" {tgt}"
+        pg.add(tgt, dep, cmd)
 
-        # # plot samtools stats
-        # input_stats_file = f"{align_dir}/general_stats/{sample.padded_idx}_{sample.id}.txt"
-        # dep = f"{log_dir}/{sample.idx}_{sample.id}.stats.OK"
-        # tgt = f"{log_dir}/{sample.idx}_{sample.id}.plot_bamstats.OK"
-        # cmd = f"{plot_bamstats} -p  {align_dir}/plot_bamstats/plot {input_stats_file}"
-        # pg.add(tgt, dep, cmd)
+        # plot samtools stats
+        input_stats_file = f"{stats_dir}/general/{sample.id}.txt"
+        dep = f"{input_stats_file}.OK"
+        tgt = f"{stats_dir}/general/{sample.id}.plot_bamstats.OK"
+        cmd = f"{plot_bamstats} -p {stats_dir}/plot {input_stats_file}"
+        pg.add(tgt, dep, cmd)
 
-    #denovo stacks
-    log = f"{working_dir}/denovo_stacks.log"
-    tgt = f"{working_dir}/denovo_stacks.OK"
-    dep = fastq_files_OK
-    cmd = f"{denovo_stacks} -T 45 -M 7 -o {denovo_stacks_dir} --popmap {population_map_file} --samples {fastq_dir} --paired -X \"ustacks: --force-diff-len\" 2> {log}"
+
+    # plot samtools
+    output_dir = f"{plot_dir}"
+    log = f"{plot_dir}/samtools.multiqc_report.log"
+    err = f"{plot_dir}/samtools.multiqc_report.err"
+    dep = samtools_multiqc_dep
+    tgt = f"{plot_dir}/samtools.multiqc_report.OK"
+    cmd = f"cd {stats_dir}; {multiqc} . -m samtools -f -o {output_dir} -n samtools --no-ansi > {log} 2> {err}"
     pg.add(tgt, dep, cmd)
 
-    # #ref stacks
-    # log = f"{working_dir}/ref_stacks.log"
-    # tgt = f"{working_dir}/ref_stacks.OK"
+    # denovo stacks
+    # log = f"{working_dir}/denovo_stacks.log"
+    # tgt = f"{working_dir}/denovo_stacks.OK"
     # dep = fastq_files_OK
     # cmd = f"{denovo_stacks} -T 45 -M 7 -o {denovo_stacks_dir} --popmap {population_map_file} --samples {fastq_dir} --paired -X \"ustacks: --force-diff-len\" 2> {log}"
     # pg.add(tgt, dep, cmd)
 
-    #denovo_map.pl -T 45 -M 7 -o ./stacks --popmap ./population.map --samples ./fastq --paired -X "ustacks: --force-diff-len"
+    #ref stacks
+    log = f"{working_dir}/ref_stacks.log"
+    tgt = f"{working_dir}/ref_stacks.OK"
+    dep = bam_files_OK
+    cmd = f"{ref_stacks} -T 30 -o {ref_stacks_dir} --popmap {population_map_file} --samples {bam_dir} 2> {log}"
+    pg.add(tgt, dep, cmd)
 
+    #denovo_map.pl -T 45 -M 7 -o ./stacks --popmap ./population.map --samples ./fastq --paired -X "ustacks: --force-diff-len"
+    #populations -P . --vcf -O . --no-hap-exports --structure --genepop --vcf-all  --phylip --write-random-snp -t 30
 
     # clean
     pg.add_clean(f"rm -fr {ref_dir} {denovo_stacks_dir} {fastq_dir}")

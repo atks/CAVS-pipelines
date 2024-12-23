@@ -75,7 +75,7 @@ def main(
     dest_dir = working_dir + "/" + run_id
     fastq_path = f"{working_dir}/demux"
     basecall_model = f"/usr/local/dorado-0.8.3/models/{basecall_model}"
-    acquisition_run_id = "0963087e39789805044251860e5e73004ac92305"
+    acquisition_run_id = "d22107a8068c869f28f472f3aad57b5dd3b147ae"
 
     print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
     print("\t{0:<20} :   {1:<10}".format("run_dir", run_id))
@@ -280,7 +280,7 @@ def main(
             output_bam_file = f"{align_dir}/{sample.idx}_{sample.id}.bam"
             log = f"{log_dir}/{sample.idx}_{sample.id}.align.log"
             sort_log = f"{log_dir}/{sample.idx}_{sample.id}.align.sort.log"
-            dep = f"{log_dir}/{sample.idx}_{sample.id}.align.ref.mmi.OK"
+            dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz.OK {log_dir}/{sample.idx}_{sample.id}.align.ref.mmi.OK"
             tgt = f"{log_dir}/{sample.idx}_{sample.id}.bam.OK"
             cmd = f"{minimap2} -ax map-ont {reference_fasta_file}.mmi {input_fastq_file} 2> {log} | {samtools} view -h | {samtools} sort -o {output_bam_file} 2> {sort_log}"
             pg.add(tgt, dep, cmd)
@@ -301,7 +301,7 @@ def main(
             pg.add(tgt, dep, cmd)
 
             # coverage stats
-            output_stats_file = f"{align_dir}/general_stats/{sample.padded_idx}_{sample.id}.txt"
+            output_stats_file = f"{align_dir}/coverage_stats/{sample.padded_idx}_{sample.id}.txt"
             dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
             tgt = f"{log_dir}/{sample.idx}_{sample.id}.coverage.stats.OK"
             cmd = f"{samtools} coverage {input_bam_file} > {output_stats_file}"
