@@ -36,13 +36,12 @@ from shutil import copy2
     "-r",
     "--reference_fasta_file",
     required=True,
-    show_default=True,
     help="reference fasta file",
 )
 @click.option(
     "-s",
     "--sample_id",
-    required=True,
+    required=False,
     default="consensus",
     show_default=True,
     help="consensus sequence sample ID",
@@ -53,12 +52,15 @@ from shutil import copy2
     required=False,
     #r941_min_hac_g507
     #r1041_e82_400bps_sup_v5.0.0
-    default="r1041_e82_400bps_sup_v4.3.0",
+    default="r1041_e82_400bps_hac_v4.3.0",
+    show_default=True,
     help="ONT Machine Model e.g. r941_min_hac_g507, r1041_e82_400bps_sup_v5.0.0",
 )
 @click.option(
     "--in_situ_ref",
     is_flag=True,
+    default=False,
+    show_default=True,
     help="Build reference databases in the location of the supplied reference FASTA file",
 )
 @click.option(
@@ -127,9 +129,9 @@ def main(
     minimap2 = "/usr/local/minimap2-2.24/minimap2"
     bwa = "/usr/local/bwa-0.7.17/bwa"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
-    #"docker run -t -v  `pwd`:`pwd` -w `pwd` fischuu/quast quast.py "
-    activate_medaka_virtualenv = "source /usr/local/medaka-1.12.1/bin/activate"
-    medaka = "/usr/local/medaka-1.12.1/bin/medaka"
+    #ontresearch/medaka:sha3486abaab0d3b90351617eb8622acf2028edb154 medaka v1.12.0
+    #ontresearch/medaka:sha447c70a639b8bcf17dc49b51e74dfcde6474837b medaka v2.0.0
+    medaka = "docker run  -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` ontresearch/medaka:sha3486abaab0d3b90351617eb8622acf2028edb154 medaka"
     seqkit = "/usr/local/seqkit-2.1.0/bin/seqkit"
 
     # make directories
