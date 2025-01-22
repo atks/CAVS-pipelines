@@ -49,7 +49,7 @@ from datetime import datetime
     "-l", "--len", help="Minimum passing read length", required=False, default=20
 )
 @click.option("-x", "--memory", help="Memory for fastqc", required=False, default=2048)
-@click.option("-y", "--model", help="Model for Dorado calling", required=False, default="dna_r10.4.1_e8.2_400bps_sup@v5.0.0")
+@click.option("-y", "--model", help="Model for Dorado calling", required=False, default="dna_r10.4.1_e8.2_400bps_hac@v5.0.0")
 @click.option("-k", "--kit", default="SQK-LSK114", show_default=True, help="Kit ID")
 @click.option("-s", "--sample_file", required=True, help="sample file")
 def main(
