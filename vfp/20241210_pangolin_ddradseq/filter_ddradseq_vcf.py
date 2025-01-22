@@ -39,7 +39,6 @@ def main(vcf_file, sample_call_rate_cutoff, variant_call_rate_cutoff):
     # read VCF file, obtain master matrix of data
     data = []
     samples = []
-    variants = []
     no_variants = 0
     no_samples = 0
     with open(vcf_file, "r") as file:
@@ -51,25 +50,36 @@ def main(vcf_file, sample_call_rate_cutoff, variant_call_rate_cutoff):
                     no_samples = len(samples)
             else:
                 chrom, pos, id, ref, alt, qual, filter, info, format, *genotypes = line.rstrip().split("\t")
-
+                data.append(Variant(id, chrom, pos, ref, alt, genotypes))
                 no_variants +=1
 
     print(f"no samples : {no_samples}")
     print(f"no variants : {no_variants}")
 
 
-    filtered_samples = []
-    filtered_variants = []
+    #pointer to subset of samples and variants
+    filtered_samples = range(no_samples)
+    filtered_variants = range(no_variants)
+
+    sample_c = [0]*no_samples
+    sample_n = [0]*no_samples
+    variant_c = [0]*no_variants
+    variant_n = [0]*no_variants
 
     change = False
     iter_no = 0
 
     while change:
 
-        #compute call rates for samples
-        for i in filtered_samples:
-            if filtered_samples[i]:
-                pass
+        #compute call rates for samples and variants
+        for i in filtered_variants:
+            for j in filtered_samples:
+                if data[i].genotypes[j].gt != -1:
+                    sample_c[j] += 1
+
+        for j in filtered_samples:
+
+
 
         #filter samples
 
@@ -90,12 +100,13 @@ def main(vcf_file, sample_call_rate_cutoff, variant_call_rate_cutoff):
 
     #compute final call rates and maf, report
 
+
     #quick summary
     print(f"no samples : {no_samples}")
     print(f"no variants : {no_variants}")
 
 class Variant(object):
-    def __init__(self, id, chrom, pos, ref, alt):
+    def __init__(self, id, chrom, pos, ref, alt, *genotypes):
         self.id = id
         self.chrom = chrom
         self.pos = pos
@@ -104,7 +115,27 @@ class Variant(object):
         self.genotypes = []
 
     def add_genotype(self, genotype):
+        for gt in genotype:
+            gt, dp, ad, gq, gl = gt.split(":")
+            if gt == "./.":
+                self.genotypes.append(Genotype(-1, -1, -1, -1, "-1,-1,-1"))
+            else:
+                if gt == "0/0":
+                    gt = 0
+                elif gt == "0/1":
+                    gt = 1
+                elif gt == "1/1":
+                    gt = 2
+                self.genotypes.append(Genotype(gt, int(dp), ad, int(gq), gl))
         self.genotypes.append(genotype)
+
+class Genotype(object):
+    def __init__(self, gt, dp, ad, gq, gl):
+        self.gt = gt
+        self.dp = dp
+        self.ad = int(ad.split(",")[1])
+        self.gq = gq
+        self.gl = gl.split(",")
 
 if __name__ == "__main__":
     main() # type: ignore
