@@ -224,7 +224,7 @@ def main(vcf_file, sample_call_rate_cutoff, variant_call_rate_cutoff, variant_ma
             ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
             info_ad0 = info_dp - info_ad1
             info_af = info_ac/(2*info_ns)
-            file.write(f"{data[i].chrom}\t{data[i].pos}\t{data[i].id}\t{data[i].ref}\t{data[i].alt}\t.\tPASS\tNS={info_ns};DP={info_dp};AD={info_ad0},{info_ad1};AF={info_af:.2f}\tGT:DP:AD:GQ:GL\t{genotypes}\n")
+            file.write(f"{data[i].chrom}\t{data[i].pos}\t{data[i].id}\t{data[i].ref}\t{data[i].alt}\t.\tPASS\tNS={info_ns};DP={info_dp};AD={info_ad0},{info_ad1};AF={info_af:.2f}\tGT:DP:AD:GQ:GL{genotypes}\n")
 
 
 
