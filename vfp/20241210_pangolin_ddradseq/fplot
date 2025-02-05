@@ -1,0 +1,176 @@
+#!/usr/bin/perl
+
+use warnings;
+use strict;
+use Cwd;
+use Cwd 'abs_path';
+use File::Basename;
+use Getopt::Long;
+use Pod::Usage;
+
+=head1 NAME
+
+ fplot 
+
+=head1 SYNOPSIS
+
+ fplot [options] file
+
+  -o                output file name
+                    Default output file is plot-<file>.pdf
+  -x                x header name
+  -y                y header name
+  -t                Title
+  -u                plot [0,1] on both axes
+  -p                Point Character: 0-25 (Default 1)
+                    http://www.phaget4.org/R/plot.html
+  -c                Colour : black, red, blue, green (Default black)
+ sample-call-file   sample call rate file
+                    a)<x-header-name>
+                    b)<y-header-name>
+
+ example: fplot -x paltum -y peimekki pscalare.txt -t "paltum vs peimekki"
+          fplot -x paltum -y peimekki pscalare.txt -t "paltum vs peimekki" -c blue -p 4
+
+ Makes a plot of 2 variables.
+ 
+=head1 DESCRIPTION
+
+=cut
+
+## Global variables
+my $outputFileName;
+my $inputFile;
+my $inputDir;
+my %COL_HEADERS;
+my $title;
+my $xLabel;
+my $yLabel;
+
+## Option variables
+my $help;
+my $axesAreUnity;
+my $pointCharacter = 1;
+my $colour = 'black';
+
+## Main Script
+# initialize options
+Getopt::Long::Configure('bundling');
+if(!GetOptions ('h'=>\$help,
+                'u'=>\$axesAreUnity,
+                'o=s'=>\$outputFileName,
+                'p=i'=>\$pointCharacter,
+                'c=s'=>\$colour,
+                't=s'=>\$title,
+                'x=s'=>\$xLabel,
+                'y=s'=>\$yLabel) 
+    || scalar(@ARGV)!=1
+    || !defined($xLabel)
+    || !defined($yLabel)
+    || $pointCharacter!~/^([12]?[0-5]|1?[6-9])$/
+    || $colour!~/^(black|blue|green|red)$/)  
+{
+    if ($help)  
+    {
+        pod2usage(-verbose => 2);
+    }
+    else  
+    {
+        pod2usage(1);
+    }
+}
+
+$inputFile = $ARGV[0];
+
+if(!defined($outputFileName))  
+{
+    my($filename, $directories, $suffix) = fileparse($inputFile, '\..*');
+    $outputFileName = "plot-$filename.pdf";
+    $inputDir = abs_path($directories);
+}
+
+$outputFileName .= '.pdf' unless($outputFileName =~ /\.pdf$/i);
+%COL_HEADERS = ($xLabel => -1, $yLabel => -1);
+
+# check file correctness
+open(iFILE, "< $inputFile") or die "Can't open sample call rate file - $inputFile :: $! \n";
+my $header = <iFILE>;
+chomp($header);
+my @fields = split(/\t/, $header);
+for my $i (0 .. $#fields)  
+{
+    if(exists $COL_HEADERS{$fields[$i]})
+    {
+        $COL_HEADERS{$fields[$i]} = $i;
+    }
+}
+close iFILE;
+
+for my $key (keys %COL_HEADERS)  
+{
+    die "Can't find required header - $key - in $inputFile \n" if($COL_HEADERS{$key} == -1);
+}
+
+# Load inputfile to R to generate plot
+my $currDir = cwd();
+
+my $rTransformedXLabel = $xLabel;
+$rTransformedXLabel =~ s/\W/./g;
+my $rTransformedYLabel = $yLabel;
+$rTransformedYLabel =~ s/\W/./g;
+
+open(oFILE, "> $currDir/R.input") or die "Can't create temp R input file :: $! \n";
+if($axesAreUnity)
+{
+    print oFILE <<RSCRIPT;
+data <- read.table("$inputDir/$inputFile", header=1 );
+pdf("$currDir/$outputFileName");
+plot( data\$$rTransformedXLabel, 
+      data\$$rTransformedYLabel, 
+      main="$title", 
+      xlab="$xLabel", 
+      ylab="$yLabel", 
+      xlim=c(0,1), 
+      ylim=c(0,1),
+      pch=$pointCharacter,
+      col="$colour");
+dev.off();
+q();
+RSCRIPT
+}
+else
+{
+    print oFILE <<RSCRIPT;
+data <- read.table("$inputDir/$inputFile", header=1 );
+pdf("$currDir/$outputFileName");
+plot( data\$$rTransformedXLabel, 
+      data\$$rTransformedYLabel, 
+      main="$title", 
+      xlab="$xLabel", 
+      ylab="$yLabel", 
+      pch=$pointCharacter,
+      col="$colour");
+dev.off();
+q();
+RSCRIPT
+}
+close oFILE;
+
+system("R --vanilla <$currDir/R.input &>$currDir/R.log") == 0 || die "Plotting failed, please check R.input and R.log";
+ 
+if ($? == -1) 
+{
+    warn "failed to execute: $!\n";
+}
+elsif 
+($? & 127) 
+{
+    printf STDERR "child died with signal %d, %s coredump\n", ($? & 127),  ($? & 128) ? 'with' : 'without';
+}
+else 
+{
+    unlink("$currDir/R.input");
+    unlink("$currDir/R.log");
+}
+
+__END__

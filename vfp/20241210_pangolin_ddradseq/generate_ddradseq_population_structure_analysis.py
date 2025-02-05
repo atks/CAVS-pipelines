@@ -278,6 +278,32 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
     #denovo_map.pl -T 45 -M 7 -o ./stacks --popmap ./population.map --samples ./fastq --paired -X "ustacks: --force-diff-len"
     #populations -P . --vcf -O . --no-hap-exports --structure --genepop --vcf-all  --phylip --write-random-snp -t 30
 
+    #filter SNPs
+
+    #compute heterozygosity
+
+    #compute pairwise IBS stats
+
+    #plot heterozygosity plots
+
+    #plot pairwise IBS plots
+
+    #filter individuals
+
+    #plot SNP/Sample call rate at each
+
+    #run structure
+
+    #run PCA
+
+    #plot geospatial plot with structure pie charts
+
+    #plot PCA with structure pie charts
+
+
+
+
+
     # clean
     pg.add_clean(f"rm -fr {ref_dir} {denovo_stacks_dir} {fastq_dir}")
 
