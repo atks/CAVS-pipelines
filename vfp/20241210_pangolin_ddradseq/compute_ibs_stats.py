@@ -52,38 +52,35 @@ def main(vcf_file):
                 no_variants +=1
 
 
-    pairwise_ibs_mean = [[0]*no_samples]*no_samples
-    pairwise_ibs_mean = [[0]*no_samples]*no_samples
+    pairwise_ibs_s = [[0]*no_samples]*no_samples
+    pairwise_ibs_ss = [[0]*no_samples]*no_samples
+    pairwise_ibs_n = [[0]*no_samples]*no_samples
+    pairwise_ibs_mean = [[0.0]*no_samples]*no_samples
+    pairwise_ibs_var = [[0.0]*no_samples]*no_samples
 
     #write sample data
+    no_pairs = 0
     for j in range(no_samples):
         for k in range(j+1,no_samples):
+            no_pairs += 1
+            if no_pairs%100==0:
+                print(f"{no_pairs} IBS stats computed")
             for i in range(no_variants):
                 if data[i].genotypes[j].gt != -1 and data[i].genotypes[k].gt != -1:
-                    pairwise_ibs[j][k] += 2-abs(data[i].genotypes[j].gt-data[i].genotypes[k].gt)
+                    ibs = 2-abs(data[i].genotypes[j].gt-data[i].genotypes[k].gt)
+                    #print(f"{data[i].genotypes[j].gt} : {data[i].genotypes[k].gt} : {ibs}")
+                    pairwise_ibs_s[j][k] += ibs
+                    pairwise_ibs_ss[j][k] += ibs**2
+                    pairwise_ibs_n[j][k] += 1
+            pairwise_ibs_mean[j][k] = pairwise_ibs_s[j][k]/pairwise_ibs_n[j][k]
+            pairwise_ibs_var[j][k] = pairwise_ibs_ss[j][k]/pairwise_ibs_n[j][k]-pairwise_ibs_mean[j][k]**2
 
-
-        sample_line1 = samples[j]
-        sample_line2 = samples[j]
-        for i in range(no_variants):
-            gt = data[i].genotypes[j].gt
-            if gt == -1:
-                sample_line1 += "\t-9"
-                sample_line2 += "\t-9"
-            elif gt == 0:
-                sample_line1 += "\t0"
-                sample_line2 += "\t0"
-            elif gt == 1:
-                sample_line1 += "\t0"
-                sample_line2 += "\t1"
-            elif gt == 2:
-                sample_line1 += "\t1"
-                sample_line2 += "\t1"
-        file.write(f"{sample_line1}\n")
-        file.write(f"{sample_line2}\n")
-
-    #out_structure_file = vcf_file.replace(".vcf", ".ibs.stats.txt")
-    #with open(out_structure_file, "w") as file:
+    #write to file
+    with open("ibs.stats.txt", "w") as file:
+        file.write("sample1\tsample2\tibs_mean\tibs_var\n")
+        for j in range(no_samples):
+            for k in range(j+1,no_samples):
+                file.write(f"{samples[j]}\t{samples[k]}\t{pairwise_ibs_mean[j][k]}\t{pairwise_ibs_var[j][k]}\n")
 
 class Variant(object):
     def __init__(self, id, chrom, pos, ref, alt, genotypes):
