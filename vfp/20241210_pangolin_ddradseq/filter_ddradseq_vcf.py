@@ -21,22 +21,28 @@
 import os
 import click
 
-
 @click.command()
+@click.option("-o", "--output_dir", required=False, default=os.path.join(os.getcwd(), "qc"), help="output directory", type=str)
 @click.option("-s", "--sample_call_rate_cutoff", default=0.9, help="sample call rate cutoff")
 @click.option("-v", "--variant_call_rate_cutoff", default=0.9, help="variant call rate cutoff")
 @click.option("-a", "--variant_maf_cutoff", default=0.05, help="variant minor allele frequency cutoff")
 @click.argument("vcf_file")
-def main(vcf_file, sample_call_rate_cutoff, variant_call_rate_cutoff, variant_maf_cutoff):
+def main(vcf_file, output_dir, sample_call_rate_cutoff, variant_call_rate_cutoff, variant_maf_cutoff):
     """
     Filter VCF file obtained from ddRADSeq.
 
     e.g. filter_ddradseq_vcf.py
     """
     print("\t{0:<20} :   {1:<10}".format("vcf file", vcf_file))
+    print("\t{0:<20} :   {1:<10}".format("output directory", output_dir))
     print("\t{0:<20} :   {1:<10}".format("minimum sample call rate", sample_call_rate_cutoff))
     print("\t{0:<20} :   {1:<10}".format("minimum variant call rate", variant_call_rate_cutoff))
     print("\t{0:<20} :   {1:<10}".format("minimum variant maf", variant_maf_cutoff))
+
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+    except OSError as error:
+        print(f"{error.filename} cannot be created")
 
     # read VCF file, obtain master matrix of data
     data = []
@@ -113,8 +119,9 @@ def main(vcf_file, sample_call_rate_cutoff, variant_call_rate_cutoff, variant_ma
                     sample_c[j] += 1
 
         #filter samples
-        with open(f"sample_call_rate_iter_{iter_no}.txt", "w") as file:
+        with open(f"{output_dir}/sample_call_rate_iter_{iter_no}.txt", "w") as file:
             new_filtered_samples.clear()
+            file.write("#sample\tsample_call_rate\n")
             for j in filtered_samples:
                 sample_call_rate = float(sample_c[j])/no_filtered_variants
                 file.write(f"{samples[j]}\t{sample_call_rate}\n")
@@ -131,8 +138,10 @@ def main(vcf_file, sample_call_rate_cutoff, variant_call_rate_cutoff, variant_ma
         ts = 0
         tv = 0
         new_filtered_variants.clear()
-        with open(f"snp_call_rate_iter_{iter_no}.txt", "w") as file:
-            with open(f"maf_iter_{iter_no}.txt", "w") as maf_file:
+        with open(f"{output_dir}/snp_call_rate_iter_{iter_no}.txt", "w") as file:
+            with open(f"{output_dir}/maf_iter_{iter_no}.txt", "w") as maf_file:
+                file.write("#variant_call_rate\n")
+                maf_file.write("#variant_maf\n")
                 for i in filtered_variants:
                     #compute variant call rates
                     variant_c[i] = 0
@@ -176,9 +185,9 @@ def main(vcf_file, sample_call_rate_cutoff, variant_call_rate_cutoff, variant_ma
         iter_no += 1
 
     #write out vcf file
-    out_vcf_file = vcf_file.replace(".vcf", ".filtered.vcf")
+    out_vcf_file = os.path.basename(vcf_file.replace(".vcf", ".filtered.vcf"))
     print(f"writing out filtered vcf file: {out_vcf_file}")
-    with open(out_vcf_file, "w") as file:
+    with open({output_dir}/out_vcf_file, "w") as file:
         file.write(vcf_hdr)
         file.write("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
         for j in finalized_samples:
@@ -231,12 +240,6 @@ def main(vcf_file, sample_call_rate_cutoff, variant_call_rate_cutoff, variant_ma
             info_ad0 = info_dp - info_ad1
             info_af = info_ac/(2*info_ns)
             file.write(f"{data[i].chrom}\t{data[i].pos}\t{data[i].id}\t{data[i].ref}\t{data[i].alt}\t.\tPASS\tNS={info_ns};DP={info_dp};AD={info_ad0},{info_ad1};AF={info_af:.2f}\tGT:DP:AD:GQ:GL{genotypes}\n")
-
-
-
-    #compute final call rates and maf, report
-
-
 
 class Variant(object):
     def __init__(self, id, chrom, pos, ref, alt, genotypes):

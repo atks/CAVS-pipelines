@@ -20,61 +20,121 @@
 
 import os
 import click
-
+import subprocess
 
 @click.command()
-@click.option(
-    "-m",
-    "--make_file",
-    show_default=True,
-    default="run_ddradseq_population_structure_analysis.mk",
-    help="make file name",
-)
-@click.option(
-    "-w",
-    "--working_dir",
-    default=os.getcwd(),
-    show_default=True,
-    help="working directory",
-)
-@click.option("-s", "--sample_file", required=True, help="sample file")
-@click.option("-p", "--population_map_file", required=True, help="population map file")
-@click.option("-g", "--genome_fasta_file", default="", required=False, help="genome FASTA file")
-def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_file):
+@click.argument("input_txt_file", type=click.Path(exists=True))
+@click.option("-o", "--output_dir", required=False, default=os.path.join(os.getcwd(), "plot"), help="output directory", type=str)
+@click.option("-x", "--x_axis_header", required=False, help="x axis", type=str)
+@click.option("-y", "--y_axis_header", required=True, help="y axis", type=str)
+@click.option("-t", "--title", required=True, help="title", type=str)
+@click.option("-p", "--point", default=1, help="Point character - http://www.phaget4.org/R/plot.html", type=int)
+@click.option("-c", "--colour", default="black", help="Point colour - black, red, blue, green", type=str)
+@click.option("-k", "--keep", default=True, help="Point colour - black, red, blue, green", type=str)
+def main(input_txt_file, output_dir, x_axis_header, y_axis_header, title, point, colour, keep):
     """
-    Population structure of Pangolins
-
     qwikplot [options] file
 
-    -o                output file name
-                    Default output file is plot-<file>.pdf
-    -x                x header name
-    -y                y header name
-    -t                Title
-    -u                plot [0,1] on both axes
-    -p                Point Character: 0-25 (Default 1)
-                    http://www.phaget4.org/R/plot.html
-    -c                Colour : black, red, blue, green (Default black)
-    sample-call-file   sample call rate file
-                    a)<x-header-name>
-                    b)<y-header-name>
+    -o   output directory
+    -x   x header name
+    -y   y header name
+    -s   sort y axis values
+    -t   Title
+    -u   plot [0,1] on both axes
+    -p   Point Character: 0-25 (Default 1)
+         http://www.phaget4.org/R/plot.html
+    -c   Colour : black, red, blue, green (Default black)
 
-    e.g. generate_ddradseq_population_structure_analysis.py
+    e.g. qwikplot sample.txt -y call_rate -t "call rate"
+         qwikplot sample.txt -x PC1 -y PC2 -t "PC1 vs PC2" -c blue -p 4
     """
-    print("\t{0:<20} :   {1:<10}".format("make file", make_file))
-    print("\t{0:<20} :   {1:<10}".format("working dir", working_dir))
-    print("\t{0:<20} :   {1:<10}".format("sample file", sample_file))
-    print("\t{0:<20} :   {1:<10}".format("population map file", population_map_file))
-    print("\t{0:<20} :   {1:<10}".format("genome fasta file", genome_fasta_file))
+    print("\t{0:<20} :   {1:<10}".format("file", input_txt_file))
+    print("\t{0:<20} :   {1:<10}".format("output dir", output_dir))
+    if x_axis_header is not None:
+        print("\t{0:<20} :   {1:<10}".format("x axis header", x_axis_header))
+    print("\t{0:<20} :   {1:<10}".format("y axis header", y_axis_header))
+    print("\t{0:<20} :   {1:<10}".format("title", title))
+    print("\t{0:<20} :   {1:<10}".format("point", point))
+    print("\t{0:<20} :   {1:<10}".format("colour", colour))
 
+    #programs
+    rscript = "/usr/bin/Rscript"
 
-    # create working directory
-    os.makedirs(working_dir, exist_ok=True)
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+    except OSError as error:
+        print(f"{error.filename} cannot be created")
 
-    # write make file
-    with open(make_file, "w") as f:
-        f.write(
-            f"""
+    # initialize
+    mpm = MiniPipeManager(f"{output_dir}/qwikplot.log")
+
+    input_txt_file = os.path.abspath(input_txt_file)
+
+    output_pdf_file = ""
+    if x_axis_header is not None:
+        output_pdf_file = f"{output_dir}/{x_axis_header}-vs-{y_axis_header}.pdf"
+    else:
+        output_pdf_file = f"{output_dir}/{y_axis_header}.pdf"
+
+    #generate R script
+    r_script_file =f"{output_dir}/plot.r"
+    if x_axis_header is None:
+        with open(r_script_file, "w") as f:
+            r_script = f"""
+            data = read.table("{input_txt_file}", header = TRUE, comment.char="")
+            colnames(data) <- gsub("^X.", "", colnames(data))
+            pdf("{output_pdf_file}")
+            plot(sort(data${y_axis_header}), type = "p", pch={point}, col = "{colour}", xlab = "index", ylab = "{y_axis_header}", main = "{title}")
+            dev.off()"""
+            f.write(r_script)
+
+        cmd = f"{rscript} {r_script_file}"
+        tgt = f"{output_pdf_file}.OK"
+        desc = f"Generating plot"
+        mpm.run(cmd, tgt, desc)
+    else:
+        with open(r_script_file, "w") as f:
+            r_script = f"""
+            data = read.table("{input_txt_file}", header = TRUE, comment.char="")
+            colnames(data) <- gsub("^X\\.", "", colnames(data))
+            pdf("{output_pdf_file}")
+            plot(data${x_axis_header}, data${y_axis_header}, type = "p", pch = {point}, col = "{colour}", xlab = "{x_axis_header}", ylab = "{y_axis_header}", main = "{title}")
+            dev.off()"""
+            f.write(r_script)
+
+        cmd = f"{rscript} {r_script_file}"
+        tgt = f"{output_pdf_file}.OK"
+        desc = f"Generating plot"
+        mpm.run(cmd, tgt, desc)
+
+class MiniPipeManager(object):
+    def __init__(self, log_file):
+        self.log_file = log_file
+        self.log_msg = []
+
+    def run(self, cmd, tgt, desc):
+        try:
+            if os.path.exists(tgt):
+                self.log(f"{desc} -  already executed")
+                self.log(cmd)
+                return
+            else:
+                self.log(f"{desc}")
+                self.log(cmd)
+                subprocess.run(cmd, shell=True, check=True)
+                subprocess.run(f"touch {tgt}", shell=True, check=True)
+        except subprocess.CalledProcessError as e:
+            self.log(f" - failed")
+            exit(1)
+
+    def log(self, msg):
+        print(msg)
+        self.log_msg.append(msg)
+
+    def print_log(self):
+        self.log(f"\nlogs written to {self.log_file}")
+        with open(self.log_file, "w") as f:
+            f.write("\n".join(self.log_msg))
 
 
 if __name__ == "__main__":
