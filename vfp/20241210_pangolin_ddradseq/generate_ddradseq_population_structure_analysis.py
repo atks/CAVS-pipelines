@@ -251,7 +251,6 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
         cmd = f"{plot_bamstats} -p {stats_dir}/plot {input_stats_file}"
         pg.add(tgt, dep, cmd)
 
-
     # plot samtools
     output_dir = f"{plot_dir}"
     log = f"{plot_dir}/samtools.multiqc_report.log"
@@ -277,6 +276,12 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
 
     #denovo_map.pl -T 45 -M 7 -o ./stacks --popmap ./population.map --samples ./fastq --paired -X "ustacks: --force-diff-len"
     #populations -P . --vcf -O . --no-hap-exports --structure --genepop --vcf-all  --phylip --write-random-snp -t 30
+
+    ################################
+    # Quality Checking and FIltering
+    ################################
+
+    #data sets
 
     #filter SNPs
 

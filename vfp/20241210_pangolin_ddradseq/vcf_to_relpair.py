@@ -20,17 +20,21 @@
 
 import os
 import click
-
+from random import sample
 
 @click.command()
 @click.argument("vcf_file")
-def main(vcf_file):
+@click.option("-s", "--no_subsets", default=100, help="number of subsets to generate")
+@click.option("-n", "--subset_size", default=2000, help="size of subsets")
+def main(vcf_file, no_subsets, subset_size):
     """
-    Convert VCF file to structure format.
+    Convert VCF file to relpair format.
 
-    e.g. vcf_to_structure.py
+    e.g. vcf_to_relpair.py
     """
     print("\t{0:<20} :   {1:<10}".format("vcf file", vcf_file))
+    print("\t{0:<20} :   {1:<10}".format("no subsets", no_subsets))
+    print("\t{0:<20} :   {1:<10}".format("subset size", subset_size))
 
     # read VCF file, obtain master matrix of data
     data = []
@@ -48,43 +52,70 @@ def main(vcf_file):
                     vcf_hdr += line
             else:
                 chrom, pos, id, ref, alt, qual, filter, info, format, *genotypes = line.rstrip().split("\t")
-                data.append(Variant(id, chrom, pos, ref, alt, genotypes))
+                ns, dp, ad, af = info.split(";")
+                h,f = af.split("=")
+                data.append(Variant(id, chrom, pos, ref, alt, float(f), genotypes))
                 no_variants +=1
 
-    out_structure_file = vcf_file.replace(".vcf", ".structure")
-    with open(out_structure_file, "w") as file:
-        #write locus header
-        for i in range(no_variants):
-            file.write(f"\tsnp_{i}")
-        file.write(f"\n")
-        #write sample data
-        for j in range(no_samples):
-            sample_line1 = samples[j]
-            sample_line2 = samples[j]
-            for i in range(no_variants):
-                gt = data[i].genotypes[j].gt
-                if gt == -1:
-                    sample_line1 += "\t-9"
-                    sample_line2 += "\t-9"
-                elif gt == 0:
-                    sample_line1 += "\t0"
-                    sample_line2 += "\t0"
-                elif gt == 1:
-                    sample_line1 += "\t0"
-                    sample_line2 += "\t1"
-                elif gt == 2:
-                    sample_line1 += "\t1"
-                    sample_line2 += "\t1"
-            file.write(f"{sample_line1}\n")
-            file.write(f"{sample_line2}\n")
+    for i in range(no_subsets):
+        relpair_loc_file = vcf_file.replace(".vcf", ".loc")
+        relpair_ped_file = vcf_file.replace(".vcf", ".ped")
+        relpair_ctl_file = vcf_file.replace(".vcf", ".ctl")
+        relpair_out_file = vcf_file.replace(".vcf", ".out")
+
+        #subsample
+        subset_indices = sorted(sample(range(no_variants), subset_size))
+
+        with open(relpair_ctl_file, "w") as ctl_file:
+            ctl_file.write(f"{relpair_loc_file}\n")
+            ctl_file.write(f"{relpair_ped_file}\n")
+            ctl_file.write(f"{relpair_out_file}\n")
+            ctl_file.write("all\n")
+            ctl_file.write("n\n")
+            ctl_file.write("n\n")
+            ctl_file.write("F\n")
+            ctl_file.write("M\n")
+            ctl_file.write("2\n")
+            ctl_file.write("0.01\n")
+            ctl_file.write("1\n")
+            ctl_file.write("10.0\n")
+
+        with open(relpair_loc_file, "w") as loc_file:
+            #write locus header
+            for i in subset_indices:
+                loc_file.write(f"MARKER{i} AUTOSOME 2 0 0.0\n")
+                loc_file.write(f"R {1-data[i].af:.2f}\n")
+                loc_file.write(f"A {data[i].af}\n")
+
+        with open(relpair_ped_file, "w") as ped_file:
+            ped_file.write(f"(I2,1X,A8)\n")
+            ped_file.write(f"(3A8,2A1,A3,{subset_size-1}(1X,A3))\n")
+            ped_file.write(f"{no_samples} FAMILY1\n")
+            for j in range(no_samples):
+                ped_file.write(f"{samples[j]}                ")
+                sample_line = "F"
+                for i in subset_indices:
+                    gt = data[i].genotypes[j].gt
+                    if gt == -1:
+                        sample_line += "    "
+                    elif gt == 0:
+                        sample_line += " R/R"
+                    elif gt == 1:
+                        sample_line += " R/A"
+                    elif gt == 2:
+                        sample_line += " A/A"
+                ped_file.write(f"{sample_line}\n")
+
+
 
 class Variant(object):
-    def __init__(self, id, chrom, pos, ref, alt, genotypes):
+    def __init__(self, id, chrom, pos, ref, alt, af, genotypes):
         self.id = id
         self.chrom = chrom
         self.pos = pos
         self.ref = ref
         self.alt = alt
+        self.af = af
         self.genotypes = []
         for g in genotypes:
             self.add_genotype(g)

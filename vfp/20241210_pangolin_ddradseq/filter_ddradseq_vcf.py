@@ -113,12 +113,14 @@ def main(vcf_file, sample_call_rate_cutoff, variant_call_rate_cutoff, variant_ma
                     sample_c[j] += 1
 
         #filter samples
-        new_filtered_samples.clear()
-        for j in filtered_samples:
-            sample_call_rate = float(sample_c[j])/no_filtered_variants
-            #print(f"sample call rate: {sample_call_rate}")
-            if sample_call_rate >= sample_call_rate_cutoff:
-                new_filtered_samples.append(j)
+        with open(f"sample_call_rate_iter_{iter_no}.txt", "w") as file:
+            new_filtered_samples.clear()
+            for j in filtered_samples:
+                sample_call_rate = float(sample_c[j])/no_filtered_variants
+                file.write(f"{samples[j]}\t{sample_call_rate}\n")
+                #print(f"sample call rate: {sample_call_rate}")
+                if sample_call_rate >= sample_call_rate_cutoff:
+                    new_filtered_samples.append(j)
 
         change = len(new_filtered_samples) != len(filtered_samples)
         filtered_samples = new_filtered_samples.copy()
@@ -129,29 +131,33 @@ def main(vcf_file, sample_call_rate_cutoff, variant_call_rate_cutoff, variant_ma
         ts = 0
         tv = 0
         new_filtered_variants.clear()
-        for i in filtered_variants:
-            #compute variant call rates
-            variant_c[i] = 0
-            variant_ac[i] = 0
-            for j in filtered_samples:
-                if data[i].genotypes[j].gt != -1:
-                    variant_c[i] += 1
-                    variant_ac[i] += data[i].genotypes[j].gt
+        with open(f"snp_call_rate_iter_{iter_no}.txt", "w") as file:
+            with open(f"maf_iter_{iter_no}.txt", "w") as maf_file:
+                for i in filtered_variants:
+                    #compute variant call rates
+                    variant_c[i] = 0
+                    variant_ac[i] = 0
+                    for j in filtered_samples:
+                        if data[i].genotypes[j].gt != -1:
+                            variant_c[i] += 1
+                            variant_ac[i] += data[i].genotypes[j].gt
 
-            #filter variants
-            variant_call_rate = float(variant_c[i])/no_filtered_samples
-            if variant_c[i] == 0:
-                variant_maf = 0
-            else:
-                variant_af = float(variant_ac[i])/(variant_c[i]*2)
-            variant_maf = min(variant_af, 1-variant_af)
-            #print(f"variant call rate: {variant_call_rate: .2f} | {variant_maf: .2f}")
-            if variant_call_rate >= variant_call_rate_cutoff and variant_maf >= variant_maf_cutoff:
-                new_filtered_variants.append(i)
-                if data[i].ts:
-                    ts += 1
-                else:
-                    tv += 1
+                    #filter variants
+                    variant_call_rate = float(variant_c[i])/no_filtered_samples
+                    if variant_c[i] == 0:
+                        variant_maf = 0
+                    else:
+                        variant_af = float(variant_ac[i])/(variant_c[i]*2)
+                    variant_maf = min(variant_af, 1-variant_af)
+                    #print(f"variant call rate: {variant_call_rate: .2f} | {variant_maf: .2f}")
+                    file.write(f"{variant_call_rate}\n")
+                    maf_file.write(f"{variant_maf}\n")
+                    if variant_call_rate >= variant_call_rate_cutoff and variant_maf >= variant_maf_cutoff:
+                        new_filtered_variants.append(i)
+                        if data[i].ts:
+                            ts += 1
+                        else:
+                            tv += 1
 
         #check for change
         change |= len(new_filtered_variants) != len(filtered_variants)
