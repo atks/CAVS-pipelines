@@ -76,7 +76,7 @@ def main(vcf_file, output_dir, sample_call_rate_cutoff, variant_call_rate_cutoff
     filtered_variants = range(no_variants)
 
     change = True
-    iter_no = 0
+    iter_no = 1
 
     new_filtered_samples = []
     new_filtered_variants = []
@@ -101,7 +101,7 @@ def main(vcf_file, output_dir, sample_call_rate_cutoff, variant_call_rate_cutoff
         print(f"iteration {iter_no}")
         change = False
 
-        if iter_no == 1:
+        if iter_no == 2:
             print("updating sample call rate cut off to 0.9 from second iteration onwards")
             sample_call_rate_cutoff = 0.9
             print("updating variant call rate cut off to 0.9 from second iteration onwards")
@@ -185,9 +185,9 @@ def main(vcf_file, output_dir, sample_call_rate_cutoff, variant_call_rate_cutoff
         iter_no += 1
 
     #write out vcf file
-    out_vcf_file = os.path.basename(vcf_file.replace(".vcf", ".filtered.vcf"))
+    out_vcf_file = os.path.join(output_dir, os.path.basename(vcf_file.replace(".vcf", ".filtered.vcf")))
     print(f"writing out filtered vcf file: {out_vcf_file}")
-    with open({output_dir}/out_vcf_file, "w") as file:
+    with open(out_vcf_file, "w") as file:
         file.write(vcf_hdr)
         file.write("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
         for j in finalized_samples:

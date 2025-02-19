@@ -74,8 +74,10 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
     fastq_dir = f"{working_dir}/fastq"
     fastq_ulen_dir = f"{working_dir}/fastq_ulen"
     bam_dir = f"{working_dir}/bam"
+    vcf_dir = f"{working_dir}/vcf"
     denovo_stacks_dir = f"{working_dir}/denovo_stacks"
     ref_stacks_dir = f"{working_dir}/ref_stacks"
+    qc_dir = f"{working_dir}/qc"
     try:
         os.makedirs(ref_dir, exist_ok=True)
         os.makedirs(log_dir, exist_ok=True)
@@ -88,8 +90,10 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
         os.makedirs(fastq_dir, exist_ok=True)
         os.makedirs(fastq_ulen_dir, exist_ok=True)
         os.makedirs(bam_dir, exist_ok=True)
+        os.makedirs(vcf_dir, exist_ok=True)
         os.makedirs(denovo_stacks_dir, exist_ok=True)
         os.makedirs(ref_stacks_dir, exist_ok=True)
+        os.makedirs(qc_dir, exist_ok=True)
     except OSError as error:
         print(f"{error.filename} cannot be created")
 
@@ -105,6 +109,18 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
     process_shortreads = "/usr/local/stacks-2.68/bin/process_shortreads"
     denovo_stacks = "/usr/local/stacks-2.68/bin/denovo_map.pl"
     ref_stacks = "/usr/local/stacks-2.68/bin/ref_map.pl"
+    filter_ddradseq_vcf = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/filter_ddradseq_vcf.py"
+    qwikplot = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/qwikplot"
+    bcftools = "/usr/local/bcftools-1.17/bin/bcftools"
+    vcf_to_structure = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/vcf_to_structure.py"
+    vcf_to_plink = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/vcf_to_plink.py"
+    vcf_to_tg = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/vcf_to_tg.py"
+    structure = "/usr/local/structure-2.3.4/structure"
+    fpca = "/usr/local/fratools-1.0/fpca"
+
+    ####################
+    # Sequence Alignment
+    ####################
 
     #################
     # reference files
@@ -196,7 +212,7 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
         cmd = f"{samtools} index {input_bam_file}"
         pg.add(tgt, dep, cmd)
 
-        #  coverage
+        # coverage
         output_stats_file = f"{stats_dir}/coverage/{sample.id}.txt"
         dep = f"{bam_dir}/{sample.id}.bam.bai.OK"
         tgt = f"{output_stats_file}.OK"
@@ -260,6 +276,17 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
     cmd = f"cd {stats_dir}; {multiqc} . -m samtools -f -o {output_dir} -n samtools --no-ansi > {log} 2> {err}"
     pg.add(tgt, dep, cmd)
 
+    ################################
+    # Variant Calling
+    ################################
+
+    #ref stacks
+    log = f"{log_dir}/ref_stacks.log"
+    tgt = f"{log_dir}/ref_stacks.OK"
+    dep = bam_files_OK
+    cmd = f"{ref_stacks} -T 30 -o {ref_stacks_dir} --popmap {population_map_file} --samples {bam_dir} 2> {log}"
+    pg.add(tgt, dep, cmd)
+
     # denovo stacks
     # log = f"{working_dir}/denovo_stacks.log"
     # tgt = f"{working_dir}/denovo_stacks.OK"
@@ -267,23 +294,66 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
     # cmd = f"{denovo_stacks} -T 45 -M 7 -o {denovo_stacks_dir} --popmap {population_map_file} --samples {fastq_dir} --paired -X \"ustacks: --force-diff-len\" 2> {log}"
     # pg.add(tgt, dep, cmd)
 
-    #ref stacks
-    log = f"{working_dir}/ref_stacks.log"
-    tgt = f"{working_dir}/ref_stacks.OK"
-    dep = bam_files_OK
-    cmd = f"{ref_stacks} -T 30 -o {ref_stacks_dir} --popmap {population_map_file} --samples {bam_dir} 2> {log}"
-    pg.add(tgt, dep, cmd)
-
     #denovo_map.pl -T 45 -M 7 -o ./stacks --popmap ./population.map --samples ./fastq --paired -X "ustacks: --force-diff-len"
     #populations -P . --vcf -O . --no-hap-exports --structure --genepop --vcf-all  --phylip --write-random-snp -t 30
 
     ################################
-    # Quality Checking and FIltering
+    # Quality Checking and Filtering
     ################################
 
-    #data sets
-
     #filter SNPs
+    input_vcf_file = f"{ref_stacks_dir}/populations.snps.vcf"
+    log = f"{log_dir}/qc.log"
+    tgt = f"{log_dir}/qc.OK"
+    dep = f"{log_dir}/ref_stacks.OK"
+    cmd = f"{filter_ddradseq_vcf} {input_vcf_file} -o {qc_dir} -s 0.1 > {log}"
+    pg.add(tgt, dep, cmd)
+
+    #QC note, underwent 3 iterations
+    #iteration 0 : initial
+    #no samples : 78
+    #no variants : 610341
+    #ts/tv :  1.20
+    #iteration 1
+    #no filtered samples : 65
+    #no variants : 32319
+    #ts/tv :  2.36
+    #iteration 2
+    #updating sample call rate cut off to 0.9 from second iteration onwards
+    #updating variant call rate cut off to 0.9 from second iteration onwards
+    #no filtered samples : 58
+    #no variants : 31906
+    #ts/tv :  2.36
+    #iteration 3 - NO CHANGE
+
+    #draw qc plots of call rates and mafs
+    for i in range(1, 4):
+        input_txt_file = f"{qc_dir}/sample_call_rate_iter_{i}.txt"
+        output_pdf_file = f"{qc_dir}/sample_call_rate_iter_{i}.pdf"
+        tgt = f"{output_pdf_file}.OK"
+        dep = f"{log_dir}/qc.OK"
+        cmd = f"{qwikplot} {input_txt_file} --ylim \"c(0,1)\" -y sample_call_rate -t \"Iteration {i} Sample Call Rate\" -z {output_pdf_file} -p 20 -c green >/dev/null"
+        pg.add(tgt, dep, cmd)
+
+        input_txt_file = f"{qc_dir}/snp_call_rate_iter_{i}.txt"
+        output_pdf_file = f"{qc_dir}/snp_call_rate_iter_{i}.pdf"
+        tgt = f"{output_pdf_file}.OK"
+        dep = f"{log_dir}/qc.OK"
+        cmd = f"{qwikplot} {input_txt_file} --ylim \"c(0,1)\" -y variant_call_rate -t \"Iteration {i} SNP Call Rate\" -z {output_pdf_file} -p 20 -c green -q 0.1 >/dev/null"
+        pg.add(tgt, dep, cmd)
+
+        input_txt_file = f"{qc_dir}/maf_iter_{i}.txt"
+        output_pdf_file = f"{qc_dir}/maf_iter_{i}.pdf"
+        tgt = f"{output_pdf_file}.OK"
+        dep = f"{log_dir}/qc.OK"
+        cmd = f"{qwikplot} {input_txt_file} --ylim \"c(0,0.5)\" -y variant_maf -t \"Iteration {i} MAF\" -z {output_pdf_file} -p 20 -c green -q 0.1 >/dev/null"
+        pg.add(tgt, dep, cmd)
+
+    ##################
+    #Relative analysis
+    ##################
+
+    #data sets
 
     #compute heterozygosity
 
@@ -293,19 +363,61 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
 
     #plot pairwise IBS plots
 
-    #filter individuals
+    ##################
+    #prepare data sets
+    ##################
 
-    #plot SNP/Sample call rate at each
+    #copy over 58 samples, 31906 variants data set
+    input_vcf_file = f"{qc_dir}/populations.snps.filtered.vcf"
+    output_vcf_file = f"{vcf_dir}/58samples_31906snps_pangolin.vcf"
+    tgt = f"{output_vcf_file}.OK"
+    dep = f"{log_dir}/qc.OK"
+    cmd = f"cp {input_vcf_file} {output_vcf_file}"
+    pg.add(tgt, dep, cmd)
 
-    #run structure
+    #remove BIOS0007 and BIOS0016
+    input_vcf_file = f"{vcf_dir}/58samples_31906snps_pangolin.vcf"
+    output_vcf_file = f"{vcf_dir}/56samples_31906snps_pangolin.vcf"
+    tgt = f"{output_vcf_file}.OK"
+    dep = f"{input_vcf_file}.OK"
+    cmd = f"{bcftools} view -s ^BIOS0016,BIOS0007 {input_vcf_file} -o {output_vcf_file}"
+    pg.add(tgt, dep, cmd)
 
-    #run PCA
 
-    #plot geospatial plot with structure pie charts
+    for dataset in ["56samples_31906snps"]:
+        # create directories in destination folder directory
+        structure_dir = f"{working_dir}/{dataset}/structure"
+        pca_dir = f"{working_dir}/{dataset}/structure"
+        try:
+            os.makedirs(structure_dir, exist_ok=True)
+            os.makedirs(pca_dir, exist_ok=True)
+        except OSError as error:
+            print(f"{error.filename} cannot be created")
 
-    #plot PCA with structure pie charts
+        #structure
+        #convert VCF file to structure format
+        input_vcf_file = f"{vcf_dir}/{dataset}_pangolin.vcf"
+        output_dir = f"{dataset}/structure"
+        tgt = f"{output_dir}/structure_files.OK"
+        dep = f"{input_vcf_file}.OK"
+        cmd = f"{vcf_to_structure} {input_vcf_file} -o {output_dir}"
+        pg.add(tgt, dep, cmd)
 
+        #run structure
+        for k in range(2, 4):
+            for rep in range(1, 4):
+                input_dir = f"{dataset}/structure"
+                output_dir = f"{dataset}/structure/k{k}"
+                tgt = f"{output_dir}/structure.OK"
+                dep = f"{input_dir}/{rep}.OK"
+                cmd = f"{structure} -K {k} -o {output_dir} -i {input_dir} > {output_dir}/structure.log"
+                pg.add(tgt, dep, cmd)
 
+        #run PCA
+
+        #plot geospatial plot with structure pie charts
+
+        #plot PCA with structure pie charts
 
 
 
@@ -315,7 +427,6 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
     # write make file
     print("Writing pipeline")
     pg.write()
-
 
 class PipelineGenerator(object):
     def __init__(self, make_file):
