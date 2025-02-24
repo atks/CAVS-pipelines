@@ -384,7 +384,8 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
     pg.add(tgt, dep, cmd)
 
 
-    for dataset in ["56samples_31906snps"]:
+    for dataset in ["56samples_31906snps", "58samples_31906snps", "55samples_19477snps"]:
+#    for dataset in ["56samples_31906snps"]:
         # create directories in destination folder directory
         structure_dir = f"{working_dir}/{dataset}/structure"
         pca_dir = f"{working_dir}/{dataset}/structure"

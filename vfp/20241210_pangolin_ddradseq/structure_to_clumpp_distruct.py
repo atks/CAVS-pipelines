@@ -41,12 +41,13 @@ def main(structure_files):
             no_line = 1
             no_individuals = -1
             k = 0
+            reps.append(StructureRep())
             no_individuals_read = 0
             in_individuals_inferred_cluster = False
             lines = f.readlines()
             for line in lines:
                 if no_line == 15:
-                    m = re.search(r"(\d+) individuals\n", line)
+                    m = re.search(r"(\d+) individuals$", line)
                     if m is not None:
                         no_individuals = int(m.group(1))
                     else:
@@ -54,7 +55,7 @@ def main(structure_files):
                         exit(1)
 
                 if no_line == 17:
-                    m = re.search(r"(\d+) populations assumed\n", line)
+                    m = re.search(r"(\d+) populations assumed$", line)
                     if m is not None:
                         k = int(m.group(1))
                         if K == 0:
@@ -82,6 +83,7 @@ def main(structure_files):
 
                 no_line += 1
 
+    #output clumpp files
 
 class StructureRep(object):
 
