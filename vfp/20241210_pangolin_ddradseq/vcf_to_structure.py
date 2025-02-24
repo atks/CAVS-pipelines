@@ -21,7 +21,6 @@
 import os
 import click
 
-
 @click.command()
 @click.argument("vcf_file")
 @click.option("-o", "--output_dir", required=True, help="output directory")
@@ -106,8 +105,8 @@ def main(vcf_file, output_dir):
 
         Data file format
 
-        #define NUMINDS    58    // (int) number of diploid individuals in data file
-        #define NUMLOCI   31906     // (int) number of loci in data file
+        #define NUMINDS   {no_samples}  // (int) number of diploid individuals in data file
+        #define NUMLOCI   {no_variants} // (int) number of loci in data file
         #define PLOIDY       2    // (int) ploidy of data
         #define MISSING     -9    // (int) value given to missing genotype data
         #define ONEROWPERIND 0    // (B) store data for individuals in a single line
@@ -297,7 +296,7 @@ class Variant(object):
         else:
             gt, dp, ad, gq, gl = genotype.split(":")
             if gt == "./.":
-                print(genotype)
+                #print(genotype)
                 self.genotypes.append(Genotype(-1, -1, -1, -1, "-1,-1,-1"))
             else:
                 if gt == "0/0":

@@ -20,7 +20,7 @@
 
 import os
 import click
-
+import random
 
 @click.command()
 @click.option(
@@ -394,32 +394,56 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
         except OSError as error:
             print(f"{error.filename} cannot be created")
 
+        ##########
         #structure
+        ##########
         #convert VCF file to structure format
         input_vcf_file = f"{vcf_dir}/{dataset}_pangolin.vcf"
-        output_dir = f"{dataset}/structure"
+        output_dir = f"{working_dir}/{dataset}/structure"
         tgt = f"{output_dir}/structure_files.OK"
         dep = f"{input_vcf_file}.OK"
         cmd = f"{vcf_to_structure} {input_vcf_file} -o {output_dir}"
         pg.add(tgt, dep, cmd)
 
         #run structure
-        for k in range(2, 4):
+        random.seed(3323)
+        for k in range(2, 5):
             for rep in range(1, 4):
-                input_dir = f"{dataset}/structure"
-                output_dir = f"{dataset}/structure/k{k}"
-                tgt = f"{output_dir}/structure.OK"
-                dep = f"{input_dir}/{rep}.OK"
-                cmd = f"{structure} -K {k} -o {output_dir} -i {input_dir} > {output_dir}/structure.log"
+                seed = int(1000*random.random())
+                output_dir = f"{working_dir}/{dataset}/structure"
+                input_structure_file = f"{output_dir}/{dataset}_pangolin.structure"
+                output_structure_results_file = f"{output_dir}/K{k}_R{rep}"
+                mainparams = f"{output_dir}/mainparams"
+                extraparams = f"{output_dir}/extraparams"
+                log = f"{output_dir}/K{k}_R{rep}.log"
+                tgt = f"{output_dir}/K{k}_R{rep}.OK"
+                dep = f"{output_dir}/structure_files.OK"
+                cmd = f"{structure} -i {input_structure_file} -o {output_structure_results_file} -m {mainparams} -e {extraparams} -K {k} -D {seed} > {log}"
                 pg.add(tgt, dep, cmd)
 
-        #run PCA
+        for k in range(2, 5):
+            for rep in range(1, 4):
+                pass
+                #plot structure bar plots
+
+                #plot geospatial plot with structure pie charts
+
+        ####
+        #PCA
+        ####
+        #convert VCF file to tg format
+        # input_vcf_file = f"{vcf_dir}/{dataset}_pangolin.vcf"
+        # output_dir = f"{working_dir}/{dataset}/pca"
+        # tgt = f"{output_dir}/pca_files.OK"
+        # dep = f"{input_vcf_file}.OK"
+        # cmd = f"{vcf_to_tg} {input_vcf_file} -o {output_dir}"
+        # pg.add(tgt, dep, cmd)
 
         #plot geospatial plot with structure pie charts
 
         #plot PCA with structure pie charts
 
-
+        #plot genome plots
 
     # clean
     pg.add_clean(f"rm -fr {ref_dir} {denovo_stacks_dir} {fastq_dir}")
