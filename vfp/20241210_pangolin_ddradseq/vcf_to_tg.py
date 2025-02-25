@@ -21,18 +21,20 @@
 import os
 import click
 
-
 @click.command()
 @click.argument("vcf_file")
-def main(vcf_file):
+@click.option("-o", "--output_dir", required=True, help="output directory")
+def main(vcf_file, output_dir):
     """
-    Convert VCF file to structure format.
+    Convert VCF file to tg format.
 
-    e.g. vcf_to_structure.py
+    e.g. vcf_to_tg.py
     """
     print("\t{0:<20} :   {1:<10}".format("vcf file", vcf_file))
+    print("\t{0:<20} :   {1:<10}".format("output directory", output_dir))
 
-    out_tg_file = vcf_file.replace(".vcf", ".tg")
+
+    out_tg_file = os.path.join(output_dir, os.path.basename(vcf_file).replace(".vcf", ".tg"))
 
     # read VCF file, obtain master matrix of data
     data = []
@@ -50,7 +52,7 @@ def main(vcf_file):
                     chrom, pos, id, ref, alt, qual, filter, info, format, *genotypes = line.rstrip().split("\t")
                     tg_file.write(f"{id}")
                     for geno in genotypes:
-                        if geno == "./.":
+                        if geno.startswith("./."):
                             tg_file.write("\t-1")
                         else:
                             geno = geno.split(":")[0].split("/")

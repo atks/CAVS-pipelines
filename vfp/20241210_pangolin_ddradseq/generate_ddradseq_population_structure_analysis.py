@@ -391,7 +391,7 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
 #    for dataset in ["56samples_31906snps"]:
         # create directories in destination folder directory
         structure_dir = f"{working_dir}/{dataset}/structure"
-        pca_dir = f"{working_dir}/{dataset}/structure"
+        pca_dir = f"{working_dir}/{dataset}/pca"
         try:
             os.makedirs(structure_dir, exist_ok=True)
             os.makedirs(pca_dir, exist_ok=True)
@@ -459,18 +459,28 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
 
             #generate sample files for plotting GIS scatterplots
 
-
-
         ####
         #PCA
         ####
         #convert VCF file to tg format
-        # input_vcf_file = f"{vcf_dir}/{dataset}_pangolin.vcf"
-        # output_dir = f"{working_dir}/{dataset}/pca"
-        # tgt = f"{output_dir}/pca_files.OK"
-        # dep = f"{input_vcf_file}.OK"
-        # cmd = f"{vcf_to_tg} {input_vcf_file} -o {output_dir}"
-        # pg.add(tgt, dep, cmd)
+        input_vcf_file = f"{vcf_dir}/{dataset}_pangolin.vcf"
+        output_dir = f"{working_dir}/{dataset}/pca"
+        tgt = f"{output_dir}/pca_files.OK"
+        dep = f"{input_vcf_file}.OK"
+        cmd = f"{vcf_to_tg} {input_vcf_file} -o {output_dir}"
+        pg.add(tgt, dep, cmd)
+
+
+        #pca
+        output_dir = f"{working_dir}/{dataset}/pca"
+        input_tg_file = f"{output_dir}/{dataset}_pangolin.tg"
+        log = f"{output_dir}/pca.log"
+        err = f"{output_dir}/pca.err"
+        tgt = f"{output_dir}/pca.OK"
+        dep = f"{input_vcf_file}.OK"
+        cmd = f"cd {output_dir}; {fpca} -i {input_tg_file} > {log} 2> {err}"
+        pg.add(tgt, dep, cmd)
+
 
         #plot geospatial plot with structure pie charts
 
