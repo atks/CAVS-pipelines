@@ -24,16 +24,16 @@ import re
 
 @click.command()
 @click.option("-s", "--structure_file", required=True, help="structure file")
-@click.option("-g", "--gis_sample_file", required=True, help="gis sample file")
+@click.option("-p", "--pca_sa_file", required=True, help="pca sample file")
 @click.option("-o", "--output_sa_file", required=True, help="output sample file")
-def main(structure_file, gis_sample_file, output_sa_file):
+def main(structure_file, pca_sa_file, output_sa_file):
     """
-    Combined structure coefficients with gis coordinates.
+    Combined structure coefficients with pca coordinates.
 
-    e.g. structure_gis_to_sa.py
+    e.g. structure_pca_to_sa.py
     """
     print("\t{0:<20} :   {1:<10}".format("structure files", structure_file))
-    print("\t{0:<20} :   {1:<10}".format("gis_sample_file", gis_sample_file))
+    print("\t{0:<20} :   {1:<10}".format("pca_sa_file", pca_sa_file))
     print("\t{0:<20} :   {1:<10}".format("output_sa_file", output_sa_file))
 
     structure_file = os.path.abspath(structure_file)
@@ -69,29 +69,24 @@ def main(structure_file, gis_sample_file, output_sa_file):
                 else:
                     break
 
-    print(f"processing {gis_sample_file}")
+    print(f"processing {pca_sa_file}")
 
-    # sample-id	latitude	longitude	sex
-    # BIOS0005	Missing	Missing	Unknown
-    # BIOS0006	1.33555	103.7986	F
-    # BIOS0007	1.376321	103.712874	M
-    # BIOS0008	1.382438	103.775458	F
-    # BIOS0009	1.410534	103.827636	M
-    # BIOS0010	1.368223	103.778963	F
-    # BIOS0011	1.35404	103.682833	M
-    # BIOS0012	1.371556	103.778181	Unknown
-    # BIOS0013	1.36449	103.77235	M
+    #sample-id	PC1	PC2	PC3	PC4	PC5	PC6	PC7	PC8	PC9	PC10	PC11	PC12	PC13	PC14	PC15	PC16	PC17	PC18	PC19	PC20
 
     with open(output_sa_file, "w") as o:
-        o.write("sample_id\tlatitude\tlongitude\tsex")
+        o.write("sample_id")
+        for i in range(20):
+            o.write(f"\tPC{i+1}")
         for i in range(int(no_clusters)):
             o.write(f"\tC{i+1}")
         o.write("\n")
-        with open(gis_sample_file, "r") as f:
+        with open(pca_sa_file, "r") as f:
             for line in f.readlines():
-                sample_id, latitude, longitude, sex = line.split()
-                if latitude!="Missing" and sample_id in rep:
-                    l = f"{sample_id}\t{latitude}\t{longitude}\t{sex}"
+                sample_id, *pcs = line.split()
+                if sample_id in rep:
+                    l = f"{sample_id}"
+                    for pc in pcs:
+                        l += f"\t{float(pc):.3f}"
                     for m in rep[sample_id].cluster_memberships:
                         l += f"\t{m:.3f}"
                     o.write(f"{l}\n")
