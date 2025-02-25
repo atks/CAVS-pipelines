@@ -121,6 +121,7 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
     structure_to_clumpp_distruct = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/structure_to_clumpp_distruct.py"
     distruct = "/usr/local/distruct-1.1/distruct"
     structure_gis_to_sa = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/structure_gis_to_sa.py"
+    structure_pca_to_sa = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/structure_pca_to_sa.py"
     pca_gis_to_sa = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/pca_gis_to_sa.py"
     plot_gis_structure = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/plot_gis_structure.py"
     plot_pca_structure = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/plot_pca_structure.py"
@@ -493,20 +494,23 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
         cmd = f"cd {output_dir}; {fpca} -i {input_tg_file} > {log} 2> {err}"
         pg.add(tgt, dep, cmd)
 
-        #generate sample files for plotting PCA - GIS scatterplots
-        output_dir = f"{working_dir}/{dataset}/pca"
-        input_pca_file = f"{output_dir}/{dataset}_pangolin.pca"
-        input_gis_sa_file = f"{annotation_dir}/78samples_pangolin.sa"
-        output_sa_file = f"{output_dir}/gisplots/{dataset}_pangolin.sa"
-        log = f"{output_dir}/gisplots/gis_sa.log"
-        tgt = f"{output_dir}/gisplots/gisplot.ok"
-        dep = f"{output_dir}/pca.OK "
-        cmd = f"{pca_gis_to_sa} -g {input_gis_sa_file} -p {input_pca_file} -o {output_sa_file} > {log}"
-        pg.add(tgt, dep, cmd)
+        #generate sample files for plotting PCA - Structure scatterplots
+        for k in range(2, 5):
+            output_dir = f"{working_dir}/{dataset}/pca"
+            input_pca_file = f"{output_dir}/{dataset}_pangolin.pca"
+            input_structure_file = f"{structure_dir}/K{k}_R1_f"
+            output_sa_file = f"{output_dir}/gisplots/{dataset}_pangolin_K{k}.sa"
+            log = f"{output_sa_file}.log"
+            tgt = f"{output_sa_file}.ok"
+            dep = f"{output_dir}/pca.OK {structure_dir}/K{k}_R1.OK"
+            cmd = f"{structure_pca_to_sa} -s {input_structure_file} -p {input_pca_file} -o {output_sa_file} > {log}"
+            pg.add(tgt, dep, cmd)
 
         #plot geospatial plot with structure pie charts
 
+
         #plot PCA with structure pie charts
+
 
         #plot genome plots
 
