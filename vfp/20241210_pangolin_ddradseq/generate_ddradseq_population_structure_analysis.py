@@ -75,6 +75,7 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
     fastq_ulen_dir = f"{working_dir}/fastq_ulen"
     bam_dir = f"{working_dir}/bam"
     vcf_dir = f"{working_dir}/vcf"
+    annotation_dir = f"{working_dir}/annotations"
     denovo_stacks_dir = f"{working_dir}/denovo_stacks"
     ref_stacks_dir = f"{working_dir}/ref_stacks"
     qc_dir = f"{working_dir}/qc"
@@ -119,7 +120,10 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
     fpca = "/usr/local/fratools-1.0/fpca"
     structure_to_clumpp_distruct = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/structure_to_clumpp_distruct.py"
     distruct = "/usr/local/distruct-1.1/distruct"
-
+    structure_gis_to_sa = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/structure_gis_to_sa.py"
+    pca_gis_to_sa = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/pca_gis_to_sa.py"
+    plot_gis_structure = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/plot_gis_structure.py"
+    plot_pca_structure = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/plot_pca_structure.py"
 
     ####################
     # Sequence Alignment
@@ -386,7 +390,6 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
     cmd = f"{bcftools} view -s ^BIOS0016,BIOS0007 {input_vcf_file} -o {output_vcf_file}"
     pg.add(tgt, dep, cmd)
 
-
     for dataset in ["56samples_31906snps", "58samples_31906snps", "55samples_19477snps"]:
 #    for dataset in ["56samples_31906snps"]:
         # create directories in destination folder directory
@@ -394,7 +397,10 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
         pca_dir = f"{working_dir}/{dataset}/pca"
         try:
             os.makedirs(structure_dir, exist_ok=True)
+            os.makedirs(f"{structure_dir}/barplots", exist_ok=True)
+            os.makedirs(f"{structure_dir}/gisplots", exist_ok=True)
             os.makedirs(pca_dir, exist_ok=True)
+            os.makedirs(f"{pca_dir}/gisplots", exist_ok=True)
         except OSError as error:
             print(f"{error.filename} cannot be created")
 
@@ -441,7 +447,6 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
 
         for k in range(2, 5):
             for rep in range(1, 4):
-
                 #run distruct
                 input_drawparam = f"K{k}_R{rep}.drawparams"
                 log = f"{output_dir}/K{k}_R{rep}.distruct.log"
@@ -458,6 +463,14 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
                 pg.add(tgt, dep, cmd)
 
             #generate sample files for plotting GIS scatterplots
+            input_structure_file = f"{output_dir}/K{k}_R1_f"
+            input_gis_sa_file = f"{annotation_dir}/78samples_pangolin.sa"
+            output_sa_file = f"{output_dir}/gisplots/K{k}_R{rep}.sa"
+            log = f"{output_dir}/gisplots/gis_sa.log"
+            tgt = f"{output_sa_file}.ok"
+            dep = f"{output_dir}/K{k}_R{rep}.OK "
+            cmd = f"{structure_gis_to_sa} -g {input_gis_sa_file} -s {input_structure_file} -o {output_sa_file} > {log}"
+            pg.add(tgt, dep, cmd)
 
         ####
         #PCA
@@ -470,7 +483,6 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
         cmd = f"{vcf_to_tg} {input_vcf_file} -o {output_dir}"
         pg.add(tgt, dep, cmd)
 
-
         #pca
         output_dir = f"{working_dir}/{dataset}/pca"
         input_tg_file = f"{output_dir}/{dataset}_pangolin.tg"
@@ -481,6 +493,16 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
         cmd = f"cd {output_dir}; {fpca} -i {input_tg_file} > {log} 2> {err}"
         pg.add(tgt, dep, cmd)
 
+        #generate sample files for plotting PCA - GIS scatterplots
+        output_dir = f"{working_dir}/{dataset}/pca"
+        input_pca_file = f"{output_dir}/{dataset}_pangolin.pca"
+        input_gis_sa_file = f"{annotation_dir}/78samples_pangolin.sa"
+        output_sa_file = f"{output_dir}/gisplots/{dataset}_pangolin.sa"
+        log = f"{output_dir}/gisplots/gis_sa.log"
+        tgt = f"{output_dir}/gisplots/gisplot.ok"
+        dep = f"{output_dir}/pca.OK "
+        cmd = f"{pca_gis_to_sa} -g {input_gis_sa_file} -p {input_pca_file} -o {output_sa_file} > {log}"
+        pg.add(tgt, dep, cmd)
 
         #plot geospatial plot with structure pie charts
 
