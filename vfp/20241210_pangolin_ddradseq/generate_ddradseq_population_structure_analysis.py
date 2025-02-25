@@ -117,6 +117,9 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
     vcf_to_tg = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/vcf_to_tg.py"
     structure = "/usr/local/structure-2.3.4/structure"
     fpca = "/usr/local/fratools-1.0/fpca"
+    structure_to_clumpp_distruct = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/structure_to_clumpp_distruct.py"
+    distruct = "/usr/local/distruct-1.1/distruct"
+
 
     ####################
     # Sequence Alignment
@@ -422,12 +425,41 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
                 cmd = f"{structure} -i {input_structure_file} -o {output_structure_results_file} -m {mainparams} -e {extraparams} -K {k} -D {seed} > {log}"
                 pg.add(tgt, dep, cmd)
 
+        #prepare distruct files
+        for k in range(2, 5):
+            output_dir = f"{working_dir}/{dataset}/structure"
+            input_structure_results_files = ""
+            log = f"{output_dir}/K{k}.distruct.log"
+            tgt = f"{output_dir}/K{k}.distruct.OK"
+            dep = ""
+            for rep in range(1, 4):
+                input_structure_results_files += f"{output_dir}/K{k}_R{rep}_f "
+                dep += f"{output_dir}/K{k}_R{rep}.OK "
+            cmd = f"{structure_to_clumpp_distruct} {input_structure_results_files} > {log}"
+            pg.add(tgt, dep, cmd)
+
+
         for k in range(2, 5):
             for rep in range(1, 4):
-                pass
-                #plot structure bar plots
 
-                #plot geospatial plot with structure pie charts
+                #run distruct
+                input_drawparam = f"K{k}_R{rep}.drawparams"
+                log = f"{output_dir}/K{k}_R{rep}.distruct.log"
+                tgt = f"{output_dir}/K{k}_R{rep}.distruct.OK"
+                dep = f"{output_dir}/K{k}.distruct.OK "
+                cmd = f"cd {output_dir}; {distruct} -d {input_drawparam} > {log}; set $? 0"
+                pg.add(tgt, dep, cmd)
+
+                input_ps_file = f"{output_dir}/K{k}_R{rep}.ps"
+                output_pdf_file = f"{output_dir}/K{k}_R{rep}.pdf"
+                tgt = f"{output_dir}/K{k}_R{rep}.pdf.ok"
+                dep = f"{output_dir}/K{k}_R{rep}.distruct.OK "
+                cmd = f"ps2pdf {input_ps_file} {output_pdf_file}"
+                pg.add(tgt, dep, cmd)
+
+            #generate sample files for plotting GIS scatterplots
+
+
 
         ####
         #PCA
