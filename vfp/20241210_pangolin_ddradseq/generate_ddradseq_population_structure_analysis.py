@@ -466,11 +466,19 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
             #generate sample files for plotting GIS scatterplots
             input_structure_file = f"{output_dir}/K{k}_R1_f"
             input_gis_sa_file = f"{annotation_dir}/78samples_pangolin.sa"
-            output_sa_file = f"{output_dir}/gisplots/K{k}_R{rep}.sa"
-            log = f"{output_dir}/gisplots/gis_sa.log"
+            output_sa_file = f"{output_dir}/gisplots/K{k}.sa"
+            log = f"{output_dir}/gisplots/K{k}_gis.log"
             tgt = f"{output_sa_file}.ok"
             dep = f"{output_dir}/K{k}_R{rep}.OK "
             cmd = f"{structure_gis_to_sa} -g {input_gis_sa_file} -s {input_structure_file} -o {output_sa_file} > {log}"
+            pg.add(tgt, dep, cmd)
+
+            #plot geospatial plot with structure pie charts
+            input_sa_file = f"{output_dir}/gisplots/K{k}.sa"
+            output_pdf_file = f"{output_dir}/gisplots/K{k}.pdf"
+            tgt = f"{output_pdf_file}.ok"
+            dep = f"{output_dir}/gisplots/K{k}.sa"
+            cmd = f"{plot_gis_structure} {input_sa_file} -o {output_dir}/gisplots -z {output_pdf_file}"
             pg.add(tgt, dep, cmd)
 
         ####
@@ -499,20 +507,23 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
             output_dir = f"{working_dir}/{dataset}/pca"
             input_pca_file = f"{output_dir}/{dataset}_pangolin.pca"
             input_structure_file = f"{structure_dir}/K{k}_R1_f"
-            output_sa_file = f"{output_dir}/gisplots/{dataset}_pangolin_K{k}.sa"
+            output_sa_file = f"{output_dir}/gisplots/K{k}.sa"
             log = f"{output_sa_file}.log"
             tgt = f"{output_sa_file}.ok"
             dep = f"{output_dir}/pca.OK {structure_dir}/K{k}_R1.OK"
             cmd = f"{structure_pca_to_sa} -s {input_structure_file} -p {input_pca_file} -o {output_sa_file} > {log}"
             pg.add(tgt, dep, cmd)
 
-        #plot geospatial plot with structure pie charts
+            #plot PCA with structure pie charts
+            #plot geospatial plot with structure pie charts
+            input_sa_file = f"{output_dir}/gisplots/K{k}.sa"
+            output_pdf_file = f"{output_dir}/gisplots/K{k}.pdf"
+            tgt = f"{output_pdf_file}.ok"
+            dep = f"{output_dir}/gisplots/K{k}.sa"
+            cmd = f"{plot_pca_structure} {input_sa_file} -o {output_dir}/gisplots -z {output_pdf_file}"
+            pg.add(tgt, dep, cmd)
 
-
-        #plot PCA with structure pie charts
-
-
-        #plot genome plots
+            #plot genome plots
 
     # clean
     pg.add_clean(f"rm -fr {ref_dir} {denovo_stacks_dir} {fastq_dir}")
