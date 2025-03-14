@@ -276,6 +276,7 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
         pg.add(tgt, dep, cmd)
 
     # plot samtools
+    # docker run  -u "root:root" -t -v  `pwd`:`pwd` -w `pwd` multiqc/multiqc multiqc  . -m samtools -f -o all  -n samtools --no-ansi
     output_dir = f"{plot_dir}"
     log = f"{plot_dir}/samtools.multiqc_report.log"
     err = f"{plot_dir}/samtools.multiqc_report.err"
