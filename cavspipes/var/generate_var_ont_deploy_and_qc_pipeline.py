@@ -110,6 +110,7 @@ def main(
     plot_bamstats = "/usr/local/samtools-1.17/bin/plot-bamstats"
 
     virus_genomes = {
+        "ASFV":"/usr/local/ref/var/FR682468.2.fasta",
         "ISKNV":"/usr/local/ref/var/NC_003494.1.fasta",
         "KHV":"/usr/local/ref/var/NC_009127.1.fasta"
                      }
@@ -258,7 +259,7 @@ def main(
             ###########################
             align_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/align_result"
             ref_fasta_file_base_name = os.path.basename(virus_genomes[sample.virus])
-            reference_fasta_file = f"{virus_genomes[sample.virus]}"
+            reference_fasta_file = virus_genomes[sample.virus]
 
             #copy reference
             dep = ""

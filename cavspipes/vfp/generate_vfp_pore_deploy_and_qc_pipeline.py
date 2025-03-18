@@ -50,7 +50,7 @@ from datetime import datetime
 )
 @click.option("-x", "--memory", help="Memory for fastqc", required=False, default=2048)
 @click.option("-y", "--model", help="Model for Dorado calling", required=False, default="dna_r10.4.1_e8.2_400bps_hac@v5.0.0")
-@click.option("-k", "--kit", default="SQK-LSK114", show_default=True, help="Kit ID")
+@click.option("-k", "--kit", default="SQK-NBD114-24", show_default=True, help="Kit ID")
 @click.option("-s", "--sample_file", required=True, help="sample file")
 def main(
     make_file,
@@ -88,15 +88,17 @@ def main(
     version = "1.0.0"
 
     # programs
-    dorado = "/usr/local/dorado-0.8.1/bin/dorado"
+    dorado = "/usr/local/dorado-0.9.1/bin/dorado"
+    #dna_r10.4.1_e8.2_5khz_stereo@v1.3
     #dna_r10.4.1_e8.2_400bps_hac@v4.4.0
     #dna_r10.4.1_e8.2_400bps_sup@v4.3.0
-    #dna_r10.4.1_e8.2_400bps_hac@v5.0.0"
-    dorado_basecall_model = f"/usr/local/dorado-0.8.1/models/{model}"
+    #dna_r10.4.1_e8.2_400bps_hac@v5.0.0
+    dorado_basecall_model = f"/usr/local/dorado-0.9.1/models/{model}"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
     fastqc = f"/usr/local/FastQC-0.12.1/fastqc --adapters /usr/local/FastQC-0.12.1/Configuration/adapter_list.nanopore.txt --memory {memory}"
-    multiqc = "/usr/local/bin/multiqc"
-    nanoplot = "/usr/local/NanoPlot-1.43/bin/NanoPlot"
+    multiqc = "docker run  -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` multiqc/multiqc multiqc "
+    #nanoplot = "/usr/local/NanoPlot-1.43/bin/NanoPlot"
+    nanoplot = f"docker run -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` staphb/nanoplot:1.42.0 NanoPlot "
     ft = "/usr/local/cavstools-0.0.1/ft"
 
     run = Run(run_id)
@@ -108,11 +110,22 @@ def main(
                 sample_id, barcode = line.rstrip().split("\t")
                 run.add_sample(index, sample_id, barcode)
 
+    #run.print()
+    #print(f"no of samples read: {len(run.samples)}")
+
+    multiplexed = index > 1
+
+    if multiplexed:
+        print("\t{0:<20} :   {1:<10}".format("multiplex", "Yes"))
+    else:
+        print("\t{0:<20} :   {1:<10}".format("multiplex", "No"))
+
     # create directories in destination folder directory
     analysis_dir = f"{dest_dir}/analysis"
     log_dir = f"{working_dir}/log"
     aux_dir = f"{working_dir}/aux"
     bam_dir = f"{working_dir}/bam"
+    demux_dir = f"{working_dir}/demux"
     fastq_dir = f"{working_dir}/fastq"
     trace_dir = f"{dest_dir}/trace"
     try:
@@ -120,6 +133,7 @@ def main(
         os.makedirs(log_dir, exist_ok=True)
         os.makedirs(aux_dir, exist_ok=True)
         os.makedirs(bam_dir, exist_ok=True)
+        os.makedirs(demux_dir, exist_ok=True)
         os.makedirs(fastq_dir, exist_ok=True)
         os.makedirs(trace_dir, exist_ok=True)
         for sample in run.samples:
@@ -144,42 +158,182 @@ def main(
     cmd = f"{dorado} duplex -r {dorado_basecall_model} {pod5_files_dir} > {output_bam_file} 2> {log}"
     pg.add(tgt, dep, cmd)
 
-    #trim and filter and extract only simple single reads and duplex reads
-    input_bam_file = f"{bam_dir}/basecalls.bam"
-    output_fastq_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
-    tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz.OK"
-    dep = f"{log_dir}/dorado_base_caller.OK"
-    cmd = f"{dorado} trim {input_bam_file} | {samtools} bam2fq -T \"*\" | grep -iP \"dx:i:0|dx:i:1\" -A 3 | grep -vP \"^--$$\"  | {ft} filter -q 7 -l 20 -o {output_fastq_file} "
-    pg.add(tgt, dep, cmd)
+    if multiplexed:
 
-    # symbolic link for fastqc
-    fastqc_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/fastqc_result"
+        #get acquisition run ID
+        #print("\t{0:<20} :   {1:<10}".format("acquisition run id", acquisition_run_id))
+        acquisition_run_id = ""
+        dest_dir = working_dir + "/" + run_id
+        nanopore_dir = os.path.abspath(nanopore_dir)
+        fastq_dir = ""
+        for dirpath, dirnames, filenames in os.walk(nanopore_dir):
+            for filename in filenames:
+                if filename.startswith("final_summary_"):
+                    final_summary_txt_file = os.path.join(dirpath, filename)
+                    with open(final_summary_txt_file, "r") as file:
+                        for line in file:
+                            if line.startswith("acquisition_run_id"):
+                                acquisition_run_id = line.rstrip().split("=")[1]
+                                break
 
-    src_fastq = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
-    dst_fastq = f"{fastqc_dir}/{sample.padded_idx}_{sample.id}.fastq.gz"
-    tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}.fastq.gz.OK"
-    dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz.OK"
-    cmd = f"ln -sf {src_fastq} {dst_fastq}"
-    pg.add(tgt, dep, cmd)
+        print("\t{0:<20} :   {1:<10}".format("acquisition_run_id", acquisition_run_id))
 
-    # fastqc
-    input_fastq_file = f"{fastqc_dir}/{sample.padded_idx}_{sample.id}.fastq.gz"
-    log = f"{log_dir}/{sample.idx}_{sample.id}_fastqc.log"
-    err = f"{log_dir}/{sample.idx}_{sample.id}_fastqc.err"
-    tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}_fastqc.OK"
-    dep = f"{log_dir}/{sample.padded_idx}_{sample.id}.fastq.gz.OK"
-    cmd = f"{fastqc} {input_fastq_file} -o {fastqc_dir} > {log} 2> {err}"
-    pg.add(tgt, dep, cmd)
+        # demux
+        # dorado demux --output-dir demux --kit-name SQK-NBD114-24  basecalls.bam
+        input_bam_file = f"{working_dir}/bam/basecalls.bam"
+        output_dir = f"{working_dir}/demux"
+        log = f"{log_dir}/demux.log"
+        err = f"{log_dir}/demux.err"
+        dep = f"{log_dir}/dorado_base_caller.OK"
+        tgt = f"{log_dir}/demux.OK"
+        cmd = f'{dorado} demux --output-dir {output_dir} --kit-name {kit} {input_bam_file} > {log} 2> {err}'
+        pg.add(tgt, dep, cmd)
 
-    #nanoplot
-    input_fastq_file = f"{fastqc_dir}/{sample.padded_idx}_{sample.id}.fastq.gz"
-    nanoplot_dir =f"{analysis_dir}/{sample.idx}_{sample.id}/nanoplot_result"
-    log = f"{log_dir}/{sample.idx}_{sample.id}_nanoplot.log"
-    err = f"{log_dir}/{sample.idx}_{sample.id}_nanoplot.err"
-    tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}_nanoplot.OK"
-    dep = f"{log_dir}/{sample.padded_idx}_{sample.id}.fastq.gz.OK"
-    cmd = f"{nanoplot} --fastq {input_fastq_file} -o {nanoplot_dir} > {log} 2> {err}"
-    pg.add(tgt, dep, cmd)
+        fastqc_multiqc_dep = ""
+        nanoplot_multiqc_dep = ""
+
+        for sample in run.samples:
+            # samtools bam2fq <acquisition_run_id>_SQK-NBD114-24_barcode01.bam  -T "*"
+            input_bam_file = f"{working_dir}/demux/{acquisition_run_id}_{kit}_{sample.barcode}.bam"
+            if sample.barcode=="unclassified":
+                input_bam_file = f"{working_dir}/demux/{acquisition_run_id}_unclassified.bam"
+            output_fastq_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
+            log = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz.log.OK"
+            tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz.OK"
+            dep = f"{log_dir}/demux.OK"
+            cmd = f"{samtools} bam2fq -T \"*\" {input_bam_file} 2> {log} | gzip > {output_fastq_file} "
+            pg.add(tgt, dep, cmd)
+
+            # symbolic link for fastqc
+            fastqc_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/fastqc_result"
+
+            src_fastq = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
+            dst_fastq = f"{fastqc_dir}/{sample.padded_idx}_{sample.id}.fastq.gz"
+            tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}.fastq.gz.OK"
+            dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz.OK"
+            cmd = f"ln -sf {src_fastq} {dst_fastq}"
+            pg.add(tgt, dep, cmd)
+
+            # fastqc
+            input_file = f"{fastqc_dir}/{sample.padded_idx}_{sample.id}.fastq.gz"
+            output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/fastqc_result"
+            log = f"{log_dir}/{sample.padded_idx}_{sample.id}.fastqc.log"
+            err = f"{log_dir}/{sample.padded_idx}_{sample.id}.fastqc.err"
+            dep = f"{log_dir}/{sample.padded_idx}_{sample.id}.fastq.gz.OK"
+            tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}.fastqc.OK"
+            fastqc_multiqc_dep += f" {tgt}"
+            cmd = f"{fastqc} {input_file} -o {output_dir} > {log} 2> {err}"
+            pg.add(tgt, dep, cmd)
+
+            # nanoplot
+            input_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
+            output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/nanoplot_result"
+            prefix = f"{sample.padded_idx}_{sample.id}_"
+            log = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.log"
+            err = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.err"
+            dep = f"{log_dir}/{sample.padded_idx}_{sample.id}.fastq.gz.OK"
+            tgt = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.run.OK"
+            cmd = f"{nanoplot} --fastq {input_file} -p {prefix} -o {output_dir} > {log} 2> {err}"
+            pg.add(tgt, dep, cmd)
+
+            #rename nanoplot file
+            src_txt_file = f"{analysis_dir}/{sample.idx}_{sample.id}/nanoplot_result/{sample.padded_idx}_{sample.id}_NanoStats.txt"
+            dst_txt_file = f"{analysis_dir}/{sample.idx}_{sample.id}/nanoplot_result/{sample.padded_idx}_{sample.id}.txt"
+            dep = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.run.OK"
+            tgt = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.run.renamed.OK"
+            nanoplot_multiqc_dep += f" {tgt}"
+            cmd = f"mv {src_txt_file} {dst_txt_file}"
+            pg.add(tgt, dep, cmd)
+
+            #remove post filtering files from nanoplot
+            txt_file = f"{analysis_dir}/{sample.idx}_{sample.id}/nanoplot_result/{sample.padded_idx}_{sample.id}_NanoStats_post_filtering.txt"
+            dep = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.run.renamed.OK"
+            tgt = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.OK"
+            nanoplot_multiqc_dep += f" {tgt}"
+            cmd = f"rm -f {txt_file}"
+            pg.add(tgt, dep, cmd)
+
+        # plot fastqc multiqc results
+        analysis = "fastqc"
+        output_dir = f"{analysis_dir}/all/{analysis}"
+        log = f"{log_dir}/{analysis}.multiqc_report.log"
+        err = f"{log_dir}/{analysis}.multiqc_report.err"
+        dep = fastqc_multiqc_dep
+        tgt = f"{log_dir}/{analysis}.multiqc_report.OK"
+        cmd = f"cd {analysis_dir}; {multiqc} . -f -m fastqc -o {output_dir} -n {analysis} --no-ansi > {log} 2> {err}"
+        pg.add(tgt, dep, cmd)
+
+        # plot nanoplot multiqc results
+        analysis = "nanoplot"
+        output_dir = f"{analysis_dir}/all/{analysis}"
+        log = f"{log_dir}/{analysis}.multiqc_report.log"
+        err = f"{log_dir}/{analysis}.multiqc_report.err"
+        dep = nanoplot_multiqc_dep
+        tgt = f"{log_dir}/{analysis}.multiqc_report.OK"
+        cmd = f"cd {analysis_dir}; {multiqc} . -f -m nanostat -o {output_dir} -n {analysis} --no-ansi > {log} 2> {err}"
+        pg.add(tgt, dep, cmd)
+
+    else: # single sample
+
+        #trim and filter and extract only simple single reads and duplex reads
+        input_bam_file = f"{bam_dir}/basecalls.bam"
+        output_fastq_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
+        tgt = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz.OK"
+        dep = f"{log_dir}/dorado_base_caller.OK"
+        #cmd = f"{dorado} trim -k {kit} {input_bam_file} | {samtools} bam2fq -T \"*\" | grep -iP \"dx:i:0|dx:i:1\" -A 3 | grep -vP \"^--$$\"  | {ft} filter -q 7 -l 20 -o {output_fastq_file} "
+        cmd = f"{dorado} trim -k {kit} {input_bam_file} | {samtools} bam2fq -T \"*\" | grep -vP \"^--$$\"  | gzip > {output_fastq_file} "
+        pg.add(tgt, dep, cmd)
+
+        # symbolic link for fastqc
+        fastqc_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/fastqc_result"
+
+        src_fastq = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
+        dst_fastq = f"{fastqc_dir}/{sample.padded_idx}_{sample.id}.fastq.gz"
+        tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}.fastq.gz.OK"
+        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz.OK"
+        cmd = f"ln -sf {src_fastq} {dst_fastq}"
+        pg.add(tgt, dep, cmd)
+
+        # fastqc
+        input_fastq_file = f"{fastqc_dir}/{sample.padded_idx}_{sample.id}.fastq.gz"
+        log = f"{log_dir}/{sample.idx}_{sample.id}_fastqc.log"
+        err = f"{log_dir}/{sample.idx}_{sample.id}_fastqc.err"
+        tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}_fastqc.OK"
+        dep = f"{log_dir}/{sample.padded_idx}_{sample.id}.fastq.gz.OK"
+        cmd = f"{fastqc} {input_fastq_file} -o {fastqc_dir} > {log} 2> {err}"
+        pg.add(tgt, dep, cmd)
+
+        # nanoplot
+        input_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
+        output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/nanoplot_result"
+        prefix = f"{sample.padded_idx}_{sample.id}_"
+        log = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.log"
+        err = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.err"
+        dep = f"{log_dir}/{sample.padded_idx}_{sample.id}.fastq.gz.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.run.OK"
+        cmd = f"{nanoplot} --fastq {input_file} -p {prefix} -o {output_dir} > {log} 2> {err}"
+        pg.add(tgt, dep, cmd)
+
+        # plot fastqc multiqc results
+        analysis = "fastqc"
+        output_dir = f"{analysis_dir}/all/{analysis}"
+        log = f"{log_dir}/{analysis}.multiqc_report.log"
+        err = f"{log_dir}/{analysis}.multiqc_report.err"
+        dep = f"{log_dir}/{sample.padded_idx}_{sample.id}_fastqc.OK"
+        tgt = f"{log_dir}/{analysis}.multiqc_report.OK"
+        cmd = f"cd {analysis_dir}; {multiqc} . -f -m fastqc -o {output_dir} -n {analysis} --no-ansi > {log} 2> {err}"
+        pg.add(tgt, dep, cmd)
+
+        # plot nanoplot multiqc results
+        analysis = "nanoplot"
+        output_dir = f"{analysis_dir}/all/{analysis}"
+        log = f"{log_dir}/{analysis}.multiqc_report.log"
+        err = f"{log_dir}/{analysis}.multiqc_report.err"
+        dep = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.run.OK"
+        tgt = f"{log_dir}/{analysis}.multiqc_report.OK"
+        cmd = f"cd {analysis_dir}; {multiqc} . -f -m nanostat -o {output_dir} -n {analysis} --no-ansi > {log} 2> {err}"
+        pg.add(tgt, dep, cmd)
+
 
     # write make file
     print("Writing pipeline")
