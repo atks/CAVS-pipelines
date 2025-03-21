@@ -40,9 +40,7 @@ import random
 @click.option("-s", "--sample_file", required=True, help="sample file")
 @click.option("-i", "--input_vcf_file", required=True, help="VCF file")
 @click.option("-d", "--dataset", required=True, help="dataset name")
-@click.option("-p", "--population_map_file", required=True, help="population map file")
-@click.option("-g", "--genome_fasta_file", default="", required=False, help="genome FASTA file")
-def main(make_file, working_dir, sample_file, input_vcf_file, dataset, population_map_file, genome_fasta_file):
+def main(make_file, working_dir, sample_file, input_vcf_file, dataset):
     """
     Population structure of Pangolins
 
@@ -53,8 +51,6 @@ def main(make_file, working_dir, sample_file, input_vcf_file, dataset, populatio
     print("\t{0:<20} :   {1:<10}".format("sample file", sample_file))
     print("\t{0:<20} :   {1:<10}".format("input VCF file", input_vcf_file))
     print("\t{0:<20} :   {1:<10}".format("dataset", dataset))
-    print("\t{0:<20} :   {1:<10}".format("population map file", population_map_file))
-    print("\t{0:<20} :   {1:<10}".format("genome fasta file", genome_fasta_file))
 
     # initialize
     pg = PipelineGenerator(make_file)
@@ -65,7 +61,6 @@ def main(make_file, working_dir, sample_file, input_vcf_file, dataset, populatio
     log_dir = f"{working_dir}/log"
     stats_dir = f"{working_dir}/stats"
     plot_dir = f"{working_dir}/plot"
-    annotation_dir = f"{working_dir}/annotations"
     try:
         os.makedirs(ref_dir, exist_ok=True)
         os.makedirs(log_dir, exist_ok=True)
@@ -82,7 +77,6 @@ def main(make_file, working_dir, sample_file, input_vcf_file, dataset, populatio
     # programs
     ##########
     samtools = "/usr/local/samtools-1.17/bin/samtools"
-    ref_stacks = "/usr/local/stacks-2.68/bin/ref_map.pl"
     bcftools = "/usr/local/bcftools-1.17/bin/bcftools"
     structure = "/usr/local/structure-2.3.4/structure"
     fpca = "/usr/local/fratools-1.0/fpca"
@@ -94,7 +88,6 @@ def main(make_file, working_dir, sample_file, input_vcf_file, dataset, populatio
     structure_to_clumpp_distruct = f"{script_dir}/structure_to_clumpp_distruct.py"
     structure_gis_to_sa = f"{script_dir}/structure_gis_to_sa.py"
     structure_pca_to_sa = f"{script_dir}/structure_pca_to_sa.py"
-    pca_gis_to_sa = f"{script_dir}/pca_gis_to_sa.py"
     plot_gis_structure = f"{script_dir}/plot_gis_structure.py"
     plot_pca_structure = f"{script_dir}/plot_pca_structure.py"
 
@@ -115,9 +108,10 @@ def main(make_file, working_dir, sample_file, input_vcf_file, dataset, populatio
     ##########
     #convert VCF file to structure format
     output_dir = structure_dir
+    log = f"{output_dir}/structure_files.log"
     tgt = f"{output_dir}/structure_files.OK"
     dep = f""
-    cmd = f"{vcf_to_structure} {input_vcf_file} -o {output_dir}"
+    cmd = f"{vcf_to_structure} {input_vcf_file} -o {output_dir} > {log}"
     pg.add(tgt, dep, cmd)
 
     #run structure
