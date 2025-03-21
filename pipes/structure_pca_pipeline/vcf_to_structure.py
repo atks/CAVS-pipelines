@@ -24,7 +24,8 @@ import click
 @click.command()
 @click.argument("vcf_file")
 @click.option("-o", "--output_dir", required=True, help="output directory")
-def main(vcf_file, output_dir):
+@click.option("-d", "--dataset", required=True, help="dataset")
+def main(vcf_file, output_dir, dataset):
     """
     Convert VCF file to structure format.  Generates the extraparams and mainparams files
 
@@ -51,7 +52,7 @@ def main(vcf_file, output_dir):
                 data.append(Variant(id, chrom, pos, ref, alt, genotypes))
                 no_variants +=1
 
-    out_structure_file = os.path.join(output_dir, os.path.basename(vcf_file.replace(".vcf", ".structure")))
+    out_structure_file = os.path.join(output_dir, f"{dataset}.structure")
     with open(out_structure_file, "w") as file:
         #write locus header
         for i in range(no_variants):

@@ -56,28 +56,23 @@ def main(make_file, working_dir, sample_file, input_vcf_file, dataset):
     pg = PipelineGenerator(make_file)
 
     # create directories in destination folder directory
-    working_dir = os.path.abspath(working_dir)
-    ref_dir = f"{working_dir}/ref"
+    working_dir = os.path.join(os.path.abspath(working_dir), dataset)
+    structure_dir = f"{working_dir}/structure"
+    pca_dir = f"{working_dir}/pca"
     log_dir = f"{working_dir}/log"
-    stats_dir = f"{working_dir}/stats"
-    plot_dir = f"{working_dir}/plot"
     try:
-        os.makedirs(ref_dir, exist_ok=True)
         os.makedirs(log_dir, exist_ok=True)
-        os.makedirs(stats_dir, exist_ok=True)
-        os.makedirs(f"{stats_dir}/coverage", exist_ok=True)
-        os.makedirs(f"{stats_dir}/general", exist_ok=True)
-        os.makedirs(f"{stats_dir}/flag", exist_ok=True)
-        os.makedirs(f"{stats_dir}/idx", exist_ok=True)
-        os.makedirs(plot_dir, exist_ok=True)
+        os.makedirs(structure_dir, exist_ok=True)
+        os.makedirs(f"{structure_dir}/barplots", exist_ok=True)
+        os.makedirs(f"{structure_dir}/gisplots", exist_ok=True)
+        os.makedirs(pca_dir, exist_ok=True)
+        os.makedirs(f"{pca_dir}/gisplots", exist_ok=True)
     except OSError as error:
         print(f"{error.filename} cannot be created")
 
     ##########
     # programs
     ##########
-    samtools = "/usr/local/samtools-1.17/bin/samtools"
-    bcftools = "/usr/local/bcftools-1.17/bin/bcftools"
     structure = "/usr/local/structure-2.3.4/structure"
     fpca = "/usr/local/fratools-1.0/fpca"
     distruct = "/usr/local/distruct-1.1/distruct"
@@ -91,18 +86,6 @@ def main(make_file, working_dir, sample_file, input_vcf_file, dataset):
     plot_gis_structure = f"{script_dir}/plot_gis_structure.py"
     plot_pca_structure = f"{script_dir}/plot_pca_structure.py"
 
-    # create directories in destination folder directory
-    structure_dir = f"{working_dir}/structure"
-    pca_dir = f"{working_dir}/pca"
-    try:
-        os.makedirs(structure_dir, exist_ok=True)
-        os.makedirs(f"{structure_dir}/barplots", exist_ok=True)
-        os.makedirs(f"{structure_dir}/gisplots", exist_ok=True)
-        os.makedirs(pca_dir, exist_ok=True)
-        os.makedirs(f"{pca_dir}/gisplots", exist_ok=True)
-    except OSError as error:
-        print(f"{error.filename} cannot be created")
-
     ##########
     #structure
     ##########
@@ -111,7 +94,7 @@ def main(make_file, working_dir, sample_file, input_vcf_file, dataset):
     log = f"{output_dir}/structure_files.log"
     tgt = f"{output_dir}/structure_files.OK"
     dep = f""
-    cmd = f"{vcf_to_structure} {input_vcf_file} -o {output_dir} > {log}"
+    cmd = f"{vcf_to_structure} {input_vcf_file} -o {output_dir} -d {dataset} > {log}"
     pg.add(tgt, dep, cmd)
 
     #run structure
@@ -218,7 +201,7 @@ def main(make_file, working_dir, sample_file, input_vcf_file, dataset):
             pg.add(tgt, dep, cmd)
 
     # clean
-    pg.add_clean(f"rm -fr {ref_dir} {log_dir} {stats_dir} {plot_dir} {structure_dir} {pca_dir}")
+    pg.add_clean(f"rm -fr {log_dir} {structure_dir} {pca_dir}")
 
     # write make file
     print("Writing pipeline")
