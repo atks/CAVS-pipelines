@@ -1,24 +1,45 @@
 library(ggplot2)
 
-
 setwd("/home/atks/analysis/admin/20250327_mmvd_mahidol")
 
 # preparation of mmvd2.txt
 # remove "'" in the header line
 # replace spaces with _
 
-data <- read.table("mmvd2.txt",
+data <- read.table("mmvd.txt",
     sep = "\t", header = TRUE, quote = "",
     fill = TRUE, comment.char = ""
 )
 
-# possible dog ID errors
-#     25 MU-653-01
-#     11 MU-653-10
-#
-#     11 records to be renamed as follows
-#     MU-653-10-08  => MU-653-01-08
-#
+data$r <- data$la / data$ao
+
+subset(data, r > 10)
+
+ggplot(data, aes(x = dog_id, y = r)) +
+    geom_boxplot()
+
+data.rishniw <- subset(data, method == "rishniw")
+
+
+
+nrow(data)
+
+nrow(data.rishniw)
+
+ggplot(data.rishniw, aes(x = dog_id, y = r)) +
+    geom_boxplot()
+
+data.hansson <- subset(data, method == "hansson")
+
+ggplot(data.hansson, aes(x = dog_id, y = r)) +
+    geom_boxplot()
+
+
+# group by dog_id, video_id and frame_id
+
+
+
+
 
 head(data)
 colnames(data)
@@ -40,7 +61,6 @@ data$dog <- sapply(
     function(x) paste(x[1:3], collapse = "-")
 )
 
-head(data)
 
 # plot dog
 

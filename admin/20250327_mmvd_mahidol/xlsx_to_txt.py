@@ -49,7 +49,7 @@ def main(txt_file, xlsx_file):
     #read in text file
     with open(txt_file, mode='w') as file:
         file.write(f"investigator\tgroup\tdog_id\tvideo_id\tframe_id\tmethod\tla\tao\n")
-        wb = load_workbook(xlsx_file)
+        wb = load_workbook(xlsx_file, data_only=True)
         ws = wb['For calculation']
         for row in ws.iter_rows():
             if row[ws["A1"].column - 1].value == "Investigator":
