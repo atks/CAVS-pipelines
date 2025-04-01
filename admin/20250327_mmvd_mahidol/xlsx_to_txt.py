@@ -57,6 +57,8 @@ def main(txt_file, xlsx_file):
 
             investigator = row[ws["A1"].column - 1].value
             group = row[ws["B1"].column - 1].value
+            if group == "Self-studied vet student":
+                group = "Self-study vet student"
 
             dog_vid = row[ws["C1"].column - 1].value
             if dog_vid == "MU-653-10-08":
@@ -75,6 +77,12 @@ def main(txt_file, xlsx_file):
             r3_ao = row[ws["M1"].column - 1].value
             h3_la = row[ws["N1"].column - 1].value
             h3_ao = row[ws["O1"].column - 1].value
+
+            if r1_la != h1_la or r2_la != h2_la or r3_la != h3_la:
+                print(f"Warning: {investigator} {group} {dog_id} {video_id} has different la values")
+                print(f"\t{r1_la} {h1_la}")
+                print(f"\t{r2_la} {h2_la}")
+                print(f"\t{r3_la} {h3_la}")
 
             file.write(f"{investigator}\t{group}\t{dog_id}\tv{video_id}\tf1\trishniw\t{r1_la}\t{r1_ao}\n")
             file.write(f"{investigator}\t{group}\t{dog_id}\tv{video_id}\tf1\thansson\t{h1_la}\t{h1_ao}\n")
