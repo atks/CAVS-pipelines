@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # The MIT License
-# Copyright (c) 2024 Adrian Tan <adrian_tan@nparks.gov.sg>
+# Copyright (c) 2025 Adrian Tan <adrian_tan@nparks.gov.sg>
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the 'Software'), to deal
 # in the Software without restriction, including without limitation the rights
@@ -100,6 +100,8 @@ def main(
     #nanoplot = "/usr/local/NanoPlot-1.43/bin/NanoPlot"
     nanoplot = f"docker run -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` staphb/nanoplot:1.42.0 NanoPlot "
     ft = "/usr/local/cavstools-0.0.1/ft"
+    amplicon_sorter = "/usr/local/amplicon_sorter-2025-03-15/bin/python3 /usr/local/amplicon_sorter-2025-03-15/amplicon_sorter.py"
+    blastn = "/usr/local/ncbi-blast-2.16.0+/bin/blastn"
 
     run = Run(run_id)
     with open(sample_file, "r") as file:
@@ -107,8 +109,12 @@ def main(
         for line in file:
             if not line.startswith("#"):
                 index += 1
-                sample_id, barcode = line.rstrip().split("\t")
-                run.add_sample(index, sample_id, barcode)
+                sample_id, barcode, min_len, max_len = line.rstrip().split("\t")
+                if min_len == "n/a":
+                    min_len = 0
+                if max_len == "n/a":
+                    max_len = 0
+                run.add_sample(index, sample_id, barcode, min_len, max_len)
 
     #run.print()
     #print(f"no of samples read: {len(run.samples)}")
@@ -165,7 +171,6 @@ def main(
         acquisition_run_id = ""
         dest_dir = working_dir + "/" + run_id
         nanopore_dir = os.path.abspath(nanopore_dir)
-        fastq_dir = ""
         for dirpath, dirnames, filenames in os.walk(nanopore_dir):
             for filename in filenames:
                 if filename.startswith("final_summary_"):
@@ -179,7 +184,7 @@ def main(
         print("\t{0:<20} :   {1:<10}".format("acquisition_run_id", acquisition_run_id))
 
         # demux
-        # dorado demux --output-dir demux --kit-name SQK-NBD114-24  basecalls.bam
+        # dorado demux --output-dir demux --kit-name SQK-NBD114-24 basecalls.bam
         input_bam_file = f"{working_dir}/bam/basecalls.bam"
         output_dir = f"{working_dir}/demux"
         log = f"{log_dir}/demux.log"
@@ -203,6 +208,27 @@ def main(
             dep = f"{log_dir}/demux.OK"
             cmd = f"{samtools} bam2fq -T \"*\" {input_bam_file} 2> {log} | gzip > {output_fastq_file} "
             pg.add(tgt, dep, cmd)
+
+            if sample.is_dna_barcode:
+                # extract into fastq directory
+                src_fastq = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
+                dst_fastq = f"{fastq_dir}/{sample.padded_idx}_{sample.id}.fastq"
+                tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}.fastq.OK"
+                dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz.OK"
+                cmd = f"zcat {src_fastq} > {dst_fastq}"
+                pg.add(tgt, dep, cmd)
+
+                # amplicon sorter
+                src_fastq = f"{fastq_dir}/{sample.padded_idx}_{sample.id}.fastq"
+                output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/amplicon_sorter_result"
+                log = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter.log"
+                tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}.amplicon_sorter.OK"
+                dep = f"{log_dir}/{sample.padded_idx}_{sample.id}.fastq.OK"
+                cmd = f"{amplicon_sorter} -i {src_fastq} -min {sample.min_len} -max {sample.max_len} -o {output_dir} > {log}"
+                pg.add(tgt, dep, cmd)
+
+                #blast
+                # blastn -db /usr/local/ref/blastdb/prokaryotes/nt_prok -query /net/singapura/vm/hts/illu24/contigs/24_15_salmonella_24_1755.contigs.fasta   -outfmt "6 qacc sacc qlen slen score length pident stitle" -out 1755.blast.output.txt -num_threads 12
 
             # symbolic link for fastqc
             fastqc_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/fastqc_result"
@@ -282,6 +308,23 @@ def main(
         dep = f"{log_dir}/dorado_base_caller.OK"
         #cmd = f"{dorado} trim -k {kit} {input_bam_file} | {samtools} bam2fq -T \"*\" | grep -iP \"dx:i:0|dx:i:1\" -A 3 | grep -vP \"^--$$\"  | {ft} filter -q 7 -l 20 -o {output_fastq_file} "
         cmd = f"{dorado} trim -k {kit} {input_bam_file} | {samtools} bam2fq -T \"*\" | grep -vP \"^--$$\"  | gzip > {output_fastq_file} "
+        pg.add(tgt, dep, cmd)
+
+        # extract into fastq directory
+        src_fastq = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
+        dst_fastq = f"{fastq_dir}/{sample.padded_idx}_{sample.id}.fastq"
+        tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}.fastq.OK"
+        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz.OK"
+        cmd = f"zcat {src_fastq} > {dst_fastq}"
+        pg.add(tgt, dep, cmd)
+
+        # amplicon sorter
+        src_fastq = f"{fastq_dir}/{sample.padded_idx}_{sample.id}.fastq"
+        output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/amplicon_sorter_result"
+        log = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter.log"
+        tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}.amplicon_sorter.OK"
+        dep = f"{log_dir}/{sample.padded_idx}_{sample.id}.fastq.OK"
+        cmd = f"{amplicon_sorter} -i {src_fastq} -min {sample.min_len} -max {sample.max_len} -o {output_dir} > {log}"
         pg.add(tgt, dep, cmd)
 
         # symbolic link for fastqc
@@ -385,16 +428,26 @@ class PipelineGenerator(object):
 
 
 class Sample(object):
-    def __init__(self, idx, id, barcode):
+    def __init__(self, idx, id, barcode, min_len, max_len):
         self.idx = idx
         self.padded_idx = f"{idx:02}"
         self.id = id
         self.barcode = barcode
+        self.min_len = min_len
+        self.max_len = max_len
+        if self.min_len == 0 and self.max_len == 0:
+            self.is_dna_barcode = False
+        else:
+            self.is_dna_barcode = True
+        if self.barcode == "unclassified":
+            self.is_dna_barcode = False
 
     def print(self):
         print(f"index   : {self.idx}")
         print(f"id      : {self.id}")
         print(f"barcode : {self.barcode}")
+        print(f"min_len : {self.min_len}")
+        print(f"max_len : {self.max_len}")
 
 
 class Run(object):
@@ -407,8 +460,8 @@ class Run(object):
         self.id = id
         self.samples = []
 
-    def add_sample(self, idx, sample_id, barcode):
-        self.samples.append(Sample(idx, sample_id, barcode))
+    def add_sample(self, idx, sample_id, barcode, min_len, max_len):
+        self.samples.append(Sample(idx, sample_id, barcode, min_len, max_len))
 
     def print(self):
         print(f"++++++++++++++++++++")
