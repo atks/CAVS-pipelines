@@ -38,19 +38,18 @@ import subprocess
 )
 @click.option(
     "-o",
-    "--output_directory",
-    default=os.getcwd(),
+    "--output_dir",
     show_default=True,
-    help="output directory, database files will be downloaded to <out_dir>/<db_release>/<db>",
+    help="output directory, by default, database files will be downloaded to <output_dir>/<database>",
 )
-def main(make_file, database, output_directory):
+def main(make_file, database, output_dir):
     """
     generate_download_blastdb_pipeline -d prokaryote
 
     e.g.  generate_download_blastdb_pipeline -d prokaryote -m download_blastdb.mk -o /home/atks/downloads
 
     \b
-    database prokaryote|fungi|invertebrate|
+    database nt|prokaryote|fungi|invertebrate|
              mitochondrion|plant|plasmid|protozoa|plastid|
              viral|vertebrate_mammalian|vertebrate_other
     """
@@ -64,27 +63,26 @@ def main(make_file, database, output_directory):
             exit()
 
     if make_file is None:
-        make_file = f"download_blastdb_{database}_db.mk"
+        make_file = f"download_{database}_blastdb.mk"
 
-    if output_directory is None:
-        output_directory = os.getcwd()
+    if output_dir is None:
+        output_dir = f"{os.getcwd()}/{database}"
+    else:
+        output_dir = os.path.abspath(output_dir)
 
     print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
     print("\t{0:<20} :   {1:<10}".format("database", database))
-    print("\t{0:<20} :   {1:<10}".format("output_directory", output_directory))
+    print("\t{0:<20} :   {1:<10}".format("output_directory", output_dir))
     print("\n")
     print(
         "Please invoked pipeline with not more than 8 jobs running concurrently due to NCBI restrictions"
     )
-    print("i.e. make -f download_blastdb.mk -j 8 -k")
+    print("i.e. make -f download_<database>_blastdb.mk -j 8 -k")
 
-    output_dir = f"{output_directory}/{database}"
-    print(f"\nDatabase will be downloaded to {output_dir}")
-
-    # try:
-    #     os.makedirs(output_dir, exist_ok=True)
-    # except OSError as error:
-    #     print(f"Directory {output_dir} cannot be created")
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+    except OSError as error:
+        print(f"Directory {output_dir} cannot be created")
 
     # get listing of files to download
     print("Getting directory listings")
@@ -101,10 +99,10 @@ def main(make_file, database, output_directory):
     for line in out.stdout.splitlines():
         m = re.search(rf">({base_name}.\d+.tar.gz)<", line)
         if m is not None:
-            print(m.group(1))
+            #print(m.group(1))
             files.append(m.group(1))
 
-    print(f"Downloading {len(files)} files.")
+    print(f"Downloading {len(files)} files. ({files[0]} - {files[-1]})")
 
     # generate make file
     print("Generating pipeline")
@@ -118,8 +116,17 @@ def main(make_file, database, output_directory):
         cmd = f"wget -c https://ftp.ncbi.nlm.nih.gov/blast/db/{file_name} -P {output_dir} 2> {err}"
         pg.add(tgt, dep, cmd)
 
+        tar_gz_file = f"{output_dir}/{file_name}"
+        err = f"{tar_gz_file}.extract.err"
+        tgt = f"{tar_gz_file}.extract.OK"
+        dep = f"{tar_gz_file}.OK"
+        cmd = f"tar xvf {file_name} 2> {err}"
+        pg.add(tgt, dep, cmd)
 
-
+        tgt = f"{tar_gz_file}.delete.OK"
+        dep = f"{tar_gz_file}.extract.OK"
+        cmd = f"rm {file_name}"
+        pg.add(tgt, dep, cmd)
 
     # clean files
     cmd = f"rm {output_dir}/*.fna.gz  {output_dir}/*.OK {output_dir}/*.err"
