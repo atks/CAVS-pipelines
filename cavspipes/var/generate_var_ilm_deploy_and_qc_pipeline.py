@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # The MIT License
-# Copyright (c) 2024 Adrian Tan <adrian_tan@nparks.gov.sg>
+# Copyright (c) 2025 Adrian Tan <adrian_tan@nparks.gov.sg>
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the 'Software'), to deal
 # in the Software without restriction, including without limitation the rights
@@ -80,12 +80,10 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     # create directories in destination folder directory
     log_dir = f"{working_dir}/log"
     analysis_dir = f"{dest_dir}/analysis"
-    contigs_dir = f"{dest_dir}/contigs"
     trace_dir = f"{dest_dir}/trace"
     try:
         os.makedirs(log_dir, exist_ok=True)
         os.makedirs(analysis_dir, exist_ok=True)
-        os.makedirs(contigs_dir, exist_ok=True)
         os.makedirs(trace_dir, exist_ok=True)
         for sample in run.samples:
             sample_dir = f"{analysis_dir}/{sample.idx}_{sample.id}"
@@ -135,7 +133,6 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     fastqc_multiqc_dep = ""
     kraken2_multiqc_dep = ""
     samtools_multiqc_dep = ""
-    quast_multiqc_dep = ""
 
     for sample in run.samples:
 

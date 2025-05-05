@@ -55,6 +55,7 @@ def main(make_file, database, output_dir):
     """
     # check on database validity
     if database not in [
+        "nt",
         "prokaryote"
          ]:
         print("error : database not valid\n", file=sys.stderr)
@@ -94,6 +95,8 @@ def main(make_file, database, output_dir):
 
     if database == "prokaryote":
         base_name = "nt_prok"
+    elif database == "nt":
+        base_name = "nt"
 
     files = []
     for line in out.stdout.splitlines():
@@ -120,12 +123,12 @@ def main(make_file, database, output_dir):
         err = f"{tar_gz_file}.extract.err"
         tgt = f"{tar_gz_file}.extract.OK"
         dep = f"{tar_gz_file}.OK"
-        cmd = f"tar xvf {file_name} 2> {err}"
+        cmd = f"tar xvf {tar_gz_file} -C {output_dir} 2> {err}"
         pg.add(tgt, dep, cmd)
 
         tgt = f"{tar_gz_file}.delete.OK"
         dep = f"{tar_gz_file}.extract.OK"
-        cmd = f"rm {file_name}"
+        cmd = f"rm {tar_gz_file}"
         pg.add(tgt, dep, cmd)
 
     # clean files

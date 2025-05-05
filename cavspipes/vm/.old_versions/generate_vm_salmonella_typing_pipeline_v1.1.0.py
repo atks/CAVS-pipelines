@@ -42,7 +42,7 @@ def main(make_file, output_dir, sample_file):
     """
     Analyse run raw reads and assembled contigs on
         a. seroseq2 v1.3.1
-        b. SISTR 1.1.3
+        b. SISTR 1.1.2
         c. mlst 2.23.0
 
     e.g. generate_vm_salmonella_typing_pipeline.py -s salmonella_pt.sa
@@ -80,11 +80,11 @@ def main(make_file, output_dir, sample_file):
         print(f"{error.filename} cannot be created")
 
     #version
-    version = "1.2.0"
+    version = "1.1.0"
 
     # programs
     seqsero2 = "/usr/local/SeqSero2-v1.3.1/bin/SeqSero2_package.py"
-    sistr = "/usr/local/sistr-1.1.3/bin/sistr"
+    sistr = "/usr/local/sistr-1.1.2/bin/sistr"
     mlst = "/usr/local/mlst-2.23.0/bin/mlst"
 
     print("")

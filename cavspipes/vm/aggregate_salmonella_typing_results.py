@@ -24,6 +24,7 @@ from shutil import copy2, which
 import openpyxl
 from openpyxl.workbook.views import BookView
 from openpyxl.worksheet.table import Table, TableStyleInfo
+from openpyxl import load_workbook
 
 @click.command()
 @click.option(
@@ -48,14 +49,15 @@ def main(input_dir, sample_file, output_xlsx):
         b. SISTR 1.1.2
         c. mlst 2.23.0
 
-    e.g. aggregate_salmonella_typing_pipeline.py -i salomnella_pt -s salmonella_pt.sa -o results.xlsx
+    e.g. aggregate_salmonella_typing_results.py -i salomnella_pt -s salmonella_pt.sa -o results.xlsx
     """
-    if not os.path.isabs(input_dir):
-        input_dir = f"{os.getcwd()}/{input_dir}"
+    input_dir = os.path.abspath(input_dir)
+    sample_file = os.path.abspath(sample_file)
+    output_xlsx = os.path.abspath(output_xlsx)
 
-    print("\t{0:<20} :   {1:<10}".format("make_file", input_dir))
-    print("\t{0:<20} :   {1:<10}".format("sample_file", sample_file))
-    print("\t{0:<20} :   {1:<10}".format("output_xlsx", output_xlsx))
+    #print("\t{0:<20} :   {1:<10}".format("make_file", input_dir))
+    #print("\t{0:<20} :   {1:<10}".format("sample_file", sample_file))
+    #print("\t{0:<20} :   {1:<10}".format("output_xlsx", output_xlsx))
 
     # read sample file
     samples = []
@@ -170,21 +172,21 @@ def main(input_dir, sample_file, output_xlsx):
                 sample_results = line.rstrip("\n")
 
             results = sample_results.split("\t")
-            cgmlst_ST = results[0]
-            cgmlst_distance = results[1]
-            cgmlst_found_loci = results[2]
-            cgmlst_genome_match = results[3]
-            cgmlst_matching_alleles = results[4]
-            cgmlst_subspecies = results[5]
-            fasta_filepath = results[6]
-            genome = results[7]
-            h1 = results[8]
-            h2 = results[9]
-            o_antigen = results[10]
-            serogroup = results[11]
-            serovar = results[12]
-            serovar_antigen = results[13]
-            serovar_cgmlst = results[14]
+            cgmlst_ST = results[1]
+            cgmlst_distance = results[2]
+            cgmlst_found_loci = results[3]
+            cgmlst_genome_match = results[4]
+            cgmlst_matching_alleles = results[5]
+            cgmlst_subspecies = results[6]
+            fasta_filepath = results[7]
+            genome = results[8]
+            h1 = results[9]
+            h2 = results[10]
+            o_antigen = results[11]
+            serogroup = results[12]
+            serovar = results[13]
+            serovar_antigen = results[14]
+            serovar_cgmlst = results[15]
 
             sistr_ws.cell(row=sample.idx+1, column=1).value = sample.id
             sistr_ws.cell(row=sample.idx+1, column=2).value = o_antigen
@@ -283,6 +285,9 @@ def main(input_dir, sample_file, output_xlsx):
             ws.column_dimensions[col].width = value + 2
 
     wb.save(output_xlsx)
+    wb.close()
+
+
 class Sample(object):
     def __init__(self, idx, id, fastq1, fastq2, contigs_fasta):
         self.idx = idx

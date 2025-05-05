@@ -86,14 +86,12 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         os.makedirs(analysis_dir, exist_ok=True)
         os.makedirs(contigs_dir, exist_ok=True)
         os.makedirs(trace_dir, exist_ok=True)
-        os.makedirs(f"{analysis_dir}/all/blast_kraken2", exist_ok=True)
         for sample in run.samples:
             sample_dir = f"{analysis_dir}/{sample.idx}_{sample.id}"
             os.makedirs(sample_dir, exist_ok=True)
             os.makedirs(f"{sample_dir}/kraken2_result", exist_ok=True)
             os.makedirs(f"{sample_dir}/fastqc_result", exist_ok=True)
             os.makedirs(f"{sample_dir}/spades_result", exist_ok=True)
-            os.makedirs(f"{sample_dir}/blast_result", exist_ok=True)
             os.makedirs(f"{sample_dir}/align_result", exist_ok=True)
             os.makedirs(f"{sample_dir}/align_result/ref", exist_ok=True)
             os.makedirs(f"{sample_dir}/align_result/general_stats", exist_ok=True)
@@ -104,7 +102,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         print(f"{error.filename} cannot be created")
 
     #version
-    version = "1.1.1"
+    version = "1.1.0"
 
     #programs
     fastqc = "/usr/local/FastQC-0.12.1/fastqc"
@@ -113,20 +111,17 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
     multiqc = "docker run  -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` multiqc/multiqc multiqc "
     spades = "docker run  -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` staphb/spades:3.15.4 spades.py "
+    #spades = "/usr/local/SPAdes-3.15.4/bin/spades.py"
     bwa = "/usr/local/bwa-0.7.17/bwa"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
     plot_bamstats = "/usr/local/samtools-1.17/bin/plot-bamstats"
     quast = "docker run -t -v  `pwd`:`pwd` -w `pwd` fischuu/quast quast.py"
-    blastdb_prok_nt = "/usr/local/ref/blast/prokaryotes"
-    blastn = "/usr/local/ncbi-blast-2.16.0+/bin/blastn"
-    aggregate_illu_results = "/usr/local/cavspipes-1.2.1/aggregate_illu_results.py"
 
     # initialize
     pg = PipelineGenerator(make_file)
 
     # analyze
     fastqc_multiqc_dep = ""
-    blast_aggregate_dep = ""
     kraken2_multiqc_dep = ""
     samtools_multiqc_dep = ""
     quast_multiqc_dep = ""
@@ -212,6 +207,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         pg.add(tgt, dep, cmd)
 
         # assemble
+        # /usr/local/SPAdes-3.15.2/bin/spades.py -1 Siniae-1086-20_S3_L001_R1_001.fastq.gz -2 Siniae-1086-20_S3_L001_R2_001.fastq.gz -o 1086 --isolate
         output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/spades_result/assembly"
         input_fastq_file1 = f"{sample.fastq1}"
         input_fastq_file2 = f"{sample.fastq2}"
@@ -230,17 +226,6 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         cmd = f"cp {src_fasta} {dst_fasta}"
         pg.add(tgt, dep, cmd)
 
-        #blast
-        if sample.id != "unclassified":
-            src_fasta_file = f"{contigs_dir}/{run.idx}_{sample.idx}_{sample.id}.contigs.fasta"
-            output_txt_file = f"{analysis_dir}/{sample.idx}_{sample.id}/blast_result/{sample.padded_idx}_{sample.id}.txt"
-            log = f"{log_dir}/{sample.idx}_{sample.id}.blast.log"
-            tgt = f"{log_dir}/{sample.idx}_{sample.id}.blast.OK"
-            dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.contigs.fasta.OK"
-            cmd = f"export BLASTDB={blastdb_prok_nt}/; {blastn} -db nt_prok -query {src_fasta_file} -outfmt \"6 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms\" -max_target_seqs 10 -evalue 1e-5 -out {output_txt_file} > {log}"
-            blast_aggregate_dep += f" {tgt}"
-            pg.add(tgt, dep, cmd)
-
         #link contigs to alignment directory
         src_fasta = f"{contigs_dir}/{run.idx}_{sample.idx}_{sample.id}.contigs.fasta"
         align_ref_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/align_result/ref"
@@ -249,7 +234,6 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         tgt = f"{log_dir}/{sample.idx}_{sample.id}.ref.contigs.fasta.OK"
         cmd = f"ln -sf {src_fasta} {dst_fasta}"
         pg.add(tgt, dep, cmd)
-
 
         ###########################
         # align to de novo assembly
@@ -370,14 +354,6 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     dep = quast_multiqc_dep
     tgt = f"{log_dir}/{analysis}.multiqc_report.OK"
     cmd = f"cd {analysis_dir}; {multiqc} . -m quast -f -o {output_dir} -n {analysis} --no-ansi > {log} 2> {err}"
-    pg.add(tgt, dep, cmd)
-
-    # aggregate blast and kraken2 results in excel
-    analysis = "blast_kraken2"
-    output_xlsx_file = f"{analysis_dir}/all/{analysis}/summary.xlsx"
-    dep = f"{blast_aggregate_dep} {kraken2_multiqc_dep}"
-    tgt = f"{log_dir}/{analysis}.aggregate_report.OK"
-    cmd = f"{aggregate_illu_results} -i {dest_dir} -s {sample_file} -o {output_xlsx_file}"
     pg.add(tgt, dep, cmd)
 
     # write make file
