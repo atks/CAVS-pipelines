@@ -54,13 +54,12 @@ def main():
     print("blastdbcmd -entry all -db Apicomplexandb -out apicomplexan.fasta")
     print("#blastdb print species of sequences in blastdb")
     print("blastdbcmd -entry all -db SSU_eukaryote_rRNA -outfmt \"%a %T %K %S\"")
+    print("#blastdb print species of sequences in blastdb (tab delimited)")
+    print("blastdbcmd -entry all -db SSU_eukaryote_rRNA -outfmt $'%a\\t%T\\t%K\\t%S'")
     print("#blastdb print species of sequences in blastdb")
     print("makeblastdb -in apicomplexan.fasta -parse_seqids -blastdb_version 5 -title apicomplexan -dbtype nucl -out apicomplexan")
     print("#download taxanomic database")
     print("wget ftp://ftp.ncbi.nlm.nih.gov/blast/db/taxdb.tar.gz")
-
-
-
 
 if __name__ == "__main__":
     main() # type: ignore[arg-type]
