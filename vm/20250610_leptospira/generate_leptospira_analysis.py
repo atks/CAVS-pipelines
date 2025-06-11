@@ -51,10 +51,12 @@ def main(make_file, working_dir, sample_file):
     # read sample file
     samples = {}
     with open(sample_file, "r") as file:
+        idx = 1
         for line in file:
             if not line.startswith("#"):
                 id, fastq1, fastq2, contigs = line.rstrip().split("\t")
-                samples[id] = Sample(id, fastq1, fastq2, contigs)
+                samples[id] = Sample(idx, id, fastq1, fastq2, contigs)
+                idx += 1
             
     # initialize
     pg = PipelineGenerator(make_file)
@@ -62,13 +64,15 @@ def main(make_file, working_dir, sample_file):
     # create directories in destination folder directory
     ref_dir = f"{working_dir}/ref"
     log_dir = f"{working_dir}/log"
+    align_dir = f"{working_dir}/align"
     stats_dir = f"{working_dir}/stats"
     plot_dir = f"{working_dir}/plot"
     bam_dir = f"{working_dir}/bam"
     try:
         os.makedirs(ref_dir, exist_ok=True)
-        # os.makedirs(log_dir, exist_ok=True)
-        # os.makedirs(stats_dir, exist_ok=True)
+        os.makedirs(log_dir, exist_ok=True)
+        os.makedirs(align_dir, exist_ok=True)
+        os.makedirs(stats_dir, exist_ok=True)
         # os.makedirs(f"{stats_dir}/coverage", exist_ok=True)
         # os.makedirs(f"{stats_dir}/general", exist_ok=True)
         # os.makedirs(f"{stats_dir}/flag", exist_ok=True)
@@ -81,7 +85,7 @@ def main(make_file, working_dir, sample_file):
     ##########
     # programs
     ##########
-    multiqc = "docker run  -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` multiqc/multiqc multiqc "
+    
     bwa = "/usr/local/bwa-0.7.17/bwa"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
     plot_bamstats = "/usr/local/samtools-1.17/bin/plot-bamstats"
@@ -93,6 +97,52 @@ def main(make_file, working_dir, sample_file):
     #################
     # reference files
     #################
+      
+    compressed_fasta_file = f"{ref_dir}/canFam6.fasta.gz"
+    tgt = f"{log_dir}/canFam6.fa.gz.OK"
+    dep = ""
+    cmd = f"wget https://hgdownload.soe.ucsc.edu/goldenPath/canFam6/bigZips/canFam6.fa.gz -O {compressed_fasta_file}"
+    pg.add(tgt, dep, cmd)
+
+    output_fasta_file = f"{ref_dir}/canFam6.fasta"
+    tgt = f"{log_dir}/canFam6.fasta.OK"
+    dep = f"{log_dir}/canFam6.fa.gz.OK"
+    cmd = f"zcat {compressed_fasta_file} > {output_fasta_file}"
+    pg.add(tgt, dep, cmd)
+
+    #index reference sequence
+    ref_fasta_file = f"{ref_dir}/canFam6.fasta"
+    log = f"{ref_dir}/canFam6.bwa_index.log"
+    tgt = f"{ref_dir}/canFam6.bwa_index.OK"
+    dep = f"{log_dir}/canFam6.fasta.OK"
+    cmd = f"{bwa} index -a bwtsw {ref_fasta_file} 2> {log}"
+    pg.add(tgt, dep, cmd)
+
+    for id, sample in samples.items():
+
+        #  align
+        output_bam_file = f"{align_dir}/{sample.id}.canfam6.bam"
+        log = f"{log_dir}/{sample.id}.align.log"
+        sort_log = f"{log_dir}/{sample.id}.align.sort.log"
+        dep = f"{ref_dir}/canFam6.bwa_index.OK"
+        tgt = f"{log_dir}/{sample.id}.canfam6.bam.OK"
+        cmd = f"{bwa} mem -t 2 -M {ref_fasta_file} {sample.fastq1} {sample.fastq2} 2> {log} | {samtools} view -hF4 | {samtools} sort -o {output_bam_file} 2> {sort_log}"
+        pg.add(tgt, dep, cmd)
+
+        #  index
+        input_bam_file = f"{align_dir}/{sample.id}.canfam6.bam"
+        dep = f"{log_dir}/{sample.id}.canfam6.bam.OK"
+        tgt = f"{log_dir}/{sample.id}.canfam6.bam.bai.OK"
+        cmd = f"{samtools} index {input_bam_file}"
+        pg.add(tgt, dep, cmd)
+
+        #  coverage
+        input_bam_file = f"{align_dir}/{sample.id}.canfam6.bam"
+        output_stats_file = f"{stats_dir}/{sample.id}.canfam6.coverage.stats.txt"
+        cmd = f"{samtools} coverage {input_bam_file} > {output_stats_file}"
+        tgt = f"{log_dir}/{sample.id}.canfam6.coverage.stats.txt.OK"
+        pg.add(tgt, dep, cmd)
+
     # >NZ_CP043884.1 Leptospira interrogans serovar Canicola strain 782 chromosome 1, complete sequence
     # >NZ_CP043885.1 Leptospira interrogans serovar Canicola strain 782 chromosome 2, complete sequence
     # >NZ_CP043886.1 Leptospira interrogans serovar Canicola strain 782 plasmid p1, complete sequence
@@ -147,18 +197,37 @@ def main(make_file, working_dir, sample_file):
     dep = f"{ref_fasta_file}.OK"
     cmd = f"{bwa} index -a bwtsw {ref_fasta_file} 2> {log}"
     pg.add(tgt, dep, cmd)
-
  
-    # #filter short reads
-    # input_fastq1_file = f"{fastq_dir}/{sample.id}.1.fq.gz"
-    # input_fastq2_file = f"{fastq_dir}/{sample.id}.2.fq.gz"
-    # output_fastq2_file = f"{fastq_dir}/{sample.id}.2.fq.gz"
-    # tgt = f"{output_fastq2_file}.OK"
-    # fastq_files_OK += f"{tgt} "
-    # dep = f"{fastq_dir}/{sample.id}.1.fq.gz.OK {fastq_dir}/{sample.id}.2.fq.gz.OK"
-    # cmd = f"{process_shortreads} -1 fastq/BIOS0006.1.fq.gz -2 fastq/BIOS0006.2.fq.gz -o {fastq_ulen_dir} --len-limit 145 "
-    # pg.add(tgt, dep, cmd)
+    for id, sample in samples.items():
 
+        #  align
+        output_bam_file = f"{align_dir}/{sample.id}.bam"
+        log = f"{log_dir}/{sample.id}.align.log"
+        sort_log = f"{log_dir}/{sample.id}.align.sort.log"
+        dep = f"{ref_dir}/bwa_index.OK"
+        tgt = f"{log_dir}/{sample.id}.bam.OK"
+        cmd = f"{bwa} mem -t 2 -M {ref_fasta_file} {sample.fastq1} {sample.fastq2} 2> {log} | {samtools} view -hF4 | {samtools} sort -o {output_bam_file} 2> {sort_log}"
+        pg.add(tgt, dep, cmd)
+
+        #  index
+        input_bam_file = f"{align_dir}/{sample.id}.bam"
+        dep = f"{log_dir}/{sample.id}.bam.OK"
+        tgt = f"{log_dir}/{sample.id}.bam.bai.OK"
+        cmd = f"{samtools} index {input_bam_file}"
+        pg.add(tgt, dep, cmd)
+
+        #  coverage
+        input_bam_file = f"{align_dir}/{sample.id}.bam"
+        output_stats_file = f"{stats_dir}/{sample.id}.coverage.stats.txt"
+        cmd = f"{samtools} coverage {input_bam_file} > {output_stats_file}"
+        tgt = f"{log_dir}/{sample.id}.coverage.stats.txt.OK"
+        pg.add(tgt, dep, cmd)
+
+    #isolate 10 analysis
+
+    #mlst
+    #/usr/local/mlst-2.23.0/bin/mlst /net/singapura/vm/hts/illu27/contigs/27_10_leptospira_interrogans_23606.contigs.fasta --json typing.json --scheme leptospira_3
+    
     # clean
     pg.add_clean(f"rm -fr {ref_dir}")
 
@@ -208,13 +277,15 @@ class PipelineGenerator(object):
 
 class Sample(object):
 
-    def __init__(self, id, fastq1, fastq2, contigs):
+    def __init__(self, idx, id, fastq1, fastq2, contigs):
+        self.idx = idx
         self.id = id
         self.fastq1 = fastq1
         self.fastq2 = fastq2
         self.contigs = contigs
 
     def print(self):
+        print(f"idx      : {self.idx}")
         print(f"id       : {self.id}")
         print(f"fastq1   : {self.fastq1}")
         print(f"fastq2   : {self.fastq2}")
