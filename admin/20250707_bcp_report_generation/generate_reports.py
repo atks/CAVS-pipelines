@@ -20,7 +20,7 @@
 
 import os
 import click
-import python-docx
+import docx
 
 @click.command()
 @click.option(
@@ -42,7 +42,7 @@ import python-docx
 @click.option("-g", "--genome_fasta_file", default="", required=False, help="genome FASTA file")
 def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_file):
     """
-    Population structure of Pangolins
+    Combine data from 
 
     e.g. generate_ddradseq_population_structure_analysis.py
     """
