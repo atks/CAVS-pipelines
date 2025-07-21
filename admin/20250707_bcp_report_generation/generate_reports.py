@@ -21,6 +21,8 @@
 import os
 import click
 import docx
+import tkinter as tk
+from tkinter import messagebox
 
 @click.command()
 @click.option(
@@ -37,7 +39,6 @@ import docx
     show_default=True,
     help="data directory",
 )
-@click.option("-s", "--sample_file", required=True, help="sample file")
 def main(working_dir, data_dir):
     """
     Combine data from 3 BCP files and generate various reports.
@@ -55,9 +56,24 @@ def main(working_dir, data_dir):
     except OSError as error:
         print(f"{error.filename} cannot be created")
 
+    def say_hello():
+        messagebox.showinfo("Hello", "Hello, World!")
 
+    #create main window
+    root = tk.Tk()
+    root.title("BCP Report Generation")
+    root.geometry("400x200")
 
+    label = tk.Label(root, text="BCP Report Generation in Progress...")
+    label.pack(pady=20)
 
+    entry = tk.Entry(root, width=50)
+    entry.pack(pady=10)
+
+    button = tk.Button(root, text="Generate Reports", command=say_hello)
+    button.pack(pady=10)
+
+    root.mainloop()
 
 class BCP(object):
     def __init__(self, bcp_dir):
