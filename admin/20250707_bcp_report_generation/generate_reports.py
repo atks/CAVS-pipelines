@@ -55,9 +55,24 @@ def main(working_dir, data_dir):
     except OSError as error:
         print(f"{error.filename} cannot be created")
 
+
+
+
+
+class BCP(object):
+    def __init__(self, bcp_dir):
+        self.bcp_dir = bcp_dir
+
     # read bcp files
-    
-    
+    # BCP_CAVS Laboratory Tests_24 Feb 2025.xlsx
+    # CAVS_Lab_combined.xlsx
+    # bcp_files/CAVS\ FormSG\ sample\ submission\ spreadsheets
+    def initialise_bcp_files(self):
+        print(f"initializing bcp files")
+ 
+    def generate_reports(self):
+        print(f"Generating reports for BCP:")
+
 
 
 
