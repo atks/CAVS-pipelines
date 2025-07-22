@@ -53,16 +53,6 @@ def main(input_vcf_file, output_vcf_file):
                 data.append(Variant(id, chrom, pos, ref, alt, info))
                 no_variants +=1
 
-    samples_het = [0.0]*no_samples
-    samples_n = [0]*no_samples
-
-    for i in range(no_variants):
-        for j in range(no_samples):
-            if data[i].genotypes[j].gt != -1:
-                if data[i].genotypes[j].gt == 1:
-                    samples_het[j] += 1
-                samples_n[j] += 1
-
     #write to file
     with open(output_vcf_file, "w") as file:
         file.write(vcf_hdr)
@@ -121,8 +111,8 @@ def main(input_vcf_file, output_vcf_file):
                 
             INFO_AF = float(INFO_AC) / float(INFO_AN)
 
-            INFO = f"NS={INFO_NS};DP={INFO_DP};AD={INFO_AD0},{INFO_AD1};AF={INFO_AF};AC={INFO_AC};AN={INFO_AN}"
-            file.write(f"{data[i].chrom}\t{data[i].pos}\t{data[i].id}\t{data[i].ref}\t{data[i].alt}\t.\tPASS\t{INFO}\tGT:DP:AD:GQ:GL\t{GENOTYPES}\n")
+            INFO = f"NS={INFO_NS};DP={INFO_DP};AD={INFO_AD0},{INFO_AD1};AF={INFO_AF:.2f};AC={INFO_AC};AN={INFO_AN}"
+            file.write(f"{data[i].chrom}\t{data[i].pos}\t{data[i].id}\t{data[i].ref}\t{data[i].alt}\t.\tPASS\t{INFO}\tGT:DP:AD:GQ:GL{GENOTYPES}\n")
 
 
       
