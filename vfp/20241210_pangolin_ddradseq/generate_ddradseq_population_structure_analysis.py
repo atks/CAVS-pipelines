@@ -125,6 +125,9 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
     pca_gis_to_sa = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/pca_gis_to_sa.py"
     plot_gis_structure = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/plot_gis_structure.py"
     plot_pca_structure = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/plot_pca_structure.py"
+    simulate_panmictic_pop = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/simulate_panmictic_pop.py"
+
+
 
     ####################
     # Sequence Alignment
@@ -392,7 +395,15 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
     cmd = f"{bcftools} view -s ^BIOS0016,BIOS0007 {input_vcf_file} -o {output_vcf_file}"
     pg.add(tgt, dep, cmd)
 
-    for dataset in ["56samples_31906snps", "58samples_31906snps", "55samples_19477snps"]:
+    #simulate 56 samples, 31906 variants data set panmictic population
+    input_vcf_file = f"{vcf_dir}/56samples_31906snps_pangolin.vcf"
+    output_vcf_file = f"{vcf_dir}/56samples_31906snps_1pop_pangolin.vcf"
+    tgt = f"{output_vcf_file}.OK"
+    dep = f"{input_vcf_file}.OK"
+    cmd = f"{simulate_panmictic_pop} -i {input_vcf_file} -o {output_vcf_file}"
+    pg.add(tgt, dep, cmd)
+
+    for dataset in ["56samples_31906snps_1pop", "56samples_31906snps", "58samples_31906snps", "55samples_19477snps"]:
 #    for dataset in ["56samples_31906snps"]:
         # create directories in destination folder directory
         structure_dir = f"{working_dir}/{dataset}/structure"
@@ -478,7 +489,7 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
             input_sa_file = f"{output_dir}/gisplots/K{k}.sa"
             output_pdf_file = f"{output_dir}/gisplots/K{k}.pdf"
             tgt = f"{output_pdf_file}.OK"
-            dep = f"{output_dir}/gisplots/K{k}.sa"
+            dep = f"{output_dir}/gisplots/K{k}.sa.OK"
             cmd = f"{plot_gis_structure} {input_sa_file} -o {output_dir}/gisplots -z {output_pdf_file}"
             pg.add(tgt, dep, cmd)
 
