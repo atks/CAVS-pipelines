@@ -56,12 +56,9 @@ def main(working_dir, data_dir):
     print("\t{0:<20} :   {1:<10}".format("data dir", data_dir))
     print("\t{0:<20} :   {1:<10}".format("reports dir", reports_dir))
 
-
-
     bcp = BCP(data_dir, working_dir)
     bcp.initialise_bcp_files()
     #bcp.generate_reports()
-
 
     ################################
     # GRAPHICAL USER INTERFACE (GUI)
@@ -105,6 +102,12 @@ class BCP(object):
 
     def initialise_bcp_files(self):
         print(f"initializing bcp files")
+
+        ################################################################
+        #THIS NEEDS TO BE REPLACED WITH THE ACTUAL BCP FILES ON ONEDRIVE
+        #SO NEED A MECHANISM TO READ OFF THE BCP FILES FROM ONEDRIVE
+        ################################################################
+
 
         #read combined lab files
         # CAVS_Lab_combined.xlsx
