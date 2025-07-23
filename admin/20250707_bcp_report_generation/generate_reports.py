@@ -60,7 +60,7 @@ def main(working_dir, data_dir):
 
     bcp = BCP(data_dir, working_dir)
     bcp.initialise_bcp_files()
-    bcp.generate_reports()
+    #bcp.generate_reports()
 
 
     ################################
@@ -68,7 +68,10 @@ def main(working_dir, data_dir):
     ################################
 
     def say_hello():
-        messagebox.showinfo("Hello", "Hello, World!")
+        bcp.generate_reports()
+        messagebox.showinfo("Reports generated and saved to reports directory",
+                            f"Reports have been generated and saved to {reports_dir}.\n"
+                            "You can now close this window.")
 
     #create main window
     root = tk.Tk()
@@ -85,7 +88,7 @@ def main(working_dir, data_dir):
     button.pack(pady=10)
 
 
-    #root.mainloop()
+    root.mainloop()
 
 class BCP(object):
     def __init__(self, bcp_dir, working_dir):
