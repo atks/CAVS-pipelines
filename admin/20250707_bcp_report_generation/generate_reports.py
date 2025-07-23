@@ -131,10 +131,6 @@ class BCP(object):
         for file_name in os.listdir(lab_results_dir):
             print(file_name)
 
-
-
-
-
     def set_table_borders(self, table):
         """
         Apply borders to all cells in a python-docx table.
