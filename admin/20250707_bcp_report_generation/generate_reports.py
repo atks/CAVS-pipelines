@@ -108,7 +108,6 @@ class BCP(object):
         #SO NEED A MECHANISM TO READ OFF THE BCP FILES FROM ONEDRIVE
         ################################################################
 
-
         #read combined lab files
         # CAVS_Lab_combined.xlsx
         # bcp_files/CAVS\ FormSG\ sample\ submission\ spreadsheets
