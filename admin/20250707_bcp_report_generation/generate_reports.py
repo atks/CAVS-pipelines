@@ -20,9 +20,13 @@
 
 import os
 import click
-import docx
+import openpyxl
 import tkinter as tk
 from tkinter import messagebox
+import docx
+from docx import Document
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 
 @click.command()
 @click.option(
@@ -45,16 +49,23 @@ def main(working_dir, data_dir):
 
     e.g. generate_bcp_reports.py
     """
+    working_dir = os.path.abspath(working_dir)
+    data_dir = os.path.abspath(data_dir)
     reports_dir = f"{working_dir}/reports"
     print("\t{0:<20} :   {1:<10}".format("working dir", working_dir))
     print("\t{0:<20} :   {1:<10}".format("data dir", data_dir))
     print("\t{0:<20} :   {1:<10}".format("reports dir", reports_dir))
 
-    # create directories
-    try:
-        os.makedirs(reports_dir, exist_ok=True)
-    except OSError as error:
-        print(f"{error.filename} cannot be created")
+
+
+    bcp = BCP(data_dir, working_dir)
+    bcp.initialise_bcp_files()
+    bcp.generate_reports()
+
+
+    ################################
+    # GRAPHICAL USER INTERFACE (GUI)
+    ################################
 
     def say_hello():
         messagebox.showinfo("Hello", "Hello, World!")
@@ -73,22 +84,122 @@ def main(working_dir, data_dir):
     button = tk.Button(root, text="Generate Reports", command=say_hello)
     button.pack(pady=10)
 
-    root.mainloop()
+
+    #root.mainloop()
 
 class BCP(object):
-    def __init__(self, bcp_dir):
+    def __init__(self, bcp_dir, working_dir):
         self.bcp_dir = bcp_dir
+        self.working_dir = working_dir
+        self.reports_dir = f"{self.working_dir}/reports"
 
-    # read bcp files
-    # BCP_CAVS Laboratory Tests_24 Feb 2025.xlsx
-    # CAVS_Lab_combined.xlsx
-    # bcp_files/CAVS\ FormSG\ sample\ submission\ spreadsheets
+        # create directories
+        try:
+            os.makedirs(self.reports_dir, exist_ok=True)
+        except OSError as error:
+            print(f"{error.filename} cannot be created")
+
+
     def initialise_bcp_files(self):
         print(f"initializing bcp files")
- 
-    def generate_reports(self):
-        print(f"Generating reports for BCP:")
 
+        #read combined lab files
+        # CAVS_Lab_combined.xlsx
+        # bcp_files/CAVS\ FormSG\ sample\ submission\ spreadsheets
+        print(f"==========================")
+        print(f"reading combined lab files")
+        print(f"==========================")
+        workbook = openpyxl.load_workbook(
+            filename=f"{self.bcp_dir}/CAVS_Lab_combined.xlsx",
+            data_only=True,
+        )
+        print(workbook.sheetnames)
+
+        print(f"=======================")
+        print(f"reading lab tests files")
+        print(f"=======================")
+        lab_tests_workbook = openpyxl.load_workbook(
+            filename=f"{self.bcp_dir}/BCP_CAVS Laboratory Tests_24 Feb 2025.xlsx",
+            data_only=True,
+        )
+        print(lab_tests_workbook.sheetnames)
+
+        print(f"=======================================")
+        print(f"iterate through lab results directories")
+        print(f"=======================================")
+        lab_results_dir = f"{self.bcp_dir}/CAVS FormSG sample submission spreadsheets"
+        for file_name in os.listdir(lab_results_dir):
+            print(file_name)
+
+
+
+
+
+    def set_table_borders(self, table):
+        """
+        Apply borders to all cells in a python-docx table.
+        """
+        for row in table.rows:
+            for cell in row.cells:
+                tc = cell._tc
+                tcPr = tc.get_or_add_tcPr()
+                tcBorders = OxmlElement('w:tcBorders')
+
+                for border_name in ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']:
+                    border = OxmlElement(f'w:{border_name}')
+                    border.set(qn('w:val'), 'single')
+                    border.set(qn('w:sz'), '4')  # 4 eighths of a point = 0.5pt
+                    border.set(qn('w:space'), '0')
+                    border.set(qn('w:color'), '000000')
+                    tcBorders.append(border)
+
+                tcPr.append(tcBorders)
+
+    def generate_reports(self):
+        print(f"==========================")
+        print(f"Generating reports for BCP")
+        print(f"==========================")
+        # Create a new document
+        doc = docx.Document()
+
+        # Add a title
+        doc.add_heading('My Report', level=0)
+
+        # Add a heading
+        doc.add_heading('Introduction', level=1)
+
+        # Add a paragraph
+        doc.add_paragraph('This document is generated using the python-docx library.')
+
+        # Add a sub-heading
+        doc.add_heading('Data Summary', level=2)
+
+        # Add another paragraph
+        doc.add_paragraph('Below is a table summarizing the data:')
+
+        # Add a table with 3 rows and 3 columns
+        table = doc.add_table(rows=3, cols=3)
+
+        # Add table headers
+        hdr_cells = table.rows[0].cells
+        hdr_cells[0].text = 'ID'
+        hdr_cells[1].text = 'Name'
+        hdr_cells[2].text = 'Score'
+
+        # Populate data rows
+        table.rows[1].cells[0].text = '1'
+        table.rows[1].cells[1].text = 'Alice'
+        table.rows[1].cells[2].text = '85'
+
+        table.rows[2].cells[0].text = '2'
+        table.rows[2].cells[1].text = 'Bob'
+        table.rows[2].cells[2].text = '90'
+
+        self.set_table_borders(table)
+
+        # Save the document
+        print(f"Saving report to {self.reports_dir}/example_report.docx")
+        doc.save(f'{self.reports_dir}/example_report.docx')        
 
 
 
