@@ -23,7 +23,7 @@ import click
 
 @click.command()
 @click.option("-n", "--subpop_size", default=5, help="subpopulation size", type=int)
-@click.option("-s", "--sample_file", default=0.9, help="sample file")
+@click.option("-s", "--sample_file", help="sample file", type=str)
 @click.argument("vcf_file")
 def main(vcf_file, subpop_size, sample_file):
     """
@@ -35,123 +35,66 @@ def main(vcf_file, subpop_size, sample_file):
     print("\t{0:<20} :   {1:<10}".format("subpopulation size", subpop_size))
     print("\t{0:<20} :   {1:<10}".format("sample file", sample_file))
     
-    try:
-        os.makedirs(output_dir, exist_ok=True)
-    except OSError as error:
-        print(f"{error.filename} cannot be created")
+    samples = {}
+
+    with open(sample_file, "r") as file:
+        for line in file:
+            if not line.startswith("#"):
+                sample_id, rest = line.strip().split("\t", 1)
+                samples[sample_id] = 1  
+
+    print(f"Number of samples: {len(samples)}")
 
     # read VCF file, obtain master matrix of data
     data = []
-    samples = []
-    vcf_hdr = ""
+    subsamples_idx = []
     no_variants = 0
-    no_samples = 0
     with open(vcf_file, "r") as file:
         for line in file:
             if line.startswith("#"):
                 if line.startswith("#CHROM"):
-                    samples = line.rstrip().split("\t")[9:]
-                    no_samples = len(samples)
-                else:
-                    vcf_hdr += line
+                    sample_ids = line.rstrip().split("\t")[9:]
+                    for idx,id in enumerate(sample_ids):
+                        #print(f"sample {idx}: {id}")
+                        if id in samples:
+                            subsamples_idx.append(idx)
+                    # print(f"INITsubsamples_idx length: {len(subsamples_idx)}")        
             else:
-                if no_variants %10000 ==0:
-                    print(f"adding variant {no_variants}")
                 chrom, pos, id, ref, alt, qual, filter, info, format, *genotypes = line.rstrip().split("\t")
-                data.append(Variant(id, chrom, pos, ref, alt, genotypes))
+                subsample_genotypes = []
+                for idx in subsamples_idx:
+                    subsample_genotypes.append(genotypes[idx])
+                data.append(Variant(id, chrom, pos, ref, alt, subsample_genotypes))
                 no_variants +=1
 
-    #no change in size
-    sample_c = [0]*no_samples
-    variant_c = [0]*no_variants
-    variant_ac = [0]*no_variants
+    print(f"Number of variants: {no_variants}")
 
-    #reducing size
-    #pointer to subset of samples and variants
-    filtered_samples = range(no_samples)
-    filtered_variants = range(no_variants)
+    c = [[0],[1]]
+    d = [l + [2] for l in c]
+    print(f"c: {c}")
+    print(f"d: {d}")
 
-    new_filtered_samples = []
-    new_filtered_variants = []
-    finalized_samples = []
-    finalized_variants = []
+    # print(f"data length: {len(data)}")
+    # print(f"subsamples_idx length: {len(subsamples_idx)}")
+    # permutate all subsamples
+    # for variant in data:
+    #   variant.print()
+    def subsets(n, k):
+        print(f"recursive step n={n} k={k}")
+        if k > n:
+            return []
+        elif k==n:
+            return [list(range(n))]
+        elif k == 0:
+            return []
+        else:            
+            return subsets(n-1, k) + [l + [n-1] for l in subsets(n-1, k-1)]
 
-    ts = 0
-    tv = 0
-    for i in filtered_variants:
-        if data[i].ts:
-            ts += 1
-        else:
-            tv += 1
-    
-    
-        print(f"iteration {iter_no}")
-        change = False
-
-        if iter_no == 2:
-            print("updating sample call rate cut off to 0.9 from second iteration onwards")
-            sample_call_rate_cutoff = 0.9
-            print("updating variant call rate cut off to 0.9 from second iteration onwards")
-            variant_call_rate_cutoff = 0.9
-
-        #compute call rates for samples
-        no_filtered_variants = len(filtered_variants)
-
-        for j in filtered_samples:
-            sample_c[j] = 0
-
-        for i in filtered_variants:
-            for j in filtered_samples:
-                if data[i].genotypes[j].gt != -1:
-                    sample_c[j] += 1
-
-        #filter samples
-        with open(f"{output_dir}/sample_call_rate_iter_{iter_no}.txt", "w") as file:
-            new_filtered_samples.clear()
-            file.write("#sample\tsample_call_rate\n")
-            for j in filtered_samples:
-                sample_call_rate = float(sample_c[j])/no_filtered_variants
-                file.write(f"{samples[j]}\t{sample_call_rate}\n")
-                #print(f"sample call rate: {sample_call_rate}")
-                if sample_call_rate >= sample_call_rate_cutoff:
-                    new_filtered_samples.append(j)
-
-        change = len(new_filtered_samples) != len(filtered_samples)
-        filtered_samples = new_filtered_samples.copy()
-        no_filtered_samples = len(filtered_samples)
-
-        print(f"no filtered samples : {no_filtered_samples}")
-
-        with open(f"{output_dir}/snp_call_rate_iter_{iter_no}.txt", "w") as file:
-            with open(f"{output_dir}/maf_iter_{iter_no}.txt", "w") as maf_file:
-                file.write("#variant_call_rate\n")
-                maf_file.write("#variant_maf\n")
-                for i in filtered_variants:
-                    #compute variant call rates
-                    variant_c[i] = 0
-                    variant_ac[i] = 0
-                    for j in filtered_samples:
-                        if data[i].genotypes[j].gt != -1:
-                            variant_c[i] += 1
-                            variant_ac[i] += data[i].genotypes[j].gt
-
-                    #filter variants
-                    variant_call_rate = float(variant_c[i])/no_filtered_samples
-                    if variant_c[i] == 0:
-                        variant_maf = 0
-                    else:
-                        variant_af = float(variant_ac[i])/(variant_c[i]*2)
-                    variant_maf = min(variant_af, 1-variant_af)
-                    #print(f"variant call rate: {variant_call_rate: .2f} | {variant_maf: .2f}")
-                    file.write(f"{variant_call_rate}\n")
-                    maf_file.write(f"{variant_maf}\n")
-                    if variant_call_rate >= variant_call_rate_cutoff and variant_maf >= variant_maf_cutoff:
-                        new_filtered_variants.append(i)
-                        if data[i].ts:
-                            ts += 1
-                        else:
-                            tv += 1
-
+    subsets_list = subsets(2, 1)
+    print(f"subsets_list length: {len(subsets_list)}") 
+    print(subsets_list)
+    # for l in subsets_list:
+    #     print(l)
     
 class Variant(object):
     def __init__(self, id, chrom, pos, ref, alt, genotypes):
@@ -179,7 +122,6 @@ class Variant(object):
             #print(genotype)
             gt, dp, ad, gq, gl = genotype.split(":")
             if gt == "./.":
-                print(genotype)
                 self.genotypes.append(Genotype(-1, -1, -1, -1, "-1,-1,-1"))
             else:
                 if gt == "0/0":
@@ -189,7 +131,17 @@ class Variant(object):
                 elif gt == "1/1":
                     gt = 2
                 self.genotypes.append(Genotype(gt, int(dp), ad, int(gq), gl))
-
+    
+    def print(self):
+        print(f"{self.id}", end="")
+        print(f"\t{self.chrom}", end="")
+        print(f"\t{self.pos}", end="")
+        print(f"\t{self.ref}", end="")
+        print(f"\t{self.alt}", end="")
+        for g in self.genotypes:
+            g.print()
+        print("")    
+            
 class Genotype(object):
     def __init__(self, gt, dp, ad, gq, gl):
         self.gt = gt
@@ -200,6 +152,9 @@ class Genotype(object):
             self.ad = int(ad.split(",")[1])
         self.gq = gq
         self.gl = gl.split(",")
+
+    def print(self):
+        print(f"\t{self.gt}", end="")
 
 if __name__ == "__main__":
     main() # type: ignore
