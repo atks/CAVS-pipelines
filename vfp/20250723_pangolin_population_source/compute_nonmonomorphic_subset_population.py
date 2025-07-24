@@ -85,7 +85,7 @@ def main(vcf_file, subpop_size, sample_file):
             return []
         elif k==n:
             return [list(range(n))]
-        elif k == 0:
+        elif k==0:
             return []
         else:            
             return subsets(n-1, k) + [l + [n-1] for l in subsets(n-1, k-1)]
