@@ -105,6 +105,7 @@ def main(vcf_file, sample_file, output_plink_file_base_name):
                             print(f"\r{no_variants} variants processed", end="")
                     
                         chrom, pos, id, ref, alt, qual, filter, info, format, *genotypes = line.rstrip().split("\t")
+                        
                         # chromosome (1-22, X, Y or 0 if unplaced)
                         # rs# or snp identifier
                         # Genetic distance (morgans) 
