@@ -119,7 +119,7 @@ def main(make_file, sequence_id_file, download_type, output_dir):
     pg = PipelineGenerator(make_file)
 
     efetch = "/usr/local/edirect-17.0/efetch"
-    is_file_empty =  "/usr/local/cavspipes-1.1.0/is_file_empty"
+    is_file_empty =  "/usr/local/cavspipes-1.2.1/is_file_empty"
 
     for id in ids:
         output_sequence_file = f"{output_dir}/{id}.{ext}"
