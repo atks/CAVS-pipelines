@@ -180,7 +180,7 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
 
     #data sets
 
-    #compute heterozygosity
+    #compute heterozygosity 
 
     #compute pairwise IBS stats
 
