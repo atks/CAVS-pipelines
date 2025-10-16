@@ -75,7 +75,6 @@ def main(
     dest_dir = working_dir + "/" + run_id
     fastq_path = f"{working_dir}/demux"
     basecall_model = f"/usr/local/dorado-0.8.3/models/{basecall_model}"
-    acquisition_run_id = "d22107a8068c869f28f472f3aad57b5dd3b147ae"
 
     print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
     print("\t{0:<20} :   {1:<10}".format("run_dir", run_id))
@@ -85,11 +84,27 @@ def main(
     print("\t{0:<20} :   {1:<10}".format("minumum length", len))
     print("\t{0:<20} :   {1:<10}".format("memory", memory))
     print("\t{0:<20} :   {1:<10}".format("kit", kit))
-    print("\t{0:<20} :   {1:<10}".format("acquisition run id", acquisition_run_id))
     print("\t{0:<20} :   {1:<10}".format("basecall model", basecall_model))
     print("\t{0:<20} :   {1:<10}".format("sample_file", sample_file))
     print("\t{0:<20} :   {1:<10}".format("dest_dir", dest_dir))
     print("\t{0:<20} :   {1:<10}".format("fastq_path", fastq_path))
+
+    #get acquisition run ID
+    #print("\t{0:<20} :   {1:<10}".format("acquisition run id", acquisition_run_id))
+    acquisition_run_id = ""
+    dest_dir = working_dir + "/" + run_id
+    nanopore_dir = os.path.abspath(nanopore_dir)
+    for dirpath, dirnames, filenames in os.walk(nanopore_dir):
+        for filename in filenames:
+            if filename.startswith("final_summary_"):
+                final_summary_txt_file = os.path.join(dirpath, filename)
+                with open(final_summary_txt_file, "r") as file:
+                    for line in file:
+                        if line.startswith("acquisition_run_id"):
+                            acquisition_run_id = line.rstrip().split("=")[1]
+                            break
+    print("\t{0:<20} :   {1:<10}".format("acquisition_run_id", acquisition_run_id))
+
 
     # version
     version = "1.0.0"
@@ -99,8 +114,7 @@ def main(
     samtools = "/usr/local/samtools-1.17/bin/samtools"
     fastqc = f"/usr/local/FastQC-0.12.1/fastqc --adapters /usr/local/FastQC-0.12.1/Configuration/adapter_list.nanopore.txt --memory {memory}"
     multiqc = "docker run  -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` multiqc/multiqc multiqc "
-
-    nanoplot = "/usr/local/NanoPlot-1.43/bin/NanoPlot"
+    nanoplot = f"docker run -u \"$$(id -u):$$(id -g)\" -t -v `pwd`:`pwd` -w `pwd` staphb/nanoplot:1.42.0 NanoPlot "
     kraken2 = "/usr/local/kraken2-2.1.2/kraken2"
     kraken2_std_db = "/usr/local/ref/kraken2/20220816_standard"
     kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
@@ -149,6 +163,7 @@ def main(
             os.makedirs(f"{sample_dir}/align_result/coverage_stats", exist_ok=True)
             os.makedirs(f"{sample_dir}/align_result/flag_stats", exist_ok=True)
             os.makedirs(f"{sample_dir}/align_result/idx_stats", exist_ok=True)
+            os.makedirs(f"{sample_dir}/nanoplot_result", exist_ok=True)
     except OSError as error:
         print(f"{error.filename} cannot be created")
 
@@ -225,34 +240,35 @@ def main(
         cmd = f"{fastqc} {input_file} -o {output_dir} > {log} 2> {err}"
         pg.add(tgt, dep, cmd)
 
-        if sample.barcode!="unclassified":
-            # nanoplot
-            input_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
-            output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/nanoplot_result"
-            prefix = f"{sample.padded_idx}_{sample.id}_"
-            log = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.log"
-            err = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.err"
-            dep = f"{log_dir}/{sample.padded_idx}_{sample.id}.fastq.gz.OK"
-            tgt = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.run.OK"
-            cmd = f"{nanoplot} --fastq {input_file} -p {prefix} -o {output_dir} > {log} 2> {err}"
-            pg.add(tgt, dep, cmd)
+        # nanoplot
+        input_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
+        output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/nanoplot_result"
+        prefix = f"{sample.padded_idx}_{sample.id}_"
+        log = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.log"
+        err = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.err"
+        dep = f"{log_dir}/{sample.padded_idx}_{sample.id}.fastq.gz.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.run.OK"
+        cmd = f"{nanoplot} --fastq {input_file} -p {prefix} -o {output_dir} > {log} 2> {err}"
+        pg.add(tgt, dep, cmd)
 
-            #rename nanoplot file
-            src_txt_file = f"{analysis_dir}/{sample.idx}_{sample.id}/nanoplot_result/{sample.padded_idx}_{sample.id}_NanoStats.txt"
-            dst_txt_file = f"{analysis_dir}/{sample.idx}_{sample.id}/nanoplot_result/{sample.padded_idx}_{sample.id}.txt"
-            dep = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.run.OK"
-            tgt = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.run.renamed.OK"
-            nanoplot_multiqc_dep += f" {tgt}"
-            cmd = f"mv {src_txt_file} {dst_txt_file}"
-            pg.add(tgt, dep, cmd)
+        #rename nanoplot file
+        src_txt_file = f"{analysis_dir}/{sample.idx}_{sample.id}/nanoplot_result/{sample.padded_idx}_{sample.id}_NanoStats.txt"
+        dst_txt_file = f"{analysis_dir}/{sample.idx}_{sample.id}/nanoplot_result/{sample.padded_idx}_{sample.id}.txt"
+        dep = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.run.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.run.renamed.OK"
+        nanoplot_multiqc_dep += f" {tgt}"
+        cmd = f"mv {src_txt_file} {dst_txt_file}"
+        pg.add(tgt, dep, cmd)
 
-            #remove post filtering files from nanoplot
-            txt_file = f"{analysis_dir}/{sample.idx}_{sample.id}/nanoplot_result/{sample.padded_idx}_{sample.id}_NanoStats_post_filtering.txt"
-            dep = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.run.renamed.OK"
-            tgt = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.OK"
-            nanoplot_multiqc_dep += f" {tgt}"
-            cmd = f"rm {txt_file}"
-            pg.add(tgt, dep, cmd)
+        # #remove post filtering files from nanoplot
+        # txt_file = f"{analysis_dir}/{sample.idx}_{sample.id}/nanoplot_result/{sample.padded_idx}_{sample.id}_NanoStats_post_filtering.txt"
+        # dep = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.run.renamed.OK"
+        # tgt = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.OK"
+        # nanoplot_multiqc_dep += f" {tgt}"
+        # cmd = f"rm {txt_file}"
+        # pg.add(tgt, dep, cmd)
+
+        if sample.virus!="n/a":
 
             ###########################
             # align to reference genome
@@ -332,28 +348,6 @@ def main(
             cmd = f"{plot_bamstats} -p  {align_dir}/plot_bamstats/plot {input_stats_file}"
             pg.add(tgt, dep, cmd)
 
-        else:
-            # nanoplot
-            input_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
-            output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/nanoplot_result"
-            prefix = f"{sample.padded_idx}_{sample.id}_"
-            log = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.log"
-            err = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.err"
-            dep = f"{log_dir}/{sample.padded_idx}_{sample.id}.fastq.gz.OK"
-            tgt = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.run.OK"
-            nanoplot_multiqc_dep += f" {tgt}"
-            cmd = f"{nanoplot} --fastq {input_file} -p {prefix} -o {output_dir} > {log} 2> {err}"
-            pg.add(tgt, dep, cmd)
-
-            #rename nanoplot file
-            src_txt_file = f"{analysis_dir}/{sample.idx}_{sample.id}/nanoplot_result/{sample.padded_idx}_{sample.id}_NanoStats.txt"
-            dst_txt_file = f"{analysis_dir}/{sample.idx}_{sample.id}/nanoplot_result/{sample.padded_idx}_{sample.id}.txt"
-            dep = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.run.OK"
-            tgt = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.OK"
-            nanoplot_multiqc_dep += f" {tgt}"
-            cmd = f"mv {src_txt_file} {dst_txt_file}"
-            pg.add(tgt, dep, cmd)
-
         # kraken2
         input_fastq_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
         output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
@@ -421,6 +415,10 @@ def main(
     print("Writing pipeline")
     pg.write()
 
+    #copy files to trace
+    copy2(__file__, trace_dir)
+    copy2(make_file, trace_dir)
+    copy2(sample_file, trace_dir)
 
 class PipelineGenerator(object):
     def __init__(self, make_file):

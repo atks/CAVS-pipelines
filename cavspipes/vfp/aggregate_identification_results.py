@@ -26,6 +26,8 @@ from openpyxl.workbook.views import BookView
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from openpyxl import load_workbook
 import heapq
+import subprocess
+import re
 
 @click.command()
 @click.option(
@@ -43,9 +45,10 @@ import heapq
     required=True,
     help="output xlsx file",
 )
+
 def main(input_dir, sample_file, output_xlsx):
     """
-    Aggregate results from blast results
+    Aggregate results from identification of barcodes.
 
     e.g. aggregate_identification_results.py -i pore16 -s pore16_pt.sa -o summary.xlsx
     """
@@ -71,15 +74,14 @@ def main(input_dir, sample_file, output_xlsx):
                 if sample_id != "unclassified":
                     samples.append(
                         Sample(index, sample_id, barcode, int(min_len), int(max_len))
-                    )
+                              )
 
     no_samples = len(samples)
 
     # write out xlsx
     wb = openpyxl.Workbook()
     del wb["Sheet"]
-    final_ws = wb.create_sheet("final")
-    blast_ws = wb.create_sheet("blast")
+    summary_ws = wb.create_sheet("summary")
 
     #set opening window size
     view = [BookView(xWindow=8000, yWindow=4000, windowWidth=25000, windowHeight=20000)]
@@ -88,98 +90,63 @@ def main(input_dir, sample_file, output_xlsx):
     #table settings
     style = TableStyleInfo(name="TableStyleLight11", showFirstColumn=False,
                         showLastColumn=False, showRowStripes=True, showColumnStripes=True)
-
-    tab = Table(displayName="final", ref=f"A1:C{no_samples+1}")
-    tab.tableStyleInfo = style
-    final_ws.add_table(tab)
-    final_ws.sheet_view.zoomScale = 200
-
-    tab = Table(displayName="blast", ref=f"A1:K{no_samples+1}")
-    tab.tableStyleInfo = style
-    blast_ws.add_table(tab)
-    blast_ws.sheet_view.zoomScale = 200
-
-    #setup headers
-    final_ws.cell(1, column=1).value = "sample"
-    final_ws.cell(1, column=2).value = "blast species"
-    final_ws.cell(1, column=3).value = "blast species (%)"
-
-    blast_ws.cell(1, column=1).value = "sample"
-    blast_ws.cell(1, column=2).value = "annotated contig count"
-    blast_ws.cell(1, column=3).value = "annotation count (up to 20 unique sequences per contig)"
-    blast_ws.cell(1, column=4).value = "species 1"
-    blast_ws.cell(1, column=5).value = "species 1 (%)"
-    blast_ws.cell(1, column=6).value = "species 2"
-    blast_ws.cell(1, column=7).value = "species 2 (%)"
-    blast_ws.cell(1, column=8).value = "species 3"
-    blast_ws.cell(1, column=9).value = "species 3 (%)"
-    blast_ws.cell(1, column=10).value = "other species (%)"
-    blast_ws.cell(1, column=11).value = "other species"
+    summary_ws.sheet_view.zoomScale = 200
 
     # aggregate files
     for sample in samples:
-        #blast results
-        blast_txt_file = f"{input_dir}/analysis/{sample.idx}_{sample.id}/identification_result/blast/{sample.padded_idx}_{sample.id}.txt"
+        sample.collect_info(input_dir)
+        #sample.print_contigs()
 
-        try:
-            with open(blast_txt_file, "r") as file:
-                unique_contigs = {}
-                species_count = {}
+    # print to excel
+    sample_row = 1
+    for sample in samples:
+        summary_ws.cell(sample_row, column=1).value = sample.id
+        summary_ws.cell(sample_row, column=2).value = f"{sample.no_reads_in_length_range}/{sample.total_reads} ({sample.no_reads_in_length_range/sample.total_reads*100:.2f}%)"
+        summary_ws.cell(sample_row+1, column=1).value = "consensus contig"
+        summary_ws.cell(sample_row+1, column=2).value = "#supporting reads"
+        summary_ws.cell(sample_row+1, column=3).value = "Best match Species"
+        summary_ws.cell(sample_row+1, column=4).value = "Best match accession"
+        summary_ws.cell(sample_row+1, column=5).value = "Score"
+        summary_ws.cell(sample_row+1, column=6).value = "Query Length"
+        summary_ws.cell(sample_row+1, column=7).value = "Subject Length"
+        summary_ws.cell(sample_row+1, column=8).value = "Overlap Length"
+        summary_ws.cell(sample_row+1, column=9).value = "Query Cover"
+        summary_ws.cell(sample_row+1, column=10).value = "Percentage Identity"
+        summary_ws.cell(sample_row+1, column=11).value = "Rest of the hits"
+        i = 2
+        for contig in sample.contigs.values():
+            summary_ws.cell(sample_row+i, column=1).value = contig.name
+            summary_ws.cell(sample_row+i, column=2).value = contig.no_reads
+            alignment = heapq.heappop(contig.sorted_alignments)
+            summary_ws.cell(sample_row+i, column=3).value = alignment.sscinames
+            summary_ws.cell(sample_row+i, column=4).value = alignment.sacc
+            summary_ws.cell(sample_row+i, column=5).value = alignment.score
+            summary_ws.cell(sample_row+i, column=6).value = alignment.qlen
+            summary_ws.cell(sample_row+i, column=7).value = alignment.slen
+            summary_ws.cell(sample_row+i, column=8).value = alignment.length
+            summary_ws.cell(sample_row+i, column=9).value = f"{100.0*alignment.length/alignment.qlen:.2f}"
+            summary_ws.cell(sample_row+i, column=10).value = f"{alignment.pident:.2f}"
+            collated_hits = []
+            while len(contig.sorted_alignments) > 0:
+                alignment = heapq.heappop(contig.sorted_alignments)
+                collated_hits.append(f"{alignment.sscinames} ({alignment.score})")
+            summary_ws.cell(sample_row+i, column=11).value = f"{";".join(collated_hits)}"
 
-                for line in file:
-# qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms
-                    results = line.rstrip("\n").split("\t")
-                    contig = results[0]
-                    ssciname = results[9]
 
-                    unique_contigs[contig] = 1
+            #print(f"Best alignment for {contig.name} is {alignment.sacc} with score {alignment.score}")
 
-                    if ssciname in species_count:
-                        species_count[ssciname] += 1
-                    else:
-                        species_count[ssciname] = 1
+            #for alignment in self.contigs[contig_name].sorted_alignments:
+            #    alignment.print()
 
-                species_heap = []
-                for name in species_count:
-                    heapq.heappush(species_heap, Species(species_count[name], name))
 
-                no_annotated_contigs = len(unique_contigs)
+            i += 1
 
-                # get top 3 species
-                total_species_annotation_count = 0.0
-                other_species = []
-                for i, species in enumerate(species_heap):
-                    total_species_annotation_count += species.no_reads
-                    if i>2:
-                        other_species.append(species.name)
+        tab = Table(displayName=f"{sample.id}", ref=f"A{sample_row+1}:K{sample_row+i-1}")
+        tab.tableStyleInfo = style
+        summary_ws.add_table(tab)
 
-                blast_ws.cell(row=sample.idx+1, column=1).value = f"{sample.idx}_{sample.id}"
-                blast_ws.cell(row=sample.idx+1, column=2).value = no_annotated_contigs
-                blast_ws.cell(row=sample.idx+1, column=3).value = total_species_annotation_count
-
-                top_species = heapq.nlargest(3, species_heap)
-                top_species_annotation_count = 0.0
-                for i, species in enumerate(top_species):
-                    blast_ws.cell(row=sample.idx+1, column=2*i+4).value = species.name
-                    blast_ws.cell(row=sample.idx+1, column=2*i+5).value = f"{species.no_reads/total_species_annotation_count*100:.2f}"
-                    top_species_annotation_count += species.no_reads
-                    if i == 0:
-                        final_ws.cell(row=sample.idx+1, column=2).value = species.name
-                        final_ws.cell(row=sample.idx+1, column=3).value = f"{species.no_reads/total_species_annotation_count*100:.2f}"
-
-                # get rest of species
-                blast_ws.cell(row=sample.idx+1, column=10).value = f"{(total_species_annotation_count-top_species_annotation_count)/total_species_annotation_count*100:.2f}"
-                blast_ws.cell(row=sample.idx+1, column=11).value = ":".join(other_species)
-                final_ws.cell(row=sample.idx+1, column=1).value = f"{sample.idx}_{sample.id}"
-
-        except FileNotFoundError as e:
-            #print(f"File does not exist: {e.filename}")
-            blast_ws.cell(row=sample.idx+1, column=1).value = f"{sample.idx}_{sample.id}"
-            for i in range(2,12):
-                blast_ws.cell(row=sample.idx+1, column=i).value = "n/a"
-            final_ws.cell(row=sample.idx+1, column=1).value = f"{sample.idx}_{sample.id}"
-            final_ws.cell(row=sample.idx+1, column=2).value = "n/a"
-            final_ws.cell(row=sample.idx+1, column=3).value = "n/a"
+        #update rows
+        sample_row += i + 1
 
     for ws in wb.worksheets:
         dims = {}
@@ -201,6 +168,83 @@ class Sample(object):
         self.barcode = barcode
         self.min_len = min_len
         self.max_len = max_len
+        self.total_reads = 0
+        self.no_reads_in_length_range = 0
+        self.contigs = {}
+
+    def collect_info(self, input_dir):
+        nanoplot_txt_file = f"{input_dir}/analysis/{self.idx}_{self.id}/nanoplot_result/{self.padded_idx}_{self.id}.txt"
+        identification_result_dir = f"{input_dir}/analysis/{self.idx}_{self.id}/identification_result"
+        ampliconsorter_csv_file = f"{identification_result_dir}/amplicon_sorter/results.csv"
+        #consensus_fasta_file = f"{identification_result_dir}/amplicon_sorter/{self.idx}_{self.id}_consensussequences.fasta"
+        consensus_fasta_file = f"{identification_result_dir}/amplicon_sorter/consensusfile.fasta"
+        blast_txt_file = f"{identification_result_dir}/blast/{self.padded_idx}_{self.id}.txt"
+
+        print(f"processing {nanoplot_txt_file}")
+        print(f"processing {ampliconsorter_csv_file}")
+        print(f"processing {consensus_fasta_file}")
+        print(f"processing {blast_txt_file}")
+
+        with open(nanoplot_txt_file, "r") as file:
+            for line in file:
+                if line.startswith("Number of reads:"):
+                    self.total_reads = int(float(line.split()[-1].replace(',', '')))
+                    break
+        try:
+            with open(ampliconsorter_csv_file, "r") as file:
+                for line in file:
+                    contig_name, read_no = line.rstrip().split(",")
+                    if contig_name == "Total":
+                        self.no_reads_in_length_range = int(read_no)
+                    elif len(contig_name) > 0:
+                        self.contigs[contig_name] = Contig(contig_name, 0, int(read_no))
+        except FileNotFoundError as e:
+            print(f"File does not exist: {e.filename}")
+
+        cmd = f"seqtk comp {consensus_fasta_file} | cut -f1,2"
+        result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+        lines = result.stdout.strip()
+        for line in lines.split("\n"):
+            print(line)
+            contig_name, length = line.removeprefix("consensus_").split("\t")
+            contig_name = re.sub(r"\(\d+\)$", "", contig_name)
+            if contig_name in self.contigs:
+                self.contigs[contig_name].length = int(length)
+            else:
+                print(f"Contig {contig_name} not found in amplicon sorter results")
+
+        with open(blast_txt_file, "r") as file:
+            #populate alignments for each contig
+            #if a contig is aligned more than once to the same sacc, only the best alignment is kept
+            for line in file:
+#                 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms
+                qacc, sacc, qlen, slen, score, length, pident, stitle, staxids, sscinames, scomnames, sskingdoms = line.rstrip("\n").split("\t")
+                contig_name = qacc.removeprefix("consensus_")
+                contig_name = re.sub(r"\(\d+\)$", "", contig_name)
+                #print(f"contig_name: {contig_name}")
+                if contig_name in self.contigs:
+                    if sacc not in self.contigs[contig_name].alignments:
+                        self.contigs[contig_name].alignments[sacc] = Alignment(qacc, sacc, qlen, slen, score, length, pident, stitle, staxids, sscinames, scomnames, sskingdoms)
+                    else:
+                        if int(score) > self.contigs[contig_name].alignments[sacc].score:
+                            print(f"Updating alignment for {contig_name} with {sacc}")
+                            self.contigs[contig_name].alignments[sacc].print()
+                            self.contigs[contig_name].alignments[sacc] = Alignment(qacc, sacc, qlen, slen, score, length, pident, stitle, staxids, sscinames, scomnames, sskingdoms)
+                            self.contigs[contig_name].alignments[sacc].print()
+                else:
+                    print(f"Contig {contig_name} not found")
+
+        #sort alignments for each contig
+        for contig_name in self.contigs:
+            #sort alignments by score
+            self.contigs[contig_name].sorted_alignments = []
+            for alignment in self.contigs[contig_name].alignments.values():
+                heapq.heappush(self.contigs[contig_name].sorted_alignments, alignment)
+
+    def print_contigs(self):
+        for name, contig in self.contigs.items():
+            self.contigs[name].print()
+
 
     def print(self):
         print(f"index           : {self.idx}")
@@ -209,6 +253,51 @@ class Sample(object):
         print(f"barcode         : {self.barcode}")
         print(f"min_len         : {self.min_len}")
         print(f"max_len         : {self.max_len}")
+
+class Contig(object):
+    def __init__(self, name, length, reads):
+        self.name = name
+        self.length = length
+        self.no_reads = reads
+        self.alignments = {}
+        self.sorted_alignments = []
+
+    def print(self):
+        print(f"contig name     : {self.name}")
+        print(f"contig length   : {self.length}")
+        print(f"contig reads    : {self.no_reads}")
+        for alignment in self.alignments.values():
+            alignment.print()
+
+class Alignment(object):
+    def __init__(self, qacc, sacc, qlen, slen, score, length, pident, stitle, staxids, sscinames, scomnames, sskingdoms):
+        self.qacc = qacc
+        self.sacc = sacc
+        self.qlen = int(qlen)
+        self.slen = int(slen)
+        self.score = int(score)
+        self.length = int(length)
+        self.pident = float(pident)
+        self.stitle = stitle
+        self.staxids = staxids
+        self.sscinames = sscinames
+        self.scomnames = scomnames
+        self.sskingdoms = sskingdoms
+
+    def __lt__(self, other):
+        return self.score > other.score
+
+    def print(self):
+        print(f"\t={self.sacc}=")
+        print(f"\t\tslen       : {self.slen}")
+        print(f"\t\tscore      : {self.score}")
+        print(f"\t\tlength     : {self.length}")
+        print(f"\t\tpident     : {self.pident}")
+        print(f"\t\tstitle     : {self.stitle}")
+        print(f"\t\tstaxids    : {self.staxids}")
+        print(f"\t\tsscinames  : {self.sscinames}")
+        print(f"\t\tscomnames  : {self.scomnames}")
+        print(f"\t\tsskingdoms : {self.sskingdoms}")
 
 class Species(object):
     def __init__(self, no_reads, name):

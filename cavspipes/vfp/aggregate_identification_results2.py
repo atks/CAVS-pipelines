@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # The MIT License
-# Copyright (c) 2024 Adrian Tan <adrian_tan@nparks.gov.sg>
+# Copyright (c) 2025 Adrian Tan <adrian_tan@nparks.gov.sg>
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the 'Software'), to deal
 # in the Software without restriction, including without limitation the rights
@@ -45,15 +45,16 @@ import heapq
 )
 def main(input_dir, sample_file, output_xlsx):
     """
-    Aggregate results from:
-        a. kraken2 results
-        b. blast results
+    Aggregate results from blast results
 
-    e.g. aggregate_illu_results.py -i salomnella_pt -s salmonella_pt.sa -o summary.xlsx
+    e.g. aggregate_identification_results.py -i pore16 -s pore16_pt.sa -o summary.xlsx
     """
     input_dir = os.path.abspath(input_dir)
     sample_file = os.path.abspath(sample_file)
     output_xlsx = os.path.abspath(output_xlsx)
+    output_dir = os.path.dirname(output_xlsx)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
 
     #print("\t{0:<20} :   {1:<10}".format("make_file", input_dir))
     #print("\t{0:<20} :   {1:<10}".format("sample_file", sample_file))
@@ -66,10 +67,10 @@ def main(input_dir, sample_file, output_xlsx):
         for line in file:
             if not line.startswith("#"):
                 index += 1
-                sample_id, fastq1, fastq2 = line.rstrip().split("\t")
+                sample_id, barcode, min_len, max_len = line.rstrip().split("\t")
                 if sample_id != "unclassified":
                     samples.append(
-                        Sample(index, sample_id, fastq1, fastq2)
+                        Sample(index, sample_id, barcode, int(min_len), int(max_len))
                     )
 
     no_samples = len(samples)
@@ -79,7 +80,6 @@ def main(input_dir, sample_file, output_xlsx):
     del wb["Sheet"]
     final_ws = wb.create_sheet("final")
     blast_ws = wb.create_sheet("blast")
-    kraken2_ws = wb.create_sheet("kraken2")
 
     #set opening window size
     view = [BookView(xWindow=8000, yWindow=4000, windowWidth=25000, windowHeight=20000)]
@@ -89,7 +89,7 @@ def main(input_dir, sample_file, output_xlsx):
     style = TableStyleInfo(name="TableStyleLight11", showFirstColumn=False,
                         showLastColumn=False, showRowStripes=True, showColumnStripes=True)
 
-    tab = Table(displayName="final", ref=f"A1:E{no_samples+1}")
+    tab = Table(displayName="final", ref=f"A1:C{no_samples+1}")
     tab.tableStyleInfo = style
     final_ws.add_table(tab)
     final_ws.sheet_view.zoomScale = 200
@@ -99,21 +99,14 @@ def main(input_dir, sample_file, output_xlsx):
     blast_ws.add_table(tab)
     blast_ws.sheet_view.zoomScale = 200
 
-    tab = Table(displayName="kraken2", ref=f"A1:J{no_samples+1}")
-    tab.tableStyleInfo = style
-    kraken2_ws.add_table(tab)
-    kraken2_ws.sheet_view.zoomScale = 200
-
     #setup headers
     final_ws.cell(1, column=1).value = "sample"
     final_ws.cell(1, column=2).value = "blast species"
     final_ws.cell(1, column=3).value = "blast species (%)"
-    final_ws.cell(1, column=4).value = "kraken2 species"
-    final_ws.cell(1, column=5).value = "kraken2 species (%)"
 
     blast_ws.cell(1, column=1).value = "sample"
     blast_ws.cell(1, column=2).value = "annotated contig count"
-    blast_ws.cell(1, column=3).value = "annotation count (up to 10 unique sequences per contig)"
+    blast_ws.cell(1, column=3).value = "annotation count (up to 20 unique sequences per contig)"
     blast_ws.cell(1, column=4).value = "species 1"
     blast_ws.cell(1, column=5).value = "species 1 (%)"
     blast_ws.cell(1, column=6).value = "species 2"
@@ -123,36 +116,21 @@ def main(input_dir, sample_file, output_xlsx):
     blast_ws.cell(1, column=10).value = "other species (%)"
     blast_ws.cell(1, column=11).value = "other species"
 
-    kraken2_ws.cell(1, column=1).value = "sample"
-    kraken2_ws.cell(1, column=2).value = "species level read count"
-    kraken2_ws.cell(1, column=3).value = "species 1"
-    kraken2_ws.cell(1, column=4).value = "species 1 (%)"
-    kraken2_ws.cell(1, column=5).value = "species 2"
-    kraken2_ws.cell(1, column=6).value = "species 2 (%)"
-    kraken2_ws.cell(1, column=7).value = "species 3"
-    kraken2_ws.cell(1, column=8).value = "species 3 (%)"
-    kraken2_ws.cell(1, column=9).value = "other species (%)"
-    kraken2_ws.cell(1, column=10).value = "other species"
-
     # aggregate files
     for sample in samples:
-
         #blast results
-        blast_txt_file = f"{input_dir}/analysis/{sample.idx}_{sample.id}/blast_result/{sample.padded_idx}_{sample.id}.txt"
+        blast_txt_file = f"{input_dir}/analysis/{sample.idx}_{sample.id}/identification_result/blast/{sample.padded_idx}_{sample.id}.txt"
 
         try:
             with open(blast_txt_file, "r") as file:
-                #print(blast_txt_file)
                 unique_contigs = {}
                 species_count = {}
 
                 for line in file:
+# qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms
                     results = line.rstrip("\n").split("\t")
                     contig = results[0]
-                    #staxid = results[8]
                     ssciname = results[9]
-                    #scomname = results[10]
-                    #sskingdom = results[11]
 
                     unique_contigs[contig] = 1
 
@@ -203,47 +181,6 @@ def main(input_dir, sample_file, output_xlsx):
             final_ws.cell(row=sample.idx+1, column=2).value = "n/a"
             final_ws.cell(row=sample.idx+1, column=3).value = "n/a"
 
-
-        #kraken2 results
-        kraken2_txt_file = f"{input_dir}/analysis/{sample.idx}_{sample.id}/kraken2_result/{sample.padded_idx}_{sample.id}.txt"
-        try:
-            with open(kraken2_txt_file, "r") as file:
-                #print(kraken2_txt_file)
-                species_heap = []
-                for line in file:
-                    percentage_reads, no_reads_clade, no_assigned_reads, tax_level, tax_id, nomenclature =  line.strip().split("\t", maxsplit=5)
-                    if tax_level == "S":
-                        heapq.heappush(species_heap, Species(int(no_reads_clade), nomenclature))
-
-                # get top 3 species
-                total_species_read_count = 0.0
-                other_species = []
-                for i, species in enumerate(species_heap):
-                    total_species_read_count += species.no_reads
-                    if i>2:
-                        other_species.append(species.name)
-
-                kraken2_ws.cell(row=sample.idx+1, column=1).value = f"{sample.idx}_{sample.id}"
-                kraken2_ws.cell(row=sample.idx+1, column=2).value = total_species_read_count
-
-                top_species = heapq.nlargest(3, species_heap)
-                top_species_read_count = 0.0
-                for i, species in enumerate(top_species):
-                    kraken2_ws.cell(row=sample.idx+1, column=2*i+3).value = species.name
-                    kraken2_ws.cell(row=sample.idx+1, column=2*i+4).value = f"{species.no_reads/total_species_read_count*100:.2f}"
-                    top_species_read_count += species.no_reads
-                    if i == 0:
-                        final_ws.cell(row=sample.idx+1, column=4).value = species.name
-                        final_ws.cell(row=sample.idx+1, column=5).value = f"{species.no_reads/total_species_read_count*100:.2f}"
-
-                # get rest of species
-                kraken2_ws.cell(row=sample.idx+1, column=9).value = f"{(total_species_read_count-top_species_read_count)/total_species_read_count*100:.2f}"
-                kraken2_ws.cell(row=sample.idx+1, column=10).value = ":".join(other_species)
-
-        except OSError as e:
-            print(f"Error: {kraken2_txt_file} : {e}")
-            pass
-
     for ws in wb.worksheets:
         dims = {}
         for row in ws.rows:
@@ -251,28 +188,27 @@ def main(input_dir, sample_file, output_xlsx):
                 if cell.value:
                     dims[cell.column_letter] = max((dims.get(cell.column_letter, 0), len(str(cell.value))))
         for col, value in dims.items():
-            print(f"{col} {value}")
             ws.column_dimensions[col].width = value
-        print(f"==============")
 
     wb.save(output_xlsx)
     wb.close()
 
-
 class Sample(object):
-    def __init__(self, idx, id, fastq1, fastq2):
+    def __init__(self, idx, id, barcode, min_len, max_len):
         self.idx = idx
         self.padded_idx = f"{idx:02}"
         self.id = id
-        self.fastq1 = fastq1
-        self.fastq2 = fastq2
+        self.barcode = barcode
+        self.min_len = min_len
+        self.max_len = max_len
 
     def print(self):
         print(f"index           : {self.idx}")
         print(f"padded index    : {self.padded_idx}")
         print(f"id              : {self.id}")
-        print(f"fastq1          : {self.fastq1}")
-        print(f"fastq2          : {self.fastq2}")
+        print(f"barcode         : {self.barcode}")
+        print(f"min_len         : {self.min_len}")
+        print(f"max_len         : {self.max_len}")
 
 class Species(object):
     def __init__(self, no_reads, name):
