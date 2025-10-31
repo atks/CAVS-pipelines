@@ -52,11 +52,14 @@ def main(make_file, working_dir):
     # create directories in destination folder directory
     ref_dir = f"{working_dir}/ref"
     assembly_dir = f"{working_dir}/assembly"
+    blast_dir = f"{working_dir}/blast"
+    annotation_dir = f"{working_dir}/assembly"
     log_dir = f"{working_dir}/log"
 
     try:
         os.makedirs(ref_dir, exist_ok=True)
         os.makedirs(assembly_dir, exist_ok=True)
+        os.makedirs(blast_dir, exist_ok=True)
         os.makedirs(log_dir, exist_ok=True)
     except OSError as error:
         print(f"Directory cannot be created")
@@ -65,6 +68,11 @@ def main(make_file, working_dir):
     #programs
     #########
     spades = "/usr/local/SPAdes-4.0.0/bin/spades.py"
+    blastn = "/usr/local/ncbi-blast-2.16.0+/bin/blastn "
+    blastdb_nt = "/db/blast/nt/nt"
+    blastdb_tx = "/db/blast/nt"
+    prokka = "docker run  -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` stabph/prokka prokka "
+    
 
     #################
     # reference files
@@ -111,7 +119,7 @@ def main(make_file, working_dir):
         #metaviral assembly
         output_dir = f"{assembly_dir}/{sample.name}/metaviral_assembly"
         dep = ""
-        tgt = f"{sample.name}_metaviral_assembly.OK"
+        tgt = f"{log_dir}/{sample.name}_metaviral_assembly.OK"
         log = f"{log_dir}/{sample.name}_metaviral_assembly.OK"
         err = f"{log_dir}/{sample.name}_metaviral_assembly.err"
         cmd = f"{spades} -1 {sample.fastq1} -2 {sample.fastq2} --threads 10 --metaviral -o {output_dir} > {log} 2> {err}"
@@ -120,13 +128,30 @@ def main(make_file, working_dir):
         #rnaviral assembly
         output_dir = f"{assembly_dir}/{sample.name}/rnaviral_assembly"
         dep = ""
-        tgt = f"{sample.name}_rnaviral_assembly.OK"
+        tgt = f"{log_dir}/{sample.name}_rnaviral_assembly.OK"
         log = f"{log_dir}/{sample.name}_rnaviral_assembly.OK"
         err = f"{log_dir}/{sample.name}_rnaviral_assembly.err"
         cmd = f"{spades} -1 {sample.fastq1} -2 {sample.fastq2} --threads 10 --rnaviral -o {output_dir} > {log} 2> {err}"
         pg.add_srun(tgt, dep, cmd, 10)
 
- 
+    ########
+    # blast  
+    ########
+    src_fasta_file = f"{assembly_dir}/M250740_CDV_bladder/metaviral_assembly/contigs.fasta"
+    output_txt_file = f"{blast_dir}/blast.results.txt"
+    log = f"{log_dir}/blast.log"
+    tgt = f"{log_dir}/blast.OK"
+    dep = f"{log_dir}/M250740_CDV_bladder_metaviral_assembly.OK"
+    cmd = f"export BLASTDB={blastdb_tx}/; {blastn} -db {blastdb_nt} -query {src_fasta_file} -outfmt \"6 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms\" -max_target_seqs 20 -evalue 1e-5 -task megablast -out {output_txt_file} > {log}"
+    pg.add(tgt, dep, cmd)
+
+    ##########
+    # Annotate
+    ##########
+#docker run -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` staphb/prokka: prokka  --kingdom Viruses ../fasta/contigs.fasta --proteins ../1915_genbank_cdv/NC_001921.1.genbank  --force --outdir M250740 --prefix M250740
+
+#scripts/filter_prokka_tbl.py  M220338/M220338.tbl -r M220338.fasta -o M220338.filtered.tbl
+
     # clean
     pg.add_clean(f"rm -fr {ref_dir} {assembly_dir} {log_dir}")
 

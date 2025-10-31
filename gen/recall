@@ -62,6 +62,8 @@ def main():
     print("wget ftp://ftp.ncbi.nlm.nih.gov/blast/db/taxdb.tar.gz")
     print("#decrypting text")
     print("cat a.des3 | openssl des3 -d -pbkdf2")
+    print("#blasting")
+    print("export BLASTDB=/db/blast/nt/; blastn  -db /db/blast/nt/nt -query contigs.fasta -outfmt \"6 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms\" -max_target_seqs 20 -evalue 1e-5 -task megablast -out blast.results.txt")
 
 if __name__ == "__main__":
     main() # type: ignore[arg-type]
