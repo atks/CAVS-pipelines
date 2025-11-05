@@ -53,6 +53,7 @@ def main(make_file, working_dir):
     ref_dir = f"{working_dir}/ref"
     assembly_dir = f"{working_dir}/assembly"
     blast_dir = f"{working_dir}/blast"
+    pairwise_alignment_dir = f"{working_dir}/pairwise_alignment"
     annotation_dir = f"{working_dir}/assembly"
     log_dir = f"{working_dir}/log"
 
@@ -60,6 +61,7 @@ def main(make_file, working_dir):
         os.makedirs(ref_dir, exist_ok=True)
         os.makedirs(assembly_dir, exist_ok=True)
         os.makedirs(blast_dir, exist_ok=True)
+        os.makedirs(pairwise_alignment_dir, exist_ok=True)
         os.makedirs(log_dir, exist_ok=True)
     except OSError as error:
         print(f"Directory cannot be created")
@@ -145,12 +147,47 @@ def main(make_file, working_dir):
     cmd = f"export BLASTDB={blastdb_tx}/; {blastn} -db {blastdb_nt} -query {src_fasta_file} -outfmt \"6 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms\" -max_target_seqs 20 -evalue 1e-5 -task megablast -out {output_txt_file} > {log}"
     pg.add(tgt, dep, cmd)
 
+
+    ####################
+    # Pairwise alignment  
+    ####################
+    #seqkit replace assembly/M250740_CDV_bladder/metaviral_assembly/contigs.fasta -p "^.*$" -r metaviral | seqtk seq > metaviral.fasta
+    #seqtk seq assembly/M250740_CDV_bladder/rnaviral_assembly/contigs.fasta  | head -2 | seqkit replace -p "^.*$"  -r rnaviral | seqtk seq -r > rnaviral.fasta
+    src_fasta_file = f"{assembly_dir}/M250740_CDV_bladder/metaviral_assembly/contigs.fasta"
+    dst_fasta_file = f"{assembly_dir}/M250740_CDV_bladder/metaviral_assembly/contigs.fasta"
+    output_txt_file = f"{blast_dir}/blast.results.txt"
+    log = f"{log_dir}/blast.log"
+    tgt = f"{log_dir}/blast.OK"
+    dep = f"{log_dir}/M250740_CDV_bladder_metaviral_assembly.OK"
+    cmd = f"export BLASTDB={blastdb_tx}/; {blastn} -db {blastdb_nt} -query {src_fasta_file} -outfmt \"6 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms\" -max_target_seqs 20 -evalue 1e-5 -task megablast -out {output_txt_file} > {log}"
+    pg.add(tgt, dep, cmd)
+
+
+    #########################
+    # copy assembled sequence  
+    #########################
+    
+
+
+    #####
+    #  quast
+    # ######    
+
     ##########
     # Annotate
     ##########
 #docker run -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` staphb/prokka: prokka  --kingdom Viruses ../fasta/contigs.fasta --proteins ../1915_genbank_cdv/NC_001921.1.genbank  --force --outdir M250740 --prefix M250740
 
+#docker run   staphb/prokka:1.14.6 prokka  --kingdom Viruses /home/atks//fasta/contigs.fasta --proteins ../1915_genbank_cdv/NC_001921.1.genbank  --force --outdir M250740 --prefix M250740
+
 #scripts/filter_prokka_tbl.py  M220338/M220338.tbl -r M220338.fasta -o M220338.filtered.tbl
+
+    #####
+    # phylogenetics
+    #####
+
+
+
 
     # clean
     pg.add_clean(f"rm -fr {ref_dir} {assembly_dir} {log_dir}")
