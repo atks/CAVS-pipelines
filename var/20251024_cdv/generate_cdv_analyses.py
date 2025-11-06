@@ -54,6 +54,7 @@ def main(make_file, working_dir):
     assembly_dir = f"{working_dir}/assembly"
     blast_dir = f"{working_dir}/blast"
     pairwise_alignment_dir = f"{working_dir}/pairwise_alignment"
+    alignment_dir = f"{working_dir}/alignment"
     annotation_dir = f"{working_dir}/annotation"
     log_dir = f"{working_dir}/log"
 
@@ -62,6 +63,7 @@ def main(make_file, working_dir):
         os.makedirs(assembly_dir, exist_ok=True)
         os.makedirs(blast_dir, exist_ok=True)
         os.makedirs(pairwise_alignment_dir, exist_ok=True)
+        os.makedirs(alignment_dir, exist_ok=True)
         os.makedirs(log_dir, exist_ok=True)
     except OSError as error:
         print(f"Directory cannot be created")
@@ -76,6 +78,7 @@ def main(make_file, working_dir):
     seqkit = "/usr/local/seqkit-2.10.1/seqkit"
     seqtk = "/usr/local/seqtk-1.4/seqtk"
     needle = "/usr/local/emboss-6.6.0/bin/needle"
+    align_and_consense = "/home/atks/programs/CAVS-pipelines/minipipes/align_and_consense.py"
     prokka = "docker run  -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` stabph/prokka prokka "
     
 
@@ -154,8 +157,6 @@ def main(make_file, working_dir):
     ####################
     # Pairwise alignment  
     ####################
-    #seqkit replace assembly/M250740_CDV_bladder/metaviral_assembly/contigs.fasta -p "^.*$" -r metaviral | seqtk seq > metaviral.fasta
-    #seqtk seq assembly/M250740_CDV_bladder/rnaviral_assembly/contigs.fasta  | head -2 | seqkit replace -p "^.*$"  -r rnaviral | seqtk seq -r > rnaviral.fasta
     src_fasta_file = f"{assembly_dir}/M250740_CDV_bladder/metaviral_assembly/contigs.fasta"
     dst_fasta_file = f"{pairwise_alignment_dir}/metaviral.fasta"
     tgt = f"{log_dir}/metaviral.fasta.OK"
@@ -167,7 +168,7 @@ def main(make_file, working_dir):
     dst_fasta_file = f"{pairwise_alignment_dir}/rnaviral.fasta"
     tgt = f"{log_dir}/rnaviral.fasta.OK"
     dep = f"{log_dir}/M250740_CDV_bladder_rnaviral_assembly.OK"
-    cmd = f"echo NODE_1_length_15672_cov_101.763379 | {seqtk} subseq {src_fasta_file} - | seqkit replace -p \"^.*$$\"  -r rnaviral | {seqtk} seq -r > {dst_fasta_file}"
+    cmd = f"echo NODE_1_length_15672_cov_101.763379 | {seqtk} subseq {src_fasta_file} - | {seqkit} replace -p \"^.*$$\"  -r rnaviral | {seqtk} seq -r > {dst_fasta_file}"
     pg.add(tgt, dep, cmd)
 
     fasta1_file = f"{pairwise_alignment_dir}/metaviral.fasta"
@@ -182,18 +183,42 @@ def main(make_file, working_dir):
     ################
     # Read alignment  
     ################
+    fastq1_file = f"/net/singapura/var/hts/ilm74/74_3_M250740_CDV_bladder_R1.fastq.gz"
+    fastq2_file = f"/net/singapura/var/hts/ilm74/74_3_M250740_CDV_bladder_R2.fastq.gz"
 
+    #against metaviral assembly
+    ref_fasta_file = f"{pairwise_alignment_dir}/metaviral.fasta"
+    output_dir = f"{alignment_dir}/metaviral_read_alignment"
+    log = f"{log_dir}/metaviral_read_alignment.log"
+    tgt = f"{log_dir}/metaviral_read_alignment.OK"
+    dep = f"{log_dir}/metaviral_rnaviral_needle_alignment.OK"
+    cmd = f"{align_and_consense} -r {ref_fasta_file} -1 {fastq1_file} -2 {fastq2_file} -o {output_dir} > {log} 2>&1"
+    pg.add(tgt, dep, cmd)
 
+    #against rnaviral assembly
+    ref_fasta_file = f"{pairwise_alignment_dir}/rnaviral.fasta"
+    output_dir = f"{alignment_dir}/rnaviral_read_alignment"
+    log = f"{log_dir}/rnaviral_read_alignment.log"
+    tgt = f"{log_dir}/rnaviral_read_alignment.OK"
+    dep = f"{log_dir}/metaviral_rnaviral_needle_alignment.OK"
+    cmd = f"{align_and_consense} -r {ref_fasta_file} -1 {fastq1_file} -2 {fastq2_file} -o {output_dir} > {log} 2>&1"
+    pg.add(tgt, dep, cmd)
 
+    #########################################
+    # Trim and copy chosen assembled sequence  
+    #########################################
+    #trim last there nucleotides off RNAViral assembly due to ambiguity observed in alignments
+    #seqkit subseq pairwise_alignment/rnaviral.fasta -r 1:15669 | seqkit replace -p "^.*$" -r "M250740"  -o new.fasta
+    ref_fasta_file = f"{pairwise_alignment_dir}/rnaviral.fasta"
+    output_fasta_file = f"{ref_dir}/M250740.fasta"
+    log = f"{log_dir}/reference_seq_trimming_renaming.log"
+    tgt = f"{log_dir}/M250740.fasta.OK"
+    dep = f"{log_dir}/metaviral_read_alignment.OK {log_dir}/rnaviral_read_alignment.OK" 
+    cmd = f"{seqkit} subseq {ref_fasta_file} -r 1:15669 | {seqkit} replace -p \"^.*$$\" -r M250740 -o {output_fasta_file} > {log} 2>&1"
+    pg.add(tgt, dep, cmd)
 
-    ################################
-    # Copy chosen assembled sequence  
-    ################################
-    
-
-
-    #####
-    #  quast
+    #######
+    # Quast
     #######    
 
     ##########
@@ -205,6 +230,12 @@ def main(make_file, working_dir):
 #docker run   staphb/prokka:1.14.6 prokka  --kingdom Viruses /home/atks//fasta/contigs.fasta --proteins ../1915_genbank_cdv/NC_001921.1.genbank  --force --outdir M250740 --prefix M250740
 
 #scripts/filter_prokka_tbl.py  M220338/M220338.tbl -r M220338.fasta -o M220338.filtered.tbl
+
+    #####
+    # prepare whole genomes
+    #####
+
+
 
     #####
     # phylogenetics

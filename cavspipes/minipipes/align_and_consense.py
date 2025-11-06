@@ -132,7 +132,7 @@ def main(
     #ontresearch/medaka:sha3486abaab0d3b90351617eb8622acf2028edb154 medaka v1.12.0
     #ontresearch/medaka:sha447c70a639b8bcf17dc49b51e74dfcde6474837b medaka v2.0.0
     medaka = "docker run  -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` ontresearch/medaka:sha3486abaab0d3b90351617eb8622acf2028edb154 medaka"
-    seqkit = "/usr/local/seqkit-2.10.1/bin/seqkit"
+    seqkit = "/usr/local/seqkit-2.10.1/seqkit"
 
     # make directories
     output_dir = os.path.abspath(output_dir)
