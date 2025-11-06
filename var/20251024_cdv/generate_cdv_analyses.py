@@ -54,7 +54,7 @@ def main(make_file, working_dir):
     assembly_dir = f"{working_dir}/assembly"
     blast_dir = f"{working_dir}/blast"
     pairwise_alignment_dir = f"{working_dir}/pairwise_alignment"
-    annotation_dir = f"{working_dir}/assembly"
+    annotation_dir = f"{working_dir}/annotation"
     log_dir = f"{working_dir}/log"
 
     try:
@@ -73,6 +73,9 @@ def main(make_file, working_dir):
     blastn = "/usr/local/ncbi-blast-2.16.0+/bin/blastn "
     blastdb_nt = "/db/blast/nt/nt"
     blastdb_tx = "/db/blast/nt"
+    seqkit = "/usr/local/seqkit-2.10.1/seqkit"
+    seqtk = "/usr/local/seqtk-1.4/seqtk"
+    needle = "/usr/local/emboss-6.6.0/bin/needle"
     prokka = "docker run  -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` stabph/prokka prokka "
     
 
@@ -154,28 +157,49 @@ def main(make_file, working_dir):
     #seqkit replace assembly/M250740_CDV_bladder/metaviral_assembly/contigs.fasta -p "^.*$" -r metaviral | seqtk seq > metaviral.fasta
     #seqtk seq assembly/M250740_CDV_bladder/rnaviral_assembly/contigs.fasta  | head -2 | seqkit replace -p "^.*$"  -r rnaviral | seqtk seq -r > rnaviral.fasta
     src_fasta_file = f"{assembly_dir}/M250740_CDV_bladder/metaviral_assembly/contigs.fasta"
-    dst_fasta_file = f"{assembly_dir}/M250740_CDV_bladder/metaviral_assembly/contigs.fasta"
-    output_txt_file = f"{blast_dir}/blast.results.txt"
-    log = f"{log_dir}/blast.log"
-    tgt = f"{log_dir}/blast.OK"
+    dst_fasta_file = f"{pairwise_alignment_dir}/metaviral.fasta"
+    tgt = f"{log_dir}/metaviral.fasta.OK"
     dep = f"{log_dir}/M250740_CDV_bladder_metaviral_assembly.OK"
-    cmd = f"export BLASTDB={blastdb_tx}/; {blastn} -db {blastdb_nt} -query {src_fasta_file} -outfmt \"6 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms\" -max_target_seqs 20 -evalue 1e-5 -task megablast -out {output_txt_file} > {log}"
+    cmd = f"{seqkit} replace {src_fasta_file} -p \"^.*$$\" -r metaviral | {seqtk} seq > {dst_fasta_file}"
     pg.add(tgt, dep, cmd)
 
+    src_fasta_file = f"{assembly_dir}/M250740_CDV_bladder/rnaviral_assembly/contigs.fasta"
+    dst_fasta_file = f"{pairwise_alignment_dir}/rnaviral.fasta"
+    tgt = f"{log_dir}/rnaviral.fasta.OK"
+    dep = f"{log_dir}/M250740_CDV_bladder_rnaviral_assembly.OK"
+    cmd = f"echo NODE_1_length_15672_cov_101.763379 | {seqtk} subseq {src_fasta_file} - | seqkit replace -p \"^.*$$\"  -r rnaviral | {seqtk} seq -r > {dst_fasta_file}"
+    pg.add(tgt, dep, cmd)
 
-    #########################
-    # copy assembled sequence  
-    #########################
+    fasta1_file = f"{pairwise_alignment_dir}/metaviral.fasta"
+    fasta2_file = f"{pairwise_alignment_dir}/rnaviral.fasta"
+    output_txt_file = f"{pairwise_alignment_dir}/metaviral_rnaviral_alignment.txt"
+    log = f"{log_dir}/metaviral_rnaviral_needle_alignment.log"
+    tgt = f"{log_dir}/metaviral_rnaviral_needle_alignment.OK"
+    dep = f"{log_dir}/metaviral.fasta.OK {log_dir}/rnaviral.fasta.OK"
+    cmd = f"{needle} {fasta1_file} {fasta2_file} -gapopen 10 -gapextend 0.5 -outfile {output_txt_file} > {log} 2>&1"
+    pg.add(tgt, dep, cmd)
+
+    ################
+    # Read alignment  
+    ################
+
+
+
+
+    ################################
+    # Copy chosen assembled sequence  
+    ################################
     
 
 
     #####
     #  quast
-    # ######    
+    #######    
 
     ##########
     # Annotate
     ##########
+
 #docker run -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` staphb/prokka: prokka  --kingdom Viruses ../fasta/contigs.fasta --proteins ../1915_genbank_cdv/NC_001921.1.genbank  --force --outdir M250740 --prefix M250740
 
 #docker run   staphb/prokka:1.14.6 prokka  --kingdom Viruses /home/atks//fasta/contigs.fasta --proteins ../1915_genbank_cdv/NC_001921.1.genbank  --force --outdir M250740 --prefix M250740
