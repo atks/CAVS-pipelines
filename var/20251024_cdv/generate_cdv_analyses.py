@@ -55,6 +55,7 @@ def main(make_file, working_dir):
     blast_dir = f"{working_dir}/blast"
     pairwise_alignment_dir = f"{working_dir}/pairwise_alignment"
     alignment_dir = f"{working_dir}/alignment"
+    quast_dir = f"{working_dir}/quast"
     annotation_dir = f"{working_dir}/annotation"
     log_dir = f"{working_dir}/log"
 
@@ -79,7 +80,8 @@ def main(make_file, working_dir):
     seqtk = "/usr/local/seqtk-1.4/seqtk"
     needle = "/usr/local/emboss-6.6.0/bin/needle"
     align_and_consense = "/home/atks/programs/CAVS-pipelines/minipipes/align_and_consense.py"
-    prokka = "docker run  -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` stabph/prokka prokka "
+    quast = f"docker run -t -v  `pwd`:`pwd` -w `pwd` fischuu/quast quast.py"
+    prokka = "docker run -t -v  `pwd`:`pwd` -w `pwd` staphb/prokka:1.14.6 prokka "
     
 
     #################
@@ -217,23 +219,52 @@ def main(make_file, working_dir):
     cmd = f"{seqkit} subseq {ref_fasta_file} -r 1:15669 | {seqkit} replace -p \"^.*$$\" -r M250740 -o {output_fasta_file} > {log} 2>&1"
     pg.add(tgt, dep, cmd)
 
+    ################################
+    # Read alignment against M250740
+    ################################
+    fastq1_file = f"/net/singapura/var/hts/ilm74/74_3_M250740_CDV_bladder_R1.fastq.gz"
+    fastq2_file = f"/net/singapura/var/hts/ilm74/74_3_M250740_CDV_bladder_R2.fastq.gz"
+
+    ref_fasta_file = f"{ref_dir}/M250740.fasta"
+    output_dir = f"{alignment_dir}/M250740_read_alignment"
+    log = f"{log_dir}/M250740_read_alignment.log"
+    tgt = f"{log_dir}/M250740_read_alignment.OK"
+    dep = f"{log_dir}/M250740.fasta.OK"
+    cmd = f"{align_and_consense} -r {ref_fasta_file} -1 {fastq1_file} -2 {fastq2_file} -o {output_dir} > {log} 2>&1"
+    pg.add(tgt, dep, cmd)
+
     #######
     # Quast
-    #######    
-
+    #######   
+    ref_fasta_file = f"{ref_dir}/M250740.fasta"
+    input_bam_file = f"{alignment_dir}/M250740_read_alignment/bam/ilm.bam"
+    log = f"{log_dir}/M250740_quast.log"
+    tgt = f"{log_dir}/M250740_quast.OK"
+    dep = f"{log_dir}/M250740_read_alignment.OK"
+    cmd = f"{quast} {ref_fasta_file} --bam {input_bam_file} -o {quast_dir} > {log} 2>&1"
+    pg.add(tgt, dep, cmd) 
+    
     ##########
     # Annotate
     ##########
+    fasta_file = f"{ref_dir}/M250740.fasta"
+    genbank_file = f"{ref_dir}/AF014953.1.genbank"
+    output_dir = f"{annotation_dir}/M250740"
+    log = f"{log_dir}/M250740_prokka.log"
+    tgt = f"{log_dir}/M250740_prokka.OK"
+    dep = f"{log_dir}/M250740.fasta.OK"
+    cmd = f"{prokka} --kingdom Viruses {fasta_file} --proteins {genbank_file} --force --outdir {output_dir} --prefix M250740 > {log} 2>&1"
+    pg.add(tgt, dep, cmd) 
 
+#docker run  -t -v  `pwd`:`pwd` -w `pwd` staphb/prokka:1.14.6 prokka  --kingdom Viruses /home/atks/analysis/var/20251024_cdv/ref/M250740.fasta  --proteins ref/AF014953.1.genbank  --force --outdir M250740 --prefix M250740
+#docker run  -t -v  `pwd`:`pwd` -w `pwd` staphb/prokka:1.14.6 prokka  
 #docker run -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` staphb/prokka: prokka  --kingdom Viruses ../fasta/contigs.fasta --proteins ../1915_genbank_cdv/NC_001921.1.genbank  --force --outdir M250740 --prefix M250740
-
 #docker run   staphb/prokka:1.14.6 prokka  --kingdom Viruses /home/atks//fasta/contigs.fasta --proteins ../1915_genbank_cdv/NC_001921.1.genbank  --force --outdir M250740 --prefix M250740
-
 #scripts/filter_prokka_tbl.py  M220338/M220338.tbl -r M220338.fasta -o M220338.filtered.tbl
 
-    #####
+    #######################
     # prepare whole genomes
-    #####
+    #######################
 
 
 
