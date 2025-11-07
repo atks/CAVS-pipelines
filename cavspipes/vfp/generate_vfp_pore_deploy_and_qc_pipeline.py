@@ -30,7 +30,7 @@ from datetime import datetime
     "-m",
     "--make_file",
     show_default=True,
-    default="pore_deploy_and_qc.mk",
+    default="",
     help="make file name",
 )
 @click.option("-r", "--run_id", required=True, help="Run ID")
@@ -51,9 +51,9 @@ from datetime import datetime
 @click.option(
     "--as_maxr", help="Amplicon Sorter Sample size for clustering", required=False, default=100000
 )
-@click.option("-x", "--memory", help="Memory for fastqc", required=False, default=2048)
+@click.option("-x", "--memory", help="Memory for fastqc", required=False, default=10000)
 @click.option("-y", "--model", help="Model for Dorado calling", required=False, default="dna_r10.4.1_e8.2_400bps_hac@v5.0.0")
-@click.option("-k", "--kit", default="SQK-NBD114-24", show_default=True, help="Kit ID")
+@click.option("-k", "--kit", default="SQK-NBD114-96", show_default=True, help="Kit ID")
 @click.option("-s", "--sample_file", required=True, help="sample file")
 def main(
     make_file,
@@ -75,6 +75,8 @@ def main(
     """
     dest_dir = working_dir + "/" + run_id
     nanopore_dir = os.path.abspath(nanopore_dir)
+    if make_file == "":
+        make_file = f"{working_dir}/{run_id}_deploy_and_qc.mk"
 
     print("\t{0:<22} :   {1:<10}".format("make_file", make_file))
     print("\t{0:<22} :   {1:<10}".format("run_dir", run_id))
@@ -106,8 +108,8 @@ def main(
     ft = "/usr/local/cavstools-0.0.1/ft"
     amplicon_sorter = "/usr/local/amplicon_sorter-2025-05-28/bin/python3 /usr/local/amplicon_sorter-2025-05-28/amplicon_sorter.py"
     blastn = "/usr/local/ncbi-blast-2.16.0+/bin/blastn "
-    blastdb_nt = "/usr/local/ref/ncbi/20250408/nt/nt"
-    blastdb_tx = "/usr/local/ref/ncbi/20250408/nt"
+    blastdb_nt = "/db/blast/nt/nt"
+    blastdb_tx = "/db/blast/nt"
     aggregate_identification_results = f"{os.path.dirname(__file__)}/aggregate_identification_results.py"
 
     run = Run(run_id)
@@ -153,8 +155,6 @@ def main(
             os.makedirs(sample_dir, exist_ok=True)
             os.makedirs(f"{sample_dir}/fastqc_result", exist_ok=True)
             os.makedirs(f"{sample_dir}/nanoplot_result", exist_ok=True)
-            os.makedirs(f"{sample_dir}/identification_result/amplicon_sorter", exist_ok=True)
-            os.makedirs(f"{sample_dir}/identification_result/blast", exist_ok=True)
     except OSError as error:
         print(f"{error.filename} cannot be created")
 
@@ -219,35 +219,47 @@ def main(
             pg.add(tgt, dep, cmd)
 
             if sample.is_dna_barcode:
-                # amplicon sorter
-                input_fastq_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
-                output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/identification_result/amplicon_sorter"
-                log = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter.log"
-                tgt = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter.OK"
-                dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz.OK"
-                #cmd = f"{amplicon_sorter} -i {input_fastq_file} -min {sample.min_len} -max {sample.max_len} -maxr {as_maxr} -ra -o {output_dir} > {log}"
-                cmd = f"{amplicon_sorter} -i {input_fastq_file} -min {sample.min_len} -max {sample.max_len} -maxr {as_maxr} -a -o {output_dir} > {log}"
-                pg.add(tgt, dep, cmd)
+                
+                for as_maxr in [100000, 500000, 1000000]:
+                
+                    suffix = ""
+                    if as_maxr == 100000:
+                        suffix = "100K"
+                    if as_maxr == 500000:
+                        suffix = "500K"
+                    if as_maxr == 1000000:
+                        suffix = "1M"                        
 
-                # amplicon sorter histogram
-                input_fastq_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
-                output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/identification_result/amplicon_sorter"
-                log = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter.hist.log"
-                tgt = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter.hist.OK"
-                dep = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter.OK"
-                cmd = f"{amplicon_sorter} -i {input_fastq_file} -min {sample.min_len} -ho -o {output_dir} > {log}"
-                pg.add(tgt, dep, cmd)
+                    # amplicon sorter
+                    input_fastq_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
+                    output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/identification_result_{suffix}/amplicon_sorter"
+                    log = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter_{suffix}.log"
+                    tgt = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter_{suffix}.OK"
+                    dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz.OK"
+                    #cmd = f"{amplicon_sorter} -i {input_fastq_file} -min {sample.min_len} -max {sample.max_len} -maxr {as_maxr} -ra -o {output_dir} > {log}"
+                    cmd = f"rm -fr {output_dir}; {amplicon_sorter} -i {input_fastq_file} -min {sample.min_len} -max {sample.max_len} -maxr {as_maxr} -o {output_dir} > {log}"
+                    pg.add(tgt, dep, cmd)
 
-                #blast
-                #src_fasta_file = f"{analysis_dir}/{sample.idx}_{sample.id}/identification_result/amplicon_sorter/{sample.idx}_{sample.id}_consensussequences.fasta"
-                src_fasta_file = f"{analysis_dir}/{sample.idx}_{sample.id}/identification_result/amplicon_sorter/consensusfile.fasta"
-                output_txt_file = f"{analysis_dir}/{sample.idx}_{sample.id}/identification_result/blast/{sample.padded_idx}_{sample.id}.txt"
-                log = f"{log_dir}/{sample.idx}_{sample.id}.blast.log"
-                tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}.blast.OK"
-                dep = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter.OK"
-                identification_aggregate_dep += f" {tgt}"
-                cmd = f"export BLASTDB={blastdb_tx}/; {blastn} -db {blastdb_nt} -query {src_fasta_file} -outfmt \"6 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms\" -max_target_seqs 20 -evalue 1e-5 -task megablast -out {output_txt_file} > {log}"
-                pg.add(tgt, dep, cmd)
+                    # amplicon sorter histogram
+                    input_fastq_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
+                    log = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter_{suffix}.hist.log"
+                    tgt = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter_{suffix}.hist.OK"
+                    dep = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter_{suffix}.OK"
+                    cmd = f"{amplicon_sorter} -i {input_fastq_file} -min {sample.min_len} -ho -o {output_dir} > {log}"
+                    pg.add(tgt, dep, cmd)
+
+                    #blast
+                    #src_fasta_file = f"{analysis_dir}/{sample.idx}_{sample.id}/identification_result_{suffix}/amplicon_sorter/{sample.idx}_{sample.id}_consensussequences.fasta"
+                    src_fasta_file = f"{analysis_dir}/{sample.idx}_{sample.id}/identification_result_{suffix}/amplicon_sorter/consensusfile.fasta"
+                    output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/identification_result_{suffix}/blast"
+                    output_txt_file = f"{output_dir}/{sample.padded_idx}_{sample.id}.txt"
+                    log = f"{log_dir}/{sample.idx}_{sample.id}.blast_{suffix}.log"
+                    tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}.blast_{suffix}.OK"
+                    dep = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter_{suffix}.OK"
+                    identification_aggregate_dep += f" {tgt}"
+                    #cmd = f"rm -fr {output_dir};export BLASTDB={blastdb_tx}/; {blastn} -db {blastdb_nt} -query {src_fasta_file} -outfmt \"6 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms\" -max_target_seqs 20 -evalue 1e-5 -task megablast -out {output_txt_file} > {log}"
+                    cmd = f"mkdir -p {output_dir};export BLASTDB={blastdb_tx}/; {blastn} -db {blastdb_nt} -query {src_fasta_file} -outfmt \"6 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms\" -max_target_seqs 20 -evalue 1e-5 -task megablast -out {output_txt_file} > {log}"
+                    pg.add(tgt, dep, cmd)
 
             # symbolic link for fastqc
             fastqc_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/fastqc_result"
@@ -319,11 +331,13 @@ def main(
 
         # aggregate identification results in excel
         analysis = "identification"
-        output_xlsx_file = f"{analysis_dir}/all/{analysis}/summary.xlsx"
-        dep = identification_aggregate_dep
-        tgt = f"{log_dir}/{analysis}.aggregate_report.OK"
-        cmd = f"{aggregate_identification_results} -i {dest_dir} -s {sample_file} -o {output_xlsx_file}"
-        pg.add(tgt, dep, cmd)
+        for suffix in ["100K", "500K", "1M"]:
+            output_xlsx_file = f"{analysis_dir}/all/{analysis}/{run_id}_summary_{suffix}.xlsx"
+            #dep = identification_aggregate_dep
+            dep = f"{log_dir}/{sample.padded_idx}_{sample.id}.blast_{suffix}.OK"
+            tgt = f"{log_dir}/{analysis}_{suffix}_summary_report.OK"
+            cmd = f"{aggregate_identification_results} -i {dest_dir} -s {sample_file} -o {output_xlsx_file} --suffix _{suffix}"
+            pg.add(tgt, dep, cmd)
 
     else: # single sample
 
@@ -395,42 +409,82 @@ def main(
         pg.add(tgt, dep, cmd)
 
         if sample.is_dna_barcode:
-            # amplicon sorter
-            input_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
-            output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/identification_result/amplicon_sorter"
-            log = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter.log"
-            tgt = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter.OK"
-            dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz.OK"
-            cmd = f"{amplicon_sorter} -i {input_fastq_file} -min {sample.min_len} -max {sample.max_len} -maxr {as_maxr} -ra -o {output_dir} > {log}"
-            #cmd = f"{amplicon_sorter} -i {input_fastq_file} -min {sample.min_len} -max {sample.max_len} -maxr 100000 -ra -o {output_dir} > {log}"
-            pg.add(tgt, dep, cmd)
+            
+            for as_maxr in [100000, 500000, 1000000]:
+                
+                    suffix = ""
+                    if as_maxr == 100000:
+                        suffix = "100K"
+                    if as_maxr == 500000:
+                        suffix = "500K"
+                    if as_maxr == 1000000:
+                        suffix = "1M"                        
 
-            # amplicon sorter histogram
-            input_fastq_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
-            output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/identification_result/amplicon_sorter/histogram"
-            log = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter.hist.log"
-            tgt = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter.hist.OK"
-            dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz.OK"
-            cmd = f"{amplicon_sorter} -i {input_fastq_file} -min {sample.min_len} -ho -o {output_dir} > {log}"
-            pg.add(tgt, dep, cmd)
+                    # amplicon sorter
+                    input_fastq_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
+                    output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/identification_result_{suffix}/amplicon_sorter"
+                    log = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter_{suffix}.log"
+                    tgt = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter_{suffix}.OK"
+                    dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz.OK"
+                    cmd = f"rm -fr {output_dir}; {amplicon_sorter} -i {input_fastq_file} -min {sample.min_len} -max {sample.max_len} -maxr {as_maxr} -o {output_dir} > {log}"
+                    pg.add(tgt, dep, cmd)
 
-            #blast
-            input_fasta_file = f"{analysis_dir}/{sample.idx}_{sample.id}/identification_result/amplicon_sorter/consensusfile.fasta"
-            output_txt_file = f"{analysis_dir}/{sample.idx}_{sample.id}/identification_result/blast/{sample.padded_idx}_{sample.id}.txt"
-            log = f"{log_dir}/{sample.idx}_{sample.id}.blast.log"
-            tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}.blast.OK"
-            dep = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter.OK"
-            cmd = f"export BLASTDB={blastdb_tx}/; {blastn} -db {blastdb_nt} -query {input_fasta_file} -outfmt \"6 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms\" -max_target_seqs 20 -evalue 1e-5 -task megablast -out {output_txt_file} > {log}"
-            pg.add(tgt, dep, cmd)
+                    # amplicon sorter histogram
+                    input_fastq_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
+                    log = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter_{suffix}.hist.log"
+                    tgt = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter_{suffix}.hist.OK"
+                    dep = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter_{suffix}.OK"
+                    cmd = f"{amplicon_sorter} -i {input_fastq_file} -min {sample.min_len} -ho -o {output_dir} > {log}"
+                    pg.add(tgt, dep, cmd)
+
+                    #blast
+                    #src_fasta_file = f"{analysis_dir}/{sample.idx}_{sample.id}/identification_result_{suffix}/amplicon_sorter/{sample.idx}_{sample.id}_consensussequences.fasta"
+                    src_fasta_file = f"{analysis_dir}/{sample.idx}_{sample.id}/identification_result_{suffix}/amplicon_sorter/consensusfile.fasta"
+                    output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/identification_result_{suffix}/blast"
+                    output_txt_file = f"{output_dir}/{sample.padded_idx}_{sample.id}.txt"
+                    log = f"{log_dir}/{sample.idx}_{sample.id}.blast_{suffix}.log"
+                    tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}.blast_{suffix}.OK"
+                    dep = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter_{suffix}.OK"
+                    cmd = f"mkdir -p {output_dir};export BLASTDB={blastdb_tx}/; {blastn} -db {blastdb_nt} -query {src_fasta_file} -outfmt \"6 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms\" -max_target_seqs 20 -evalue 1e-5 -task megablast -out {output_txt_file} > {log}"
+                    pg.add(tgt, dep, cmd)
+            
+            # # amplicon sorter
+            # input_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
+            # output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/identification_result/amplicon_sorter"
+            # log = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter.log"
+            # tgt = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter.OK"
+            # dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz.OK"
+            # cmd = f"{amplicon_sorter} -i {input_fastq_file} -min {sample.min_len} -max {sample.max_len} -maxr {as_maxr} -ra -o {output_dir} > {log}"
+            # #cmd = f"{amplicon_sorter} -i {input_fastq_file} -min {sample.min_len} -max {sample.max_len} -maxr 100000 -ra -o {output_dir} > {log}"
+            # pg.add(tgt, dep, cmd)
+
+            # # amplicon sorter histogram
+            # input_fastq_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
+            # output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/identification_result/amplicon_sorter/histogram"
+            # log = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter.hist.log"
+            # tgt = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter.hist.OK"
+            # dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz.OK"
+            # cmd = f"{amplicon_sorter} -i {input_fastq_file} -min {sample.min_len} -ho -o {output_dir} > {log}"
+            # pg.add(tgt, dep, cmd)
+
+            # #blast
+            # input_fasta_file = f"{analysis_dir}/{sample.idx}_{sample.id}/identification_result/amplicon_sorter/consensusfile.fasta"
+            # output_txt_file = f"{analysis_dir}/{sample.idx}_{sample.id}/identification_result/blast/{sample.padded_idx}_{sample.id}.txt"
+            # log = f"{log_dir}/{sample.idx}_{sample.id}.blast.log"
+            # tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}.blast.OK"
+            # dep = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter.OK"
+            # cmd = f"export BLASTDB={blastdb_tx}/; {blastn} -db {blastdb_nt} -query {input_fasta_file} -outfmt \"6 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms\" -max_target_seqs 20 -evalue 1e-5 -task megablast -out {output_txt_file} > {log}"
+            # pg.add(tgt, dep, cmd)
 
             # copy identification results in excel
             analysis = "identification"
-            output_xlsx_file = f"{analysis_dir}/all/{analysis}/summary.xlsx"
-            dep = f"{log_dir}/{sample.padded_idx}_{sample.id}.blast.OK"
-            tgt = f"{log_dir}/{analysis}.aggregate_report.OK"
-            cmd = f"{aggregate_identification_results} -i {dest_dir} -s {sample_file} -o {output_xlsx_file}"
-            pg.add(tgt, dep, cmd)
-
+            for suffix in ["100K", "500K", "1M"]:
+                output_xlsx_file = f"{analysis_dir}/all/{analysis}/{run_id}_summary_{suffix}.xlsx"
+                dep = f"{log_dir}/{sample.idx}_{sample.id}.nanoplot.run.renamed.OK {log_dir}/{sample.padded_idx}_{sample.id}.blast_{suffix}.OK"
+                tgt = f"{log_dir}/{analysis}_{suffix}_summary_report.OK"
+                cmd = f"{aggregate_identification_results} -i {dest_dir} -s {sample_file} -o {output_xlsx_file} --suffix _{suffix}"
+                pg.add(tgt, dep, cmd)
+            
     pg.add_clean(f"rm -fr aux bam demux fastq log {run_id}")
 
     # write make file

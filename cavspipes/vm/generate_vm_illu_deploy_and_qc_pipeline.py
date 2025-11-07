@@ -31,7 +31,7 @@ from datetime import datetime
     "-m",
     "--make_file",
     show_default=True,
-    default="illu_deploy_and_qc.mk",
+    default="",
     help="make file name",
 )
 @click.option("-r", "--run_id", required=True, help="Run ID")
@@ -51,6 +51,9 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     e.g. generate_vm_illu_deploy_and_qc_pipeline -r illu1 -i raw -si illu1.sa
     """
     dest_dir = working_dir + "/" + run_id
+    if make_file == "":
+        make_file = f"{working_dir}/{run_id}_deploy_and_qc.mk"
+
     illumina_dir = os.path.abspath(illumina_dir)
     fastq_dir = ""
     for dirpath, dirnames, filenames in os.walk(illumina_dir):

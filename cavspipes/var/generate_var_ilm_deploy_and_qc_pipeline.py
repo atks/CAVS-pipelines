@@ -85,6 +85,10 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         os.makedirs(log_dir, exist_ok=True)
         os.makedirs(analysis_dir, exist_ok=True)
         os.makedirs(trace_dir, exist_ok=True)
+        os.makedirs(f"{analysis_dir}/all/fastqc", exist_ok=True)
+        os.makedirs(f"{analysis_dir}/all/samtools", exist_ok=True)
+        os.makedirs(f"{analysis_dir}/all/kraken2", exist_ok=True)
+
         for sample in run.samples:
             sample_dir = f"{analysis_dir}/{sample.idx}_{sample.id}"
             os.makedirs(sample_dir, exist_ok=True)
@@ -105,26 +109,34 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
     # programs
     fastqc = f"/usr/local/FastQC-0.12.1/fastqc --adapters /usr/local/FastQC-0.12.1/Configuration/adapter_list.illumina.txt"
     kraken2 = "/usr/local/kraken2-2.1.2/kraken2"
-    kraken2_std_db = "/usr/local/ref/kraken2/20210908_standard"
-    kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
+    kraken2_std_db = "/db/kraken2/k2_standard_20220607"
+    kt_import_taxonomy = "/usr/local/Krona-2.8.1/bin/ktImportTaxonomy"
     multiqc = "docker run  -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` multiqc/multiqc multiqc "
     bwa = "/usr/local/bwa-0.7.17/bwa"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
     plot_bamstats = "/usr/local/samtools-1.17/bin/plot-bamstats"
 
     virus_genomes = {
-        "ASFV":"/usr/local/ref/var/FR682468.2.fasta",
-        "ISKNV":"/usr/local/ref/var/NC_003494.1.fasta",
-        "KHV":"/usr/local/ref/var/NC_009127.1.fasta",
-        "NDV":"/usr/local/ref/var/NC_039223.1.fasta",
-        "H9N2":"/usr/local/ref/var/H9N2.fasta",
-        "H5N1":"/usr/local/ref/var/H5N1.fasta",
-        "H3N2":"/usr/local/ref/var/H3N2.fasta",
-        "H2N2":"/usr/local/ref/var/H2N2.fasta",
-        "H7N9":"/usr/local/ref/var/H7N9.fasta",
-        "H1N1a":"/usr/local/ref/var/H1N1a.fasta",
-        "H1N1b":"/usr/local/ref/var/H1N1b.fasta"
+        "ASFV":"/db/ref/FR682468.2.fasta",
+        "ISKNV":"/db/ref/NC_003494.1.fasta",
+        #"KHV":"/db/ref/NC_009127.1.fasta",
+        "KHV":"/db/ref/DQ657948.1.fasta",
+        "NDV":"/db/ref/NC_039223.1.fasta",
+        "H1N1":"/db/ref/H1N1.fasta",
+        "H9N2":"/db/ref/H9N2.fasta",
+        "H5N1":"/db/ref/H5N1.fasta",
+        "H3N2":"/db/ref/H3N2.fasta",
+        "H2N2":"/db/ref/H2N2.fasta",
+        "H7N9":"/db/ref/H7N9.fasta",
+        "H1N1a":"/db/ref/H1N1a.fasta",
+        "H1N1b":"/db/ref/H1N1b.fasta",
+        "REOVIRUS":"/db/ref/reovirus.fasta",
+        "BIRNAVIRUS":"/db/ref/birnavirus.fasta",
+        "CDV":"/db/ref/AF014953.1.fasta",
+        "RSIV":"/db/ref/AB104413.1.fasta",
     }
+
+
 
     # initialize
     pg = PipelineGenerator(make_file)
@@ -223,13 +235,14 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
             reference_fasta_file =  virus_genomes[sample.virus]
 
             #copy reference
+            ref_dir = f"{sample_dir}/align_result/ref"
             dep = ""
             tgt = f"{log_dir}/{sample.idx}_{sample.id}.ref.fasta.OK"
-            cmd = f"cp {reference_fasta_file} {align_dir}"
+            cmd = f"cp {reference_fasta_file} {ref_dir}"
             pg.add(tgt, dep, cmd)
 
             # construct reference
-            reference_fasta_file = f"{align_dir}/{ref_fasta_file_base_name}"
+            reference_fasta_file = f"{ref_dir}/{ref_fasta_file_base_name}"
             log = f"{log_dir}/{sample.idx}_{sample.id}.ref.bwa_index.log"
             dep = f"{log_dir}/{sample.idx}_{sample.id}.ref.fasta.OK"
             tgt = f"{log_dir}/{sample.idx}_{sample.id}.ref.bwa_index.OK"

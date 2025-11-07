@@ -31,7 +31,6 @@ from datetime import datetime
     "-m",
     "--make_file",
     show_default=True,
-    default="ont_deploy_and_qc.mk",
     help="make file name",
 )
 @click.option("-r", "--run_id", required=True, help="Run ID")
@@ -74,7 +73,9 @@ def main(
     log_dir = f"{working_dir}/log"
     dest_dir = working_dir + "/" + run_id
     fastq_path = f"{working_dir}/demux"
-    basecall_model = f"/usr/local/dorado-0.8.3/models/{basecall_model}"
+    basecall_model = f"/usr/local/dorado-0.9.1/models/{basecall_model}"
+    if make_file is None:
+        make_file = f"{working_dir}/{run_id}_deploy_and_qc.mk"
 
     print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
     print("\t{0:<20} :   {1:<10}".format("run_dir", run_id))
@@ -110,23 +111,37 @@ def main(
     version = "1.0.0"
 
     # programs
-    dorado = "/usr/local/dorado-0.8.3/bin/dorado"
+    dorado = "/usr/local/dorado-0.9.1/bin/dorado"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
     fastqc = f"/usr/local/FastQC-0.12.1/fastqc --adapters /usr/local/FastQC-0.12.1/Configuration/adapter_list.nanopore.txt --memory {memory}"
     multiqc = "docker run  -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` multiqc/multiqc multiqc "
     nanoplot = f"docker run -u \"$$(id -u):$$(id -g)\" -t -v `pwd`:`pwd` -w `pwd` staphb/nanoplot:1.42.0 NanoPlot "
     kraken2 = "/usr/local/kraken2-2.1.2/kraken2"
-    kraken2_std_db = "/usr/local/ref/kraken2/20220816_standard"
-    kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
+    kraken2_std_db = "/db/kraken2/k2_standard_20220607"
+    kt_import_taxonomy = "/usr/local/Krona-2.8.1/bin/ktImportTaxonomy"
     ft = "/usr/local/cavstools-0.0.1/ft"
     minimap2 = "/usr/local/minimap2-2.24/minimap2"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
     plot_bamstats = "/usr/local/samtools-1.17/bin/plot-bamstats"
 
     virus_genomes = {
-        "ASFV":"/usr/local/ref/var/FR682468.2.fasta",
-        "ISKNV":"/usr/local/ref/var/NC_003494.1.fasta",
-        "KHV":"/usr/local/ref/var/NC_009127.1.fasta"
+        "ASFV":"/db/ref/FR682468.2.fasta",
+        "ISKNV":"/db/ref/NC_003494.1.fasta",
+        #"KHV":"/db/ref/NC_009127.1.fasta",
+        "KHV":"/db/ref/DQ657948.1.fasta",
+        "NDV":"/db/ref/NC_039223.1.fasta",
+        "H1N1":"/db/ref/H1N1.fasta",
+        "H9N2":"/db/ref/H9N2.fasta",
+        "H5N1":"/db/ref/H5N1.fasta",
+        "H3N2":"/db/ref/H3N2.fasta",
+        "H2N2":"/db/ref/H2N2.fasta",
+        "H7N9":"/db/ref/H7N9.fasta",
+        "H1N1a":"/db/ref/H1N1a.fasta",
+        "H1N1b":"/db/ref/H1N1b.fasta",
+        "REOVIRUS":"/db/ref/reovirus.fasta",
+        "BIRNAVIRUS":"/db/ref/birnavirus.fasta",
+        "CDV":"/db/ref/AF014953.1.fasta",
+        "RSIV":"/db/ref/AB104413.1.fasta",
                      }
 
     run = Run(run_id)
@@ -149,6 +164,10 @@ def main(
         os.makedirs(log_dir, exist_ok=True)
         os.makedirs(trace_dir, exist_ok=True)
         os.makedirs(analysis_dir, exist_ok=True)
+        os.makedirs(f"{analysis_dir}/all/fastqc", exist_ok=True)
+        os.makedirs(f"{analysis_dir}/all/nanoplot", exist_ok=True)
+        os.makedirs(f"{analysis_dir}/all/samtools", exist_ok=True)
+        os.makedirs(f"{analysis_dir}/all/kraken2", exist_ok=True)
         os.makedirs(aux_dir, exist_ok=True)
         os.makedirs(bam_dir, exist_ok=True)
         os.makedirs(fastq_dir, exist_ok=True)
@@ -358,7 +377,7 @@ def main(
         tgt = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.OK"
         kraken2_multiqc_dep += f" {tgt}"
         cmd = f"{kraken2} --db {kraken2_std_db} {input_fastq_file} --use-names --report {report_file} > {log} 2> {err}"
-        pg.add_srun(tgt, dep, cmd, 15)
+        pg.add_srun(tgt, dep, cmd, 20)
 
         # plot kronatools radial tree
         output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"

@@ -80,18 +80,18 @@ def main(make_file, output_dir, sample_file):
         print(f"{error.filename} cannot be created")
 
     #version
-    version = "1.2.0"
+    version = "1.3.0"
 
     # programs
-    seqsero2 = "/usr/local/SeqSero2-v1.3.1/bin/SeqSero2_package.py"
+    seqsero2 = "/usr/local/SeqSero2-v1.3.2/bin/SeqSero2_package.py"
     sistr = "/usr/local/sistr-1.1.3/bin/sistr"
     mlst = "/usr/local/mlst-2.23.0/bin/mlst"
 
     print("")
     print(f"  Checking for required programs")
     print(f"  ==============================")
-    commands = ['blastn', 'any2fasta', 'samtools', 'spades.py', 'SalmID.py', 'seqkit', 'bedtools', 'aggregate_salmonella_typing_results.py']
-    tools = ['mlst', 'mlst', 'seqsero2', 'seqsero2', 'seqsero2', 'seqsero2', 'seqsero2', 'vmst']
+    commands = ['blastn', 'any2fasta', 'samtools', 'spades.py', 'SalmID.py', 'seqkit', 'bedtools', 'mafft', 'aggregate_salmonella_typing_results.py']
+    tools = ['mlst', 'mlst', 'seqsero2', 'seqsero2', 'seqsero2', 'seqsero2', 'seqsero2', 'sistr', 'vmst']
 
     for i,cmd in enumerate(commands):
         command_path = which(cmd)

@@ -45,8 +45,13 @@ import re
     required=True,
     help="output xlsx file",
 )
-
-def main(input_dir, sample_file, output_xlsx):
+@click.option(
+    "--suffix",
+    show_default=True,
+    default="",
+    help="suffix for identification result directory",
+)
+def main(input_dir, sample_file, output_xlsx, suffix):
     """
     Aggregate results from identification of barcodes.
 
@@ -94,7 +99,7 @@ def main(input_dir, sample_file, output_xlsx):
 
     # aggregate files
     for sample in samples:
-        sample.collect_info(input_dir)
+        sample.collect_info(input_dir, suffix)
         #sample.print_contigs()
 
     # print to excel
@@ -102,6 +107,7 @@ def main(input_dir, sample_file, output_xlsx):
     for sample in samples:
         summary_ws.cell(sample_row, column=1).value = sample.id
         summary_ws.cell(sample_row, column=2).value = f"{sample.no_reads_in_length_range}/{sample.total_reads} ({sample.no_reads_in_length_range/sample.total_reads*100:.2f}%)"
+        #headers
         summary_ws.cell(sample_row+1, column=1).value = "consensus contig"
         summary_ws.cell(sample_row+1, column=2).value = "#supporting reads"
         summary_ws.cell(sample_row+1, column=3).value = "Best match Species"
@@ -114,31 +120,27 @@ def main(input_dir, sample_file, output_xlsx):
         summary_ws.cell(sample_row+1, column=10).value = "Percentage Identity"
         summary_ws.cell(sample_row+1, column=11).value = "Rest of the hits"
         i = 2
-        for contig in sample.contigs.values():
-            summary_ws.cell(sample_row+i, column=1).value = contig.name
-            summary_ws.cell(sample_row+i, column=2).value = contig.no_reads
-            alignment = heapq.heappop(contig.sorted_alignments)
-            summary_ws.cell(sample_row+i, column=3).value = alignment.sscinames
-            summary_ws.cell(sample_row+i, column=4).value = alignment.sacc
-            summary_ws.cell(sample_row+i, column=5).value = alignment.score
-            summary_ws.cell(sample_row+i, column=6).value = alignment.qlen
-            summary_ws.cell(sample_row+i, column=7).value = alignment.slen
-            summary_ws.cell(sample_row+i, column=8).value = alignment.length
-            summary_ws.cell(sample_row+i, column=9).value = f"{100.0*alignment.length/alignment.qlen:.2f}"
-            summary_ws.cell(sample_row+i, column=10).value = f"{alignment.pident:.2f}"
-            collated_hits = []
-            while len(contig.sorted_alignments) > 0:
+        if len(sample.contigs) != 0:
+            for contig in sample.contigs.values():
+                summary_ws.cell(sample_row+i, column=1).value = contig.name
+                summary_ws.cell(sample_row+i, column=2).value = contig.no_reads
                 alignment = heapq.heappop(contig.sorted_alignments)
-                collated_hits.append(f"{alignment.sscinames} ({alignment.score})")
-            summary_ws.cell(sample_row+i, column=11).value = f"{";".join(collated_hits)}"
-
-
-            #print(f"Best alignment for {contig.name} is {alignment.sacc} with score {alignment.score}")
-
-            #for alignment in self.contigs[contig_name].sorted_alignments:
-            #    alignment.print()
-
-
+                summary_ws.cell(sample_row+i, column=3).value = alignment.sscinames
+                summary_ws.cell(sample_row+i, column=4).value = alignment.sacc
+                summary_ws.cell(sample_row+i, column=5).value = alignment.score
+                summary_ws.cell(sample_row+i, column=6).value = alignment.qlen
+                summary_ws.cell(sample_row+i, column=7).value = alignment.slen
+                summary_ws.cell(sample_row+i, column=8).value = alignment.length
+                summary_ws.cell(sample_row+i, column=9).value = f"{100.0*alignment.length/alignment.qlen:.2f}"
+                summary_ws.cell(sample_row+i, column=10).value = f"{alignment.pident:.2f}"
+                collated_hits = []
+                while len(contig.sorted_alignments) > 0:
+                    alignment = heapq.heappop(contig.sorted_alignments)
+                    collated_hits.append(f"{alignment.sscinames} ({alignment.score})")
+                summary_ws.cell(sample_row+i, column=11).value = f"{";".join(collated_hits)}"
+                i += 1
+        else:
+            summary_ws.cell(sample_row+i, column=1).value = "No contigs assembled"
             i += 1
 
         tab = Table(displayName=f"{sample.id}", ref=f"A{sample_row+1}:K{sample_row+i-1}")
@@ -172,9 +174,9 @@ class Sample(object):
         self.no_reads_in_length_range = 0
         self.contigs = {}
 
-    def collect_info(self, input_dir):
+    def collect_info(self, input_dir, suffix):
         nanoplot_txt_file = f"{input_dir}/analysis/{self.idx}_{self.id}/nanoplot_result/{self.padded_idx}_{self.id}.txt"
-        identification_result_dir = f"{input_dir}/analysis/{self.idx}_{self.id}/identification_result"
+        identification_result_dir = f"{input_dir}/analysis/{self.idx}_{self.id}/identification_result{suffix}"
         ampliconsorter_csv_file = f"{identification_result_dir}/amplicon_sorter/results.csv"
         #consensus_fasta_file = f"{identification_result_dir}/amplicon_sorter/{self.idx}_{self.id}_consensussequences.fasta"
         consensus_fasta_file = f"{identification_result_dir}/amplicon_sorter/consensusfile.fasta"
@@ -203,43 +205,46 @@ class Sample(object):
 
         cmd = f"seqtk comp {consensus_fasta_file} | cut -f1,2"
         result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
-        lines = result.stdout.strip()
-        for line in lines.split("\n"):
-            print(line)
-            contig_name, length = line.removeprefix("consensus_").split("\t")
-            contig_name = re.sub(r"\(\d+\)$", "", contig_name)
-            if contig_name in self.contigs:
-                self.contigs[contig_name].length = int(length)
-            else:
-                print(f"Contig {contig_name} not found in amplicon sorter results")
-
-        with open(blast_txt_file, "r") as file:
-            #populate alignments for each contig
-            #if a contig is aligned more than once to the same sacc, only the best alignment is kept
-            for line in file:
-#                 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms
-                qacc, sacc, qlen, slen, score, length, pident, stitle, staxids, sscinames, scomnames, sskingdoms = line.rstrip("\n").split("\t")
-                contig_name = qacc.removeprefix("consensus_")
+        
+        if result.stdout != "":
+            lines = result.stdout.strip()
+            for line in lines.split("\n"):
+                #print(line)
+                contig_name, length = line.removeprefix("consensus_").split("\t")
                 contig_name = re.sub(r"\(\d+\)$", "", contig_name)
-                #print(f"contig_name: {contig_name}")
                 if contig_name in self.contigs:
-                    if sacc not in self.contigs[contig_name].alignments:
-                        self.contigs[contig_name].alignments[sacc] = Alignment(qacc, sacc, qlen, slen, score, length, pident, stitle, staxids, sscinames, scomnames, sskingdoms)
-                    else:
-                        if int(score) > self.contigs[contig_name].alignments[sacc].score:
-                            print(f"Updating alignment for {contig_name} with {sacc}")
-                            self.contigs[contig_name].alignments[sacc].print()
-                            self.contigs[contig_name].alignments[sacc] = Alignment(qacc, sacc, qlen, slen, score, length, pident, stitle, staxids, sscinames, scomnames, sskingdoms)
-                            self.contigs[contig_name].alignments[sacc].print()
+                    self.contigs[contig_name].length = int(length)
                 else:
-                    print(f"Contig {contig_name} not found")
+                    print(f"Contig {contig_name} not found in amplicon sorter results")
 
-        #sort alignments for each contig
-        for contig_name in self.contigs:
-            #sort alignments by score
-            self.contigs[contig_name].sorted_alignments = []
-            for alignment in self.contigs[contig_name].alignments.values():
-                heapq.heappush(self.contigs[contig_name].sorted_alignments, alignment)
+            with open(blast_txt_file, "r") as file:
+                #populate alignments for each contig
+                #if a contig is aligned more than once to the same sacc, only the best alignment is kept
+                for line in file:
+    #                 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms
+                    qacc, sacc, qlen, slen, score, length, pident, stitle, staxids, sscinames, scomnames, sskingdoms = line.rstrip("\n").split("\t")
+                    contig_name = qacc.removeprefix("consensus_")
+                    contig_name = re.sub(r"\(\d+\)$", "", contig_name)
+                    #print(f"contig_name: {contig_name}")
+                    if contig_name in self.contigs:
+                        if sacc not in self.contigs[contig_name].alignments:
+                            self.contigs[contig_name].alignments[sacc] = Alignment(qacc, sacc, qlen, slen, score, length, pident, stitle, staxids, sscinames, scomnames, sskingdoms)
+                        else:
+                            if int(score) > self.contigs[contig_name].alignments[sacc].score:
+                                print(f"Updating alignment for {contig_name} with {sacc}")
+                                self.contigs[contig_name].alignments[sacc].print()
+                                self.contigs[contig_name].alignments[sacc] = Alignment(qacc, sacc, qlen, slen, score, length, pident, stitle, staxids, sscinames, scomnames, sskingdoms)
+                                self.contigs[contig_name].alignments[sacc].print()
+                    else:
+                        print(f"Contig {contig_name} not found")
+
+            #sort alignments for each contig
+            for contig_name in self.contigs:
+                #sort alignments by score
+                self.contigs[contig_name].sorted_alignments = []
+                for alignment in self.contigs[contig_name].alignments.values():
+                    heapq.heappush(self.contigs[contig_name].sorted_alignments, alignment)
+        
 
     def print_contigs(self):
         for name, contig in self.contigs.items():

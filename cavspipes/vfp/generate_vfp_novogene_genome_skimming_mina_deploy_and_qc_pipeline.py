@@ -127,6 +127,7 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
             sample_dir = f"{analysis_dir}/{sample.idx}_{sample.id}"
             os.makedirs(sample_dir, exist_ok=True)
             os.makedirs(f"{sample_dir}/fastqc_result", exist_ok=True)
+            os.makedirs(f"{sample_dir}/kraken2_result", exist_ok=True)
             os.makedirs(f"{sample_dir}/align_result", exist_ok=True)
             os.makedirs(f"{sample_dir}/align_result/ref", exist_ok=True)
             os.makedirs(f"{sample_dir}/align_result/general_stats", exist_ok=True)
@@ -148,6 +149,9 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
     fastqc = "/usr/local/FastQC-0.11.9/fastqc"
     trimmomatic = "java -jar /usr/local/Trimmomatic-0.39/trimmomatic-0.39.jar PE"
     trimmomatic_trimmer = "ILLUMINACLIP:/usr/local/Trimmomatic-0.39/adapters/TruSeq3-PE-2.fa:2:30:10:2:True LEADING:3 TRAILING:3 MINLEN:36"
+    kraken2 = "/usr/local/kraken2-2.1.2/kraken2"
+    kraken2_std_db = "/db/kraken2/k2_standard_20220607"
+    kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
     spades = "/usr/local/SPAdes-4.0.0/bin/spades.py"
     multiqc = "docker run  -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` multiqc/multiqc multiqc "
     bwa = "/usr/local/bwa-0.7.17/bwa"
@@ -263,6 +267,19 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
         cmd = f"{fastqc} {input_fastq2} -o {fastqc_dir} > {log} 2> {err}"
         pg.add(tgt, dep, cmd)
         fastqc_multiqc_dep += f" {tgt}"
+
+        # kraken2
+        input_fastq_file1 = f"{sample.fastq1}"
+        input_fastq_file2 = f"{sample.fastq2}"
+        output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
+        report_file = f"{output_dir}/{sample.padded_idx}_{sample.id}.txt"
+        log = f"{output_dir}/report.log"
+        err = f"{output_dir}/run.log"
+        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}_R1.fastq.gz.OK {log_dir}/{run.idx}_{sample.idx}_{sample.id}_R2.fastq.gz.OK"
+        tgt = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.OK"
+        kraken2_multiqc_dep += f" {tgt}"
+        cmd = f"{kraken2} --db {kraken2_std_db} --threads 15 --paired {input_fastq_file1} {input_fastq_file2} --use-names --report {report_file} > {log} 2> {err}"
+        pg.add_srun(tgt, dep, cmd, 15)
 
         # assemble
         # /usr/local/SPAdes-3.15.2/bin/spades.py -1 Siniae-1086-20_S3_L001_R1_001.fastq.gz -2 Siniae-1086-20_S3_L001_R2_001.fastq.gz -o 1086 --isolate
