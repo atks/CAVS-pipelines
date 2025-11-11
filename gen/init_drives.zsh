@@ -1,0 +1,13 @@
+#!/usr/bin/env zsh
+open smb://atks@singapura/var
+open smb://atks@singapura/var-docs
+open smb://atks@singapura/var-uploads
+open smb://atks@singapura/vm
+open smb://atks@singapura/vm-docs
+open smb://atks@singapura/vm-uploads
+open smb://atks@singapura/vfp
+open smb://atks@singapura/vfp-docs
+open smb://atks@singapura/vfp-uploads
+open smb://atks@singapura/singapura-atks
+open smb://atks@singapura/singapura-cavs
+open smb://atks@shangri-la/shangri-la-atks
