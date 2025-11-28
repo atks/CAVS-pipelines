@@ -238,7 +238,7 @@ def main(
                     dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz.OK"
                     #cmd = f"{amplicon_sorter} -i {input_fastq_file} -min {sample.min_len} -max {sample.max_len} -maxr {as_maxr} -ra -o {output_dir} > {log}"
                     cmd = f"rm -fr {output_dir}; {amplicon_sorter} -i {input_fastq_file} -min {sample.min_len} -max {sample.max_len} -maxr {as_maxr} -o {output_dir} > {log}"
-                    pg.add(tgt, dep, cmd)
+                    pg.add_srun(tgt, dep, cmd, 15)
 
                     # amplicon sorter histogram
                     input_fastq_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
@@ -259,7 +259,7 @@ def main(
                     identification_aggregate_dep += f" {tgt}"
                     #cmd = f"rm -fr {output_dir};export BLASTDB={blastdb_tx}/; {blastn} -db {blastdb_nt} -query {src_fasta_file} -outfmt \"6 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms\" -max_target_seqs 20 -evalue 1e-5 -task megablast -out {output_txt_file} > {log}"
                     cmd = f"mkdir -p {output_dir};export BLASTDB={blastdb_tx}/; {blastn} -db {blastdb_nt} -query {src_fasta_file} -outfmt \"6 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms\" -max_target_seqs 20 -evalue 1e-5 -task megablast -out {output_txt_file} > {log}"
-                    pg.add(tgt, dep, cmd)
+                    pg.add_srun_blastdb(tgt, dep, cmd, 15)
 
             # symbolic link for fastqc
             fastqc_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/fastqc_result"
@@ -333,8 +333,7 @@ def main(
         analysis = "identification"
         for suffix in ["100K", "500K", "1M"]:
             output_xlsx_file = f"{analysis_dir}/all/{analysis}/{run_id}_summary_{suffix}.xlsx"
-            #dep = identification_aggregate_dep
-            dep = f"{log_dir}/{sample.padded_idx}_{sample.id}.blast_{suffix}.OK"
+            dep = identification_aggregate_dep
             tgt = f"{log_dir}/{analysis}_{suffix}_summary_report.OK"
             cmd = f"{aggregate_identification_results} -i {dest_dir} -s {sample_file} -o {output_xlsx_file} --suffix _{suffix}"
             pg.add(tgt, dep, cmd)
@@ -427,7 +426,7 @@ def main(
                     tgt = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter_{suffix}.OK"
                     dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz.OK"
                     cmd = f"rm -fr {output_dir}; {amplicon_sorter} -i {input_fastq_file} -min {sample.min_len} -max {sample.max_len} -maxr {as_maxr} -o {output_dir} > {log}"
-                    pg.add(tgt, dep, cmd)
+                    pg.add_srun(tgt, dep, cmd, 15)
 
                     # amplicon sorter histogram
                     input_fastq_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
@@ -446,7 +445,7 @@ def main(
                     tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}.blast_{suffix}.OK"
                     dep = f"{log_dir}/{sample.idx}_{sample.id}.amplicon_sorter_{suffix}.OK"
                     cmd = f"mkdir -p {output_dir};export BLASTDB={blastdb_tx}/; {blastn} -db {blastdb_nt} -query {src_fasta_file} -outfmt \"6 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms\" -max_target_seqs 20 -evalue 1e-5 -task megablast -out {output_txt_file} > {log}"
-                    pg.add(tgt, dep, cmd)
+                    pg.add_srun_blastdb(tgt, dep, cmd, 15)
             
             # # amplicon sorter
             # input_file = f"{dest_dir}/{run.idx}_{sample.idx}_{sample.id}.fastq.gz"
@@ -508,6 +507,11 @@ class PipelineGenerator(object):
         self.tgts.append(tgt)
         self.deps.append(dep)
         self.cmds.append(f"srun --mincpus {cpu} {cmd}")
+
+    def add_srun_blastdb(self, tgt, dep, cmd, cpu):
+        self.tgts.append(tgt)
+        self.deps.append(dep)
+        self.cmds.append(f"srun --mincpus {cpu} --export=ALL,BLASTDB=/db/blast/prokaryote {cmd}")
 
     def add(self, tgt, dep, cmd):
         self.tgts.append(tgt)

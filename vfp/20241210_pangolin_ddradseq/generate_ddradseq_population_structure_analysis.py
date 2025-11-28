@@ -124,6 +124,7 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
     structure_pca_to_sa = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/structure_pca_to_sa.py"
     pca_gis_to_sa = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/pca_gis_to_sa.py"
     plot_gis_structure = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/plot_gis_structure.py"
+    plot_gis_structure_with_labels = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/plot_gis_structure_with_labels.py"
     plot_pca_structure = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/plot_pca_structure.py"
     simulate_panmictic_pop = "/home/atks/programs/CAVS-pipelines/vfp/20241210_pangolin_ddradseq/simulate_panmictic_pop.py"
 
@@ -493,6 +494,14 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
             cmd = f"{plot_gis_structure} {input_sa_file} -o {output_dir}/gisplots -z {output_pdf_file}"
             pg.add(tgt, dep, cmd)
 
+            #plot geospatial plot with structure pie charts (with labels)
+            input_sa_file = f"{output_dir}/gisplots/K{k}.sa"
+            output_pdf_file = f"{output_dir}/gisplots_with_labels/K{k}.pdf"
+            tgt = f"{output_pdf_file}.OK"
+            dep = f"{output_dir}/gisplots/K{k}.sa.OK"
+            cmd = f"{plot_gis_structure_with_labels} {input_sa_file} -o {output_dir}/gisplots_with_labels -z {output_pdf_file}"
+            pg.add(tgt, dep, cmd)
+
         ####
         #PCA
         ####
@@ -534,8 +543,6 @@ def main(make_file, working_dir, sample_file, population_map_file, genome_fasta_
             dep = f"{output_dir}/gisplots/K{k}.sa"
             cmd = f"{plot_pca_structure} {input_sa_file} -o {output_dir}/gisplots -z {output_pdf_file}"
             pg.add(tgt, dep, cmd)
-
-            #plot genome plots
 
     # clean
     pg.add_clean(f"rm -fr {ref_dir} {denovo_stacks_dir} {fastq_dir}")

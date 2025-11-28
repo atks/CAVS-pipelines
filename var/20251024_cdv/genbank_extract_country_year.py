@@ -46,15 +46,10 @@ def main(input_genbank_files, write):
     for genbank_file in input_genbank_files:
         
         n += 1
-        acc = ""
-        header = ""
-        with open(genbank_file) as file:
-            for line in file:
-                if line.startswith(">"):
-                    header = line.strip()
-                    acc = header.lstrip(">").split(" ")[0]
-                    break
         
+        definition = ""
+        acc = ""
+        host = "unknown"
         seq_len = 0
         country = "no country"
         date = "no date"
@@ -66,11 +61,22 @@ def main(input_genbank_files, write):
                         break
                     else:
                         line = line.strip()
-                        #/geo_loc_name="Italy"
+                        m = re.match(r'DEFINITION\s+(.+)$', line)
+                        if m:
+                            definition = m.group(1)
+                            continue
+                        m = re.match(r'LOCUS\s+(\D\D_?\d\d\d\d\d\d)', line)
+                        if m:
+                            acc = m.group(1)
+                            continue
                         m = re.match(r'source\s+1\.\.(\d+)', line)
                         if m:
                             seq_len = int(m.group(1))
                             continue
+                        m = re.match(r'/host="(.+)"', line)
+                        if m:
+                            host = m.group(1)
+                            continue                        
                         m = re.match(r'/geo_loc_name="(.+)"', line)
                         if m:
                             n_country_annotated += 1
@@ -84,7 +90,7 @@ def main(input_genbank_files, write):
                             continue
 
         if seq_len>15000:
-            print(f"{genbank_file}\t{seq_len}\t{country}\t{year}\t{header}")
+            print(f"{genbank_file}\t{acc}\t{seq_len}\t{country}\t{year}\t{host}\t{definition}")
 
     print(f"no genbank files       : {n}")
     print(f"no country annotated : {n_country_annotated}")

@@ -202,7 +202,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         tgt = f"{log_dir}/{sample.idx}_{sample.id}.kraken2.OK"
         kraken2_multiqc_dep += f" {tgt}"
         cmd = f"{kraken2} --db {kraken2_std_db} --threads 15 --paired {input_fastq_file1} {input_fastq_file2} --use-names --report {report_file} > {log} 2> {err}"
-        pg.add_srun(tgt, dep, cmd, 15)
+        pg.add_srun(tgt, dep, cmd, 20)
 
         # plot kronatools radial tree
         output_dir = f"{analysis_dir}/{sample.idx}_{sample.id}/kraken2_result"
@@ -241,9 +241,9 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
             log = f"{log_dir}/{sample.idx}_{sample.id}.blast.log"
             tgt = f"{log_dir}/{sample.idx}_{sample.id}.blast.OK"
             dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.contigs.fasta.OK"
-            cmd = f"export BLASTDB={blastdb_prok_nt}/; {blastn} -db nt_prok -query {src_fasta_file} -outfmt \"6 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms\" -max_target_seqs 10 -evalue 1e-5 -out {output_txt_file} > {log}"
+            cmd = f"{blastn} -db nt_prok -query {src_fasta_file} -outfmt \"6 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms\" -max_target_seqs 10 -evalue 1e-5 -out {output_txt_file} > {log}"
             blast_aggregate_dep += f" {tgt}"
-            pg.add(tgt, dep, cmd)
+            pg.add_srun_blastdb(tgt, dep, cmd, 15)
 
         #link contigs to alignment directory
         src_fasta = f"{contigs_dir}/{run.idx}_{sample.idx}_{sample.id}.contigs.fasta"
@@ -405,6 +405,11 @@ class PipelineGenerator(object):
         self.tgts.append(tgt)
         self.deps.append(dep)
         self.cmds.append(f"srun --mincpus {cpu} {cmd}")
+
+    def add_srun_blastdb(self, tgt, dep, cmd, cpu):
+        self.tgts.append(tgt)
+        self.deps.append(dep)
+        self.cmds.append(f"srun --mincpus {cpu} --export=ALL,BLASTDB=/db/blast/prokaryote {cmd}")
 
     def add(self, tgt, dep, cmd):
         self.tgts.append(tgt)

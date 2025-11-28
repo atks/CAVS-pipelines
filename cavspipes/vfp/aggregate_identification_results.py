@@ -28,6 +28,7 @@ from openpyxl import load_workbook
 import heapq
 import subprocess
 import re
+from pathlib import Path
 
 @click.command()
 @click.option(
@@ -124,21 +125,26 @@ def main(input_dir, sample_file, output_xlsx, suffix):
             for contig in sample.contigs.values():
                 summary_ws.cell(sample_row+i, column=1).value = contig.name
                 summary_ws.cell(sample_row+i, column=2).value = contig.no_reads
-                alignment = heapq.heappop(contig.sorted_alignments)
-                summary_ws.cell(sample_row+i, column=3).value = alignment.sscinames
-                summary_ws.cell(sample_row+i, column=4).value = alignment.sacc
-                summary_ws.cell(sample_row+i, column=5).value = alignment.score
-                summary_ws.cell(sample_row+i, column=6).value = alignment.qlen
-                summary_ws.cell(sample_row+i, column=7).value = alignment.slen
-                summary_ws.cell(sample_row+i, column=8).value = alignment.length
-                summary_ws.cell(sample_row+i, column=9).value = f"{100.0*alignment.length/alignment.qlen:.2f}"
-                summary_ws.cell(sample_row+i, column=10).value = f"{alignment.pident:.2f}"
-                collated_hits = []
-                while len(contig.sorted_alignments) > 0:
+                if len(contig.sorted_alignments) > 0:
                     alignment = heapq.heappop(contig.sorted_alignments)
-                    collated_hits.append(f"{alignment.sscinames} ({alignment.score})")
-                summary_ws.cell(sample_row+i, column=11).value = f"{";".join(collated_hits)}"
-                i += 1
+                    summary_ws.cell(sample_row+i, column=3).value = alignment.sscinames
+                    summary_ws.cell(sample_row+i, column=4).value = alignment.sacc
+                    summary_ws.cell(sample_row+i, column=5).value = alignment.score
+                    summary_ws.cell(sample_row+i, column=6).value = alignment.qlen
+                    summary_ws.cell(sample_row+i, column=7).value = alignment.slen
+                    summary_ws.cell(sample_row+i, column=8).value = alignment.length
+                    summary_ws.cell(sample_row+i, column=9).value = f"{100.0*alignment.length/alignment.qlen:.2f}"
+                    summary_ws.cell(sample_row+i, column=10).value = f"{alignment.pident:.2f}"
+                    collated_hits = []
+                    while len(contig.sorted_alignments) > 0:
+                        alignment = heapq.heappop(contig.sorted_alignments)
+                        collated_hits.append(f"{alignment.sscinames} ({alignment.score})")
+                    summary_ws.cell(sample_row+i, column=11).value = f"{";".join(collated_hits)}"
+                    i += 1
+                else:
+                    summary_ws.cell(sample_row+i, column=3).value = "No BLAST hits"
+                    summary_ws.cell(sample_row+i, column=6).value = contig.length                   
+                    i += 1    
         else:
             summary_ws.cell(sample_row+i, column=1).value = "No contigs assembled"
             i += 1
@@ -195,7 +201,10 @@ class Sample(object):
         try:
             with open(ampliconsorter_csv_file, "r") as file:
                 for line in file:
-                    contig_name, read_no = line.rstrip().split(",")
+                    line = line.rstrip()
+                    if line=="":
+                        continue
+                    contig_name, read_no = line.split(",")
                     if contig_name == "Total":
                         self.no_reads_in_length_range = int(read_no)
                     elif len(contig_name) > 0:
@@ -203,8 +212,13 @@ class Sample(object):
         except FileNotFoundError as e:
             print(f"File does not exist: {e.filename}")
 
+        path = Path(consensus_fasta_file)
+
+        if not path.exists():
+            return
+
         cmd = f"seqtk comp {consensus_fasta_file} | cut -f1,2"
-        result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+        result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)      
         
         if result.stdout != "":
             lines = result.stdout.strip()
