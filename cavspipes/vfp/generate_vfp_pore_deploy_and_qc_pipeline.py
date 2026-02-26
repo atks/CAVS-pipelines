@@ -511,7 +511,7 @@ class PipelineGenerator(object):
     def add_srun_blastdb(self, tgt, dep, cmd, cpu):
         self.tgts.append(tgt)
         self.deps.append(dep)
-        self.cmds.append(f"srun --mincpus {cpu} --export=ALL,BLASTDB=/db/blast/prokaryote {cmd}")
+        self.cmds.append(f"srun --mincpus {cpu} --export=ALL,BLASTDB=/db/blast/nt {cmd}")
 
     def add(self, tgt, dep, cmd):
         self.tgts.append(tgt)

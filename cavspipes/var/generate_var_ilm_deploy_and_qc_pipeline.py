@@ -132,6 +132,7 @@ def main(make_file, run_id, illumina_dir, working_dir, sample_file):
         "H1N1b":"/db/ref/H1N1b.fasta",
         "REOVIRUS":"/db/ref/reovirus.fasta",
         "BIRNAVIRUS":"/db/ref/birnavirus.fasta",
+        "CPV":"/db/ref/NC_001539.1.fasta",
         "CDV":"/db/ref/AF014953.1.fasta",
         "RSIV":"/db/ref/AB104413.1.fasta",
     }

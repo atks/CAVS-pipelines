@@ -48,7 +48,7 @@ from datetime import datetime
 @click.option(
     "-l", "--len", help="Minimum passing read length", required=False, default=20
 )
-@click.option("-x", "--memory", help="Memory for fastqc", required=False, default=2048)
+@click.option("-x", "--memory", help="Memory for fastqc", required=False, default=10000)
 @click.option("-k", "--kit", default="SQK-NBD114-24", show_default=True, help="Kit ID")
 #dna_r10.4.1_e8.2_400bps_sup@v5.0.0
 @click.option("-y", "--basecall_model", default="dna_r10.4.1_e8.2_400bps_hac@v5.0.0", show_default=True)

@@ -31,7 +31,7 @@ from datetime import datetime
     "-m",
     "--make_file",
     show_default=True,
-    default="novogene_genome_skimming_mina_deploy_and_qc.mk",
+    default = "",
     help="make file name",
 )
 @click.option("-r", "--run_id", required=True, help="Run ID")
@@ -44,12 +44,14 @@ from datetime import datetime
     help="working directory",
 )
 @click.option("-s", "--sample_file", required=True, help="sample file")
-#@click.option("-g", "--genome_fasta_file", required=True, help="genome fasta file")
-def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
+@click.option("--no_longest_contigs", default=50, help="sample file")
+@click.option("--min_mitoseq_len", default=14000, help="sample file")
+@click.option("--max_mitoseq_len", default=17000, help="sample file")
+def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file, no_longest_contigs, min_mitoseq_len, max_mitoseq_len):
     """
     Moves Novogene Illumina fastq files to a destination and performs QC
 
-    e.g. generate_vfp_novogene_ddradseq_mina_deploy_and_qc_pipeline -r mina1 -i raw -s mina1.sa -g /usr/local/ref/vfp/ManJav1.0_HiC.fasta
+    e.g. generate_vfp_novogene_genome_skimming_mina_deploy_and_qc_pipeline -r mina1 -i raw -s mina1.sa -g /usr/local/ref/vfp/ManJav1.0_HiC.fasta
     """
     dest_dir = working_dir + "/" + run_id
     novogene_illumina_dir = os.path.abspath(novogene_illumina_dir)
@@ -101,13 +103,19 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
                 run.add_sample(index, novogene_sample_id, sample_id, novogene_fastq1s, novogene_fastq2s, no_files)
 
 
+    if make_file == "":
+        make_file = f"{working_dir}/{run_id}_novogene_genome_skimming_deploy_and_qc.mk"
+
     print("\t{0:<21} :   {1:<10}".format("make_file", make_file))
     print("\t{0:<21} :   {1:<10}".format("run_dir", run_id))
     print("\t{0:<21} :   {1:<10}".format("novogene_illumina_dir", novogene_illumina_dir))
     print("\t{0:<21} :   {1:<10}".format("working_dir", working_dir))
     print("\t{0:<21} :   {1:<10}".format("sample_file", sample_file))
     print("\t{0:<21} :   {1:<10}".format("dest_dir", dest_dir))
-
+    print("\t{0:<21} :   {1:<10}".format("no longest contigs", no_longest_contigs))
+    print("\t{0:<21} :   {1:<10}".format("min mitoseq len", min_mitoseq_len))
+    print("\t{0:<21} :   {1:<10}".format("max mitoseq len", max_mitoseq_len))
+    
     # create directories in destination folder directory
     log_dir = f"{working_dir}/log"
     untrimmed_fastq_dir = f"{working_dir}/untrimmed_fastq"
@@ -128,16 +136,14 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
             os.makedirs(sample_dir, exist_ok=True)
             os.makedirs(f"{sample_dir}/fastqc_result", exist_ok=True)
             os.makedirs(f"{sample_dir}/kraken2_result", exist_ok=True)
-            os.makedirs(f"{sample_dir}/align_result", exist_ok=True)
             os.makedirs(f"{sample_dir}/align_result/ref", exist_ok=True)
             os.makedirs(f"{sample_dir}/align_result/general_stats", exist_ok=True)
             os.makedirs(f"{sample_dir}/align_result/coverage_stats", exist_ok=True)
             os.makedirs(f"{sample_dir}/align_result/flag_stats", exist_ok=True)
             os.makedirs(f"{sample_dir}/align_result/idx_stats", exist_ok=True)
-
+            os.makedirs(f"{sample_dir}/blast_result", exist_ok=True)
+            
         os.makedirs(f"{analysis_dir}/all/fastqc", exist_ok=True)
-        os.makedirs(f"{analysis_dir}/all/quast", exist_ok=True)
-        os.makedirs(f"{analysis_dir}/all/samtools", exist_ok=True)
             
     except OSError as error:
         print(f"{error.filename} cannot be created")
@@ -152,13 +158,17 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
     kraken2 = "/usr/local/kraken2-2.1.2/kraken2"
     kraken2_std_db = "/db/kraken2/k2_standard_20220607"
     kt_import_taxonomy = "/usr/local/KronaTools-2.8.1/bin/ktImportTaxonomy"
-    spades = "/usr/local/SPAdes-4.0.0/bin/spades.py"
-    multiqc = "docker run  -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` multiqc/multiqc multiqc "
     bwa = "/usr/local/bwa-0.7.17/bwa"
     samtools = "/usr/local/samtools-1.17/bin/samtools"
     plot_bamstats = "/usr/local/samtools-1.17/bin/plot-bamstats"
     quast = "docker run -t -v  `pwd`:`pwd` -w `pwd` fischuu/quast quast.py"
-
+    spades = "/usr/local/SPAdes-4.0.0/bin/spades.py"
+    multiqc = "docker run  -u \"root:root\" -t -v  `pwd`:`pwd` -w `pwd` multiqc/multiqc multiqc "
+    seqkit = "/usr/local/seqkit-2.10.1/seqkit"
+    blastn = "/usr/local/ncbi-blast-2.16.0+/bin/blastn "
+    blastdb_nt = "/db/blast/nt/nt"
+    blastdb_tx = "/db/blast/nt"
+        
     # initialize
     pg = PipelineGenerator(make_file)
 
@@ -339,7 +349,7 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
         cmd = f"{samtools} index {input_bam_file}"
         pg.add(tgt, dep, cmd)
 
-        #  coverage
+        # coverage
         input_bam_file = f"{align_dir}/{sample.idx}_{sample.id}.bam"
         output_stats_file = f"{align_dir}/coverage_stats/{sample.padded_idx}_{sample.id}.txt"
         dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
@@ -348,7 +358,7 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
         samtools_multiqc_dep += f" {tgt}"
         pg.add(tgt, dep, cmd)
 
-        #  stats
+        # stats
         output_stats_file = f"{align_dir}/general_stats/{sample.padded_idx}_{sample.id}.txt"
         dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
         tgt = f"{log_dir}/{sample.idx}_{sample.id}.stats.OK"
@@ -356,7 +366,7 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
         samtools_multiqc_dep += f" {tgt}"
         pg.add(tgt, dep, cmd)
 
-        #  flag stats
+        # flag stats
         output_stats_file = f"{align_dir}/flag_stats/{sample.padded_idx}_{sample.id}.txt"
         dep = f"{log_dir}/{sample.idx}_{sample.id}.bam.bai.OK"
         tgt = f"{log_dir}/{sample.idx}_{sample.id}.flag.stats.OK"
@@ -391,6 +401,40 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
         quast_multiqc_dep += f" {tgt}"
         pg.add(tgt, dep, cmd)
 
+        #extract top 50 contigs for blasting
+        input_fasta_file = f"{contigs_dir}/{run.idx}_{sample.idx}_{sample.id}.contigs.fasta"
+        output_fasta_file = f"{analysis_dir}/{sample.idx}_{sample.id}/blast_result/genome.fasta"
+        tgt = f"{log_dir}/genome.fasta.OK"
+        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.contigs.fasta.OK"
+        cmd = f"{seqkit} head -n {no_longest_contigs} {input_fasta_file} > {output_fasta_file}"
+        pg.add(tgt, dep, cmd)
+
+        #blast
+        input_fasta_file = f"{analysis_dir}/{sample.idx}_{sample.id}/blast_result/genome.fasta"
+        output_txt_file = f"{analysis_dir}/{sample.idx}_{sample.id}/blast_result/genome_blast.txt"
+        log = f"{log_dir}/{sample.idx}_{sample.id}.genome.blast.log"
+        tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}.genome.blast.OK"
+        dep = f"{log_dir}/genome.fasta.OK"
+        cmd = f"{blastn} -db {blastdb_nt} -query {input_fasta_file} -outfmt \"6 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms\" -max_target_seqs 20 -evalue 1e-5 -task megablast -out {output_txt_file} > {log}"
+        pg.add_srun_blastdb(tgt, dep, cmd, 10)
+
+        #extract contigs for candidate mitogenomes
+        input_fasta_file = f"{contigs_dir}/{run.idx}_{sample.idx}_{sample.id}.contigs.fasta"
+        output_fasta_file = f"{analysis_dir}/{sample.idx}_{sample.id}/blast_result/mitogenome.fasta"
+        tgt = f"{log_dir}/mitogenome.fasta.OK"
+        dep = f"{log_dir}/{run.idx}_{sample.idx}_{sample.id}.contigs.fasta.OK"
+        cmd = f"{seqkit} seq {input_fasta_file} -m {min_mitoseq_len} -M {max_mitoseq_len} > {output_fasta_file}"
+        pg.add(tgt, dep, cmd)
+
+        #blast
+        input_fasta_file = f"{analysis_dir}/{sample.idx}_{sample.id}/blast_result/mitogenome.fasta"
+        output_txt_file = f"{analysis_dir}/{sample.idx}_{sample.id}/blast_result/mitogenome_blast.txt"
+        log = f"{log_dir}/{sample.idx}_{sample.id}.mitogenome.blast.log"
+        tgt = f"{log_dir}/{sample.padded_idx}_{sample.id}.mitogenome.blast.OK"
+        dep = f"{log_dir}/mitogenome.fasta.OK"
+        cmd = f"{blastn} -db {blastdb_nt} -query {input_fasta_file} -outfmt \"6 qacc sacc qlen slen score length pident stitle staxids sscinames scomnames sskingdoms\" -max_target_seqs 20 -evalue 1e-5 -task megablast -out {output_txt_file} > {log}"
+        pg.add_srun_blastdb(tgt, dep, cmd, 10)
+        
     #plot fastqc multiqc results
     analysis = "fastqc"
     output_dir = f"{analysis_dir}/all/{analysis}"
@@ -442,6 +486,11 @@ class PipelineGenerator(object):
         self.tgts.append(tgt)
         self.deps.append(dep)
         self.cmds.append(f"srun --mincpus {cpu} {cmd}")
+
+    def add_srun_blastdb(self, tgt, dep, cmd, cpu):
+        self.tgts.append(tgt)
+        self.deps.append(dep)
+        self.cmds.append(f"srun --mincpus {cpu} --export=ALL,BLASTDB=/db/blast/nt {cmd}")
 
     def add(self, tgt, dep, cmd):
         self.tgts.append(tgt)

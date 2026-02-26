@@ -30,10 +30,11 @@ from datetime import datetime
     "-m",
     "--make_file",
     show_default=True,
-    default="novogene_ilm_deploy_and_qc.mk",
+    default="",
     help="make file name",
 )
 @click.option("-r", "--run_id", required=True, help="Run ID")
+@click.option("-a", "--adaptor", default="TruSeq", help="adaptor")
 @click.option("-i", "--novogene_illumina_dir", required=True, help="illumina directory")
 @click.option(
     "-w",
@@ -43,11 +44,11 @@ from datetime import datetime
     help="working directory",
 )
 @click.option("-s", "--sample_file", required=True, help="sample file")
-def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
+def main(make_file, run_id, adaptor, novogene_illumina_dir, working_dir, sample_file):
     """
     Moves Illumina fastq files to a destination and performs QC
 
-    e.g. generate_var_novogene_ilm_deploy_and_qc_pipeline -r ilm23 -i raw -i ilm23.sa
+    e.g. generate_var_novogene_ilm_deploy_and_qc_pipeline -r ilm23 -i raw -s ilm23.sa
     """
     dest_dir = working_dir + "/" + run_id
     illumina_dir = os.path.abspath(novogene_illumina_dir)
@@ -57,7 +58,11 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
             if dirname == "01.RawData":
                 fastq_dir = os.path.join(dirpath, dirname)
 
+    if make_file == "":
+        make_file = f"{working_dir}/{run_id}_novogene_deploy_and_qc.mk"
+
     print("\t{0:<20} :   {1:<10}".format("make_file", make_file))
+    print("\t{0:<20} :   {1:<10}".format("adaptor", adaptor))
     print("\t{0:<20} :   {1:<10}".format("run_dir", run_id))
     print("\t{0:<20} :   {1:<10}".format("illumina_dir", illumina_dir))
     print("\t{0:<20} :   {1:<10}".format("working_dir", working_dir))
@@ -137,7 +142,15 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
     # programs
     fastqc = f"/usr/local/FastQC-0.12.1/fastqc --adapters /usr/local/FastQC-0.12.1/Configuration/adapter_list.illumina.txt"
     trimmomatic = "java -jar /usr/local/Trimmomatic-0.39/trimmomatic-0.39.jar PE"
-    trimmomatic_trimmer = "ILLUMINACLIP:/usr/local/Trimmomatic-0.39/adapters/TruSeq3-PE-2.fa:2:30:10:2:True LEADING:3 TRAILING:3 MINLEN:36"
+    trimmomatic_trimmer = ""   
+    if adaptor == "TruSeq" or adaptor == "Nextera":
+        trimmomatic_trimmer = "ILLUMINACLIP:/usr/local/Trimmomatic-0.39/adapters/TruSeq3-PE-2.fa:2:30:10:2:True LEADING:3 TRAILING:3 MINLEN:36"
+    elif adaptor == "RiboZeroPlus":
+        trimmomatic_trimmer = "HEADCROP:1 ILLUMINACLIP:/usr/local/Trimmomatic-0.39/adapters/RiboZeroPlus.fa:2:30:10:8 SLIDINGWINDOW:4:15 LEADING:3 TRAILING:3 MINLEN:36"
+    else:
+        print(f"Adaptor {adaptor} not recognized")
+        exit(1)
+
     kraken2 = "/usr/local/kraken2-2.1.2/kraken2"
     kraken2_std_db = "/db/kraken2/k2_standard_20220607"
     kt_import_taxonomy = "/usr/local/Krona-2.8.1/bin/ktImportTaxonomy"
@@ -161,6 +174,9 @@ def main(make_file, run_id, novogene_illumina_dir, working_dir, sample_file):
         "H1N1b":"/db/ref/H1N1b.fasta",
         "REOVIRUS":"/db/ref/reovirus.fasta",
         "BIRNAVIRUS":"/db/ref/birnavirus.fasta",
+        "CDV":"/db/ref/AF014953.1.fasta",
+        "CPV":"/db/ref/NC_001539.1.fasta",
+        "RSIV":"/db/ref/AB104413.1.fasta",
     }
 
     # initialize
