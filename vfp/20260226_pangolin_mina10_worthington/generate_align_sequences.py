@@ -59,7 +59,7 @@ def main(make_file, working_dir, sample_file, genome_reference_fasta_file):
                 index += 1
                 sample_id, run = line.rstrip().split("\t")
                 fastq1 = f"/net/singapura/vfp/datasets/worthington2024/fastq/{run}_1.fastq.gz"
-                fastq2 = f"/net/singapura/vfp/datasets/worthington2024/fastq/{run}_2.fastq.gz"
+                fastq2 = f"/net/singapura/vfp/datasets/worthington2024/fastq/{run_id}_2.fastq.gz"
                 samples.append(Sample(sample_id, fastq1, fastq2))
 
 
